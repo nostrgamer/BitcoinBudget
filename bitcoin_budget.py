@@ -578,7 +578,7 @@ class BitcoinBudgetApp:
         """Initialize the main application"""
         self.root = tk.Tk()
         self.root.title("Bitcoin Budget Desktop")
-        self.root.geometry("1000x700")  # Increased from 800x600
+        self.root.geometry("1300x700")  # Increased from 1200x700
         
         self.current_month = get_current_month()
         
@@ -646,7 +646,7 @@ class BitcoinBudgetApp:
         list_frame = ttk.Frame(categories_frame)
         list_frame.grid(row=0, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        self.categories_listbox = tk.Listbox(list_frame, height=8, width=60)
+        self.categories_listbox = tk.Listbox(list_frame, height=8, width=100)
         self.categories_listbox.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.categories_listbox.yview)
@@ -979,7 +979,7 @@ class BitcoinBudgetApp:
         # Create a simple menu to choose report type
         menu_window = tk.Toplevel(self.root)
         menu_window.title("Choose Report Type")
-        menu_window.geometry("450x350")
+        menu_window.geometry("500x400")
         menu_window.transient(self.root)
         menu_window.grab_set()
         
@@ -1028,7 +1028,7 @@ class BitcoinBudgetApp:
         
         cancel_btn = ttk.Button(frame, text="Cancel", 
                   command=menu_window.destroy)
-        cancel_btn.grid(row=5, column=0, pady=(10, 0), ipadx=10, ipady=5)
+        cancel_btn.grid(row=5, column=0, pady=(10, 0), ipadx=10, ipady=8, sticky=(tk.W, tk.E))
     
     def run(self):
         """Start the application"""
@@ -1679,100 +1679,39 @@ class PurchasingPowerReportWindow:
     def get_period_description(self):
         """Get description of current budget period"""
         if self.current_period == "current_month":
-            return f"Based on current month ({self.month}) budget"
+            return f"Based on current month ({self.month}) spending"
         elif self.current_period == "last_3_months":
             start_date, end_date = get_date_range_for_period(self.month, "last_3_months")
-            return f"Based on average budget from {start_date} to {end_date}"
+            return f"Based on actual spending from {start_date} to {end_date}"
         elif self.current_period == "last_6_months":
             start_date, end_date = get_date_range_for_period(self.month, "last_6_months")
-            return f"Based on average budget from {start_date} to {end_date}"
+            return f"Based on actual spending from {start_date} to {end_date}"
         elif self.current_period == "last_12_months":
             start_date, end_date = get_date_range_for_period(self.month, "last_12_months")
-            return f"Based on average budget from {start_date} to {end_date}"
+            return f"Based on actual spending from {start_date} to {end_date}"
         else:
             return ""
     
     def get_base_budget(self):
-        """Calculate base budget based on selected period"""
-        if self.current_period == "current_month":
-            return get_total_allocated(self.month)
-        else:
-            # For multi-month periods, get average monthly allocation
-            start_date, end_date = get_date_range_for_period(self.month, self.current_period)
-            start_year, start_month = map(int, start_date[:7].split('-'))
-            end_year, end_month = map(int, end_date[:7].split('-'))
-            
-            total_allocated = 0
-            month_count = 0
-            
-            current_year, current_month = start_year, start_month
-            while (current_year < end_year) or (current_year == end_year and current_month <= end_month):
-                month_str = f"{current_year}-{current_month:02d}"
-                total_allocated += get_total_allocated(month_str)
-                month_count += 1
-                
-                current_month += 1
-                if current_month > 12:
-                    current_month = 1
-                    current_year += 1
-            
-            return total_allocated / month_count if month_count > 0 else 0
+        """Calculate base budget based on selected period using actual spending"""
+        breakdown, total = self.get_spending_breakdown_for_period()
+        return total
     
     def get_spending_breakdown_for_period(self):
         """Get spending breakdown by category for the selected period"""
         if self.current_period == "current_month":
-            # Get current month allocations
-            categories = get_categories()
-            breakdown = []
-            total = 0
+            # Get current month spending breakdown (actual expenses)
+            start_date = f"{self.month}-01"
+            year, month = map(int, self.month.split('-'))
+            last_day = calendar.monthrange(year, month)[1]
+            end_date = f"{self.month}-{last_day:02d}"
             
-            for cat in categories:
-                allocated = get_category_allocated(cat['id'], self.month)
-                if allocated > 0:
-                    breakdown.append({
-                        'category': cat['name'],
-                        'amount': allocated
-                    })
-                    total += allocated
-            
+            breakdown, total = get_spending_breakdown(start_date, end_date)
             return breakdown, total
         else:
-            # For multi-month periods, get average monthly allocations
+            # For multi-month periods, get actual spending breakdown
             start_date, end_date = get_date_range_for_period(self.month, self.current_period)
-            start_year, start_month = map(int, start_date[:7].split('-'))
-            end_year, end_month = map(int, end_date[:7].split('-'))
-            
-            categories = get_categories()
-            category_totals = {cat['id']: {'name': cat['name'], 'total': 0} for cat in categories}
-            month_count = 0
-            
-            current_year, current_month = start_year, start_month
-            while (current_year < end_year) or (current_year == end_year and current_month <= end_month):
-                month_str = f"{current_year}-{current_month:02d}"
-                
-                for cat in categories:
-                    allocated = get_category_allocated(cat['id'], month_str)
-                    category_totals[cat['id']]['total'] += allocated
-                
-                month_count += 1
-                current_month += 1
-                if current_month > 12:
-                    current_month = 1
-                    current_year += 1
-            
-            # Calculate averages and create breakdown
-            breakdown = []
-            total = 0
-            
-            for cat_data in category_totals.values():
-                avg_amount = cat_data['total'] / month_count if month_count > 0 else 0
-                if avg_amount > 0:
-                    breakdown.append({
-                        'category': cat_data['name'],
-                        'amount': avg_amount
-                    })
-                    total += avg_amount
-            
+            breakdown, total = get_spending_breakdown(start_date, end_date)
             return breakdown, total
     
     def update_pie_charts(self):
