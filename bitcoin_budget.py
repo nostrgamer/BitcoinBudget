@@ -1540,7 +1540,7 @@ class PurchasingPowerReportWindow:
         # Create new window
         self.window = tk.Toplevel(parent)
         self.window.title("Future Purchasing Power Analysis")
-        self.window.geometry("1000x600")
+        self.window.geometry("1400x900")
         self.window.transient(parent)
         self.window.grab_set()
         
@@ -1556,7 +1556,7 @@ class PurchasingPowerReportWindow:
         # Configure grid weights
         self.window.grid_rowconfigure(0, weight=1)
         self.window.grid_columnconfigure(0, weight=1)
-        main_frame.grid_rowconfigure(3, weight=1)
+        main_frame.grid_rowconfigure(4, weight=1)
         main_frame.grid_columnconfigure(0, weight=1)
         
         # Title
@@ -1593,17 +1593,46 @@ class PurchasingPowerReportWindow:
         ttk.Label(inflation_frame, text="%").grid(row=0, column=1, padx=(2, 10))
         ttk.Button(inflation_frame, text="Update", command=self.update_inflation).grid(row=0, column=2)
         
+        # Time horizon selection
+        ttk.Label(settings_frame, text="Future Time Horizon:").grid(row=2, column=0, sticky=tk.W, pady=(10, 0), padx=(0, 10))
+        horizon_frame = ttk.Frame(settings_frame)
+        horizon_frame.grid(row=2, column=1, sticky=tk.W, pady=(10, 0))
+        
+        self.horizon_var = tk.StringVar(value="5")
+        horizon_buttons = [
+            ("1 Year", "1"), ("2 Years", "2"), ("5 Years", "5"), ("10 Years", "10")
+        ]
+        for i, (text, value) in enumerate(horizon_buttons):
+            ttk.Radiobutton(horizon_frame, text=text, variable=self.horizon_var, 
+                           value=value, command=self.update_analysis).grid(row=0, column=i, padx=5)
+        
         # Period info
         self.period_info_label = ttk.Label(settings_frame, text="", font=("Arial", 9), foreground="blue")
-        self.period_info_label.grid(row=2, column=0, columnspan=2, pady=(10, 0), sticky=tk.W)
+        self.period_info_label.grid(row=3, column=0, columnspan=2, pady=(10, 0), sticky=tk.W)
+        
+        # Charts frame - side by side pie charts
+        charts_frame = ttk.LabelFrame(main_frame, text="Spending Comparison: Current vs Future", padding="10")
+        charts_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        
+        # Create matplotlib figure with two subplots
+        self.fig = Figure(figsize=(14, 6), dpi=100)
+        self.ax1 = self.fig.add_subplot(121)  # Current spending pie
+        self.ax2 = self.fig.add_subplot(122)  # Future spending pie
+        
+        # Create canvas
+        self.canvas = FigureCanvasTkAgg(self.fig, charts_frame)
+        self.canvas.get_tk_widget().grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        charts_frame.grid_rowconfigure(0, weight=1)
+        charts_frame.grid_columnconfigure(0, weight=1)
         
         # Results table frame
         results_frame = ttk.LabelFrame(main_frame, text="Future Purchasing Power Projections", padding="10")
-        results_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S))
+        results_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
         
         # Create treeview for results
         columns = ("Years", "Current Budget", "Future Equivalent", "Reduction", "Bitcoin Price", "Purchasing Power Gain")
-        self.results_tree = ttk.Treeview(results_frame, columns=columns, show="headings", height=8)
+        self.results_tree = ttk.Treeview(results_frame, columns=columns, show="headings", height=6)
         
         # Configure columns
         self.results_tree.heading("Years", text="Years Ahead")
@@ -1689,6 +1718,153 @@ class PurchasingPowerReportWindow:
             
             return total_allocated / month_count if month_count > 0 else 0
     
+    def get_spending_breakdown_for_period(self):
+        """Get spending breakdown by category for the selected period"""
+        if self.current_period == "current_month":
+            # Get current month allocations
+            categories = get_categories()
+            breakdown = []
+            total = 0
+            
+            for cat in categories:
+                allocated = get_category_allocated(cat['id'], self.month)
+                if allocated > 0:
+                    breakdown.append({
+                        'category': cat['name'],
+                        'amount': allocated
+                    })
+                    total += allocated
+            
+            return breakdown, total
+        else:
+            # For multi-month periods, get average monthly allocations
+            start_date, end_date = get_date_range_for_period(self.month, self.current_period)
+            start_year, start_month = map(int, start_date[:7].split('-'))
+            end_year, end_month = map(int, end_date[:7].split('-'))
+            
+            categories = get_categories()
+            category_totals = {cat['id']: {'name': cat['name'], 'total': 0} for cat in categories}
+            month_count = 0
+            
+            current_year, current_month = start_year, start_month
+            while (current_year < end_year) or (current_year == end_year and current_month <= end_month):
+                month_str = f"{current_year}-{current_month:02d}"
+                
+                for cat in categories:
+                    allocated = get_category_allocated(cat['id'], month_str)
+                    category_totals[cat['id']]['total'] += allocated
+                
+                month_count += 1
+                current_month += 1
+                if current_month > 12:
+                    current_month = 1
+                    current_year += 1
+            
+            # Calculate averages and create breakdown
+            breakdown = []
+            total = 0
+            
+            for cat_data in category_totals.values():
+                avg_amount = cat_data['total'] / month_count if month_count > 0 else 0
+                if avg_amount > 0:
+                    breakdown.append({
+                        'category': cat_data['name'],
+                        'amount': avg_amount
+                    })
+                    total += avg_amount
+            
+            return breakdown, total
+    
+    def update_pie_charts(self):
+        """Update the pie charts showing current vs future spending"""
+        # Clear previous charts
+        self.ax1.clear()
+        self.ax2.clear()
+        
+        # Get current spending breakdown
+        current_breakdown, current_total = self.get_spending_breakdown_for_period()
+        
+        if not current_breakdown or current_total <= 0:
+            # No spending data
+            self.ax1.text(0.5, 0.5, 'No spending data\nfor selected period', 
+                         horizontalalignment='center', verticalalignment='center', 
+                         transform=self.ax1.transAxes, fontsize=12)
+            self.ax1.set_title("Current Spending", fontsize=14, fontweight='bold')
+            
+            self.ax2.text(0.5, 0.5, 'No data to analyze', 
+                         horizontalalignment='center', verticalalignment='center', 
+                         transform=self.ax2.transAxes, fontsize=12)
+            self.ax2.set_title("Future Spending", fontsize=14, fontweight='bold')
+            
+            self.canvas.draw()
+            return
+        
+        # Get future purchasing power calculation
+        years_ahead = int(self.horizon_var.get())
+        future_total, reduction_percentage = calculate_future_purchasing_power(
+            current_total, years_ahead, self.inflation_rate
+        )
+        
+        # Current spending pie chart
+        current_categories = [item['category'] for item in current_breakdown]
+        current_amounts = [item['amount'] for item in current_breakdown]
+        current_colors = plt.cm.Set3(range(len(current_categories)))
+        
+        wedges1, texts1, autotexts1 = self.ax1.pie(current_amounts, labels=current_categories, 
+                                                   autopct='%1.1f%%', colors=current_colors, 
+                                                   startangle=90)
+        
+        self.ax1.set_title(f"Current Spending\n{format_sats(int(current_total))}", 
+                          fontsize=14, fontweight='bold')
+        
+        # Future spending pie chart with Bitcoin Vibes
+        future_categories = []
+        future_amounts = []
+        future_colors = []
+        
+        # Scale down current categories proportionally
+        scale_factor = future_total / current_total
+        for i, item in enumerate(current_breakdown):
+            future_categories.append(item['category'])
+            future_amounts.append(item['amount'] * scale_factor)
+            future_colors.append(current_colors[i])
+        
+        # Add Bitcoin Vibes category for the savings
+        bitcoin_vibes_amount = current_total - future_total
+        if bitcoin_vibes_amount > 0:
+            future_categories.append("🚀 Bitcoin Vibes")
+            future_amounts.append(bitcoin_vibes_amount)
+            future_colors.append('#FFD700')  # Gold color for Bitcoin Vibes
+        
+        wedges2, texts2, autotexts2 = self.ax2.pie(future_amounts, labels=future_categories, 
+                                                   autopct='%1.1f%%', colors=future_colors, 
+                                                   startangle=90)
+        
+        self.ax2.set_title(f"Future Spending ({years_ahead} year{'s' if years_ahead > 1 else ''})\n" +
+                          f"Same purchasing power: {format_sats(int(future_total))}", 
+                          fontsize=14, fontweight='bold')
+        
+        # Style the charts
+        for autotext in autotexts1:
+            autotext.set_color('white')
+            autotext.set_fontweight('bold')
+            autotext.set_fontsize(9)
+        
+        for autotext in autotexts2:
+            autotext.set_color('white')
+            autotext.set_fontweight('bold')
+            autotext.set_fontsize(9)
+        
+        for text in texts1:
+            text.set_fontsize(8)
+        
+        for text in texts2:
+            text.set_fontsize(8)
+        
+        # Adjust layout
+        self.fig.tight_layout()
+        self.canvas.draw()
+    
     def update_analysis(self):
         """Update the purchasing power analysis table"""
         # Clear existing results
@@ -1697,6 +1873,9 @@ class PurchasingPowerReportWindow:
         
         # Update period description
         self.period_info_label.config(text=self.get_period_description())
+        
+        # Update pie charts
+        self.update_pie_charts()
         
         # Get base budget
         base_budget = self.get_base_budget()

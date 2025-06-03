@@ -12,7 +12,7 @@ A simple, single-file envelope budgeting application for Bitcoin users.
 
 ## Why This Approach?
 
-- **One Python file** (~500 lines total)
+- **One Python file** (~2000 lines total)
 - **SQLite database** (one file, no setup)
 - **Tkinter GUI** (built into Python)
 - **Zero configuration** (just run it)
@@ -59,6 +59,9 @@ This creates a single `bitcoin_budget.exe` file (~15MB) that runs anywhere.
 ### Reports & Analytics
 - ✅ Spending breakdown by category (pie chart)
 - ✅ Net worth analysis (bar chart with trend line)
+- ✅ Future purchasing power predictions (Bitcoin power law analysis)
+- ✅ Economic analysis with inflation vs Bitcoin appreciation
+- ✅ Side-by-side pie chart comparisons (current vs future with "Bitcoin Vibes")
 - ✅ Multiple time periods (current month, 3/6/12 months, custom range)
 - ✅ Visual charts using matplotlib
 
@@ -115,7 +118,8 @@ def get_category_balance(category_id, month):
 3. **Allocate Budget**: Assign 100,000 sats to Groceries, 300,000 to Rent
 4. **Add Expenses**: Spend 25,000 sats from Groceries category
 5. **Check Balances**: See remaining amounts in each envelope
-6. **View Reports**: 📊 Reports → Spending Breakdown or Net Worth Analysis
+6. **View Reports**: 📊 Reports → Spending Breakdown, Net Worth Analysis, or Future Purchasing Power
+7. **Analyze Future**: See how Bitcoin's power law reduces your future spending needs
 
 ## File Structure
 

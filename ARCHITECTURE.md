@@ -13,7 +13,7 @@ This is a **simple, single-file budgeting application** for Bitcoin users. No ov
 - **Database**: SQLite (single file database)
 - **Charts**: matplotlib (for reports and analytics)
 - **Deployment**: PyInstaller (single executable)
-- **Total Code**: ~500-600 lines in one file
+- **Total Code**: ~2000 lines in one file
 
 ## Why This Stack?
 
@@ -118,6 +118,14 @@ def get_net_worth_data(start_date, end_date):
 def get_date_range_for_period(base_month, period_type):
     """Convert period (3 months, 6 months, etc.) to date range"""
     return start_date, end_date
+
+def calculate_btc_fair_value(days_since_genesis):
+    """Bitcoin power law: 1.0117e-17 * days^5.82"""
+    return power_law_price
+
+def calculate_future_purchasing_power(current_budget, years, inflation_rate):
+    """Analyze future spending needs vs Bitcoin appreciation"""
+    return future_budget_sats, reduction_percentage
 ```
 
 ## File Structure
@@ -183,11 +191,17 @@ bitcoin_budget/
 3. Net worth analysis bar chart
 4. Time period selection
 
-### Phase 5: Distribution (1 hour)
+### Phase 5: Economic Analysis (3-4 hours)
+1. Bitcoin power law implementation
+2. Future purchasing power calculations
+3. Inflation vs appreciation analysis
+4. Pie chart comparisons with "Bitcoin Vibes"
+
+### Phase 6: Distribution (1 hour)
 1. PyInstaller executable
 2. Basic testing
 
-**Total Development Time: 1-2 weekends**
+**Total Development Time: 2-3 weekends**
 
 ## Key Benefits
 
@@ -196,6 +210,7 @@ bitcoin_budget/
 - **Local data**: Everything stays on your machine
 - **Portable**: Copy `.exe` file anywhere
 - **Bitcoin-focused**: Satoshis as first-class citizen
+- **Economic insights**: Power law predictions show future purchasing power
 
 ### For Developers
 - **Understandable**: Read entire codebase in 10 minutes
@@ -222,14 +237,14 @@ pip install pyinstaller matplotlib
 pyinstaller --onefile --windowed bitcoin_budget.py
 ```
 
-This creates a single ~20MB executable that includes Python, Tkinter, SQLite, and matplotlib.
+This creates a single ~25MB executable that includes Python, Tkinter, SQLite, and matplotlib.
 
 ## Comparison: Before vs After
 
 | Aspect | C# Clean Architecture | Python Simple |
 |--------|----------------------|---------------|
 | **Files** | 50+ files, 20+ classes | 1 file |
-| **Lines of Code** | 3,000+ lines | 500-600 lines |
+| **Lines of Code** | 3,000+ lines | 2000 lines |
 | **Concepts to Learn** | Clean Architecture, CQRS, DDD | Functions, SQLite |
 | **Time to Understand** | Hours/Days | 10 minutes |
 | **Time to Build** | Weeks | Weekend |
@@ -253,4 +268,4 @@ But start simple. Most users need basic envelope budgeting, not enterprise featu
 - ✅ Single executable under 20MB
 - ✅ All YNAB core features working
 - ✅ Zero configuration setup
-- ✅ Readable codebase under 600 lines 
+- ✅ Readable codebase under 2000 lines 
