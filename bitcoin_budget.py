@@ -9,7 +9,7 @@ No over-engineering, just straightforward budgeting that works.
 import sqlite3
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import calendar
 import os
 
@@ -979,7 +979,7 @@ class BitcoinBudgetApp:
         # Create a simple menu to choose report type
         menu_window = tk.Toplevel(self.root)
         menu_window.title("Choose Report Type")
-        menu_window.geometry("400x300")
+        menu_window.geometry("450x350")
         menu_window.transient(self.root)
         menu_window.grab_set()
         
@@ -992,7 +992,7 @@ class BitcoinBudgetApp:
         # Configure frame to expand
         menu_window.grid_rowconfigure(0, weight=1)
         menu_window.grid_columnconfigure(0, weight=1)
-        frame.grid_rowconfigure(4, weight=1)
+        frame.grid_rowconfigure(5, weight=1)
         frame.grid_columnconfigure(0, weight=1)
         
         ttk.Label(frame, text="Select Report Type:", font=("Arial", 14, "bold")).grid(row=0, column=0, pady=(0, 20))
@@ -1005,6 +1005,10 @@ class BitcoinBudgetApp:
             menu_window.destroy()
             NetWorthReportWindow(self.root, self.current_month)
         
+        def open_purchasing_power_report():
+            menu_window.destroy()
+            PurchasingPowerReportWindow(self.root, self.current_month)
+        
         # Create larger, more readable buttons
         spending_btn = ttk.Button(frame, text="📊 Spending Breakdown", 
                   command=open_spending_report)
@@ -1014,13 +1018,17 @@ class BitcoinBudgetApp:
                   command=open_networth_report)
         networth_btn.grid(row=2, column=0, pady=10, sticky=(tk.W, tk.E), ipadx=10, ipady=8)
         
+        purchasing_btn = ttk.Button(frame, text="🔮 Future Purchasing Power", 
+                  command=open_purchasing_power_report)
+        purchasing_btn.grid(row=3, column=0, pady=10, sticky=(tk.W, tk.E), ipadx=10, ipady=8)
+        
         # Add separator
         separator = ttk.Separator(frame, orient='horizontal')
-        separator.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=15)
+        separator.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=15)
         
         cancel_btn = ttk.Button(frame, text="Cancel", 
                   command=menu_window.destroy)
-        cancel_btn.grid(row=4, column=0, pady=(10, 0), ipadx=10, ipady=5)
+        cancel_btn.grid(row=5, column=0, pady=(10, 0), ipadx=10, ipady=5)
     
     def run(self):
         """Start the application"""
@@ -1517,6 +1525,246 @@ class NetWorthReportWindow:
         
         # Draw the chart
         self.canvas.draw()
+
+
+class PurchasingPowerReportWindow:
+    def __init__(self, parent, month):
+        """Initialize the purchasing power report window"""
+        self.parent = parent
+        self.month = month
+        self.current_period = "last_6_months"  # Default to 6 months for budget calculation
+        self.custom_start_date = ""
+        self.custom_end_date = ""
+        self.inflation_rate = 0.08  # Default 8% inflation
+        
+        # Create new window
+        self.window = tk.Toplevel(parent)
+        self.window.title("Future Purchasing Power Analysis")
+        self.window.geometry("1000x600")
+        self.window.transient(parent)
+        self.window.grab_set()
+        
+        self.create_widgets()
+        self.update_analysis()
+    
+    def create_widgets(self):
+        """Create the report interface"""
+        # Main frame
+        main_frame = ttk.Frame(self.window, padding="10")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Configure grid weights
+        self.window.grid_rowconfigure(0, weight=1)
+        self.window.grid_columnconfigure(0, weight=1)
+        main_frame.grid_rowconfigure(3, weight=1)
+        main_frame.grid_columnconfigure(0, weight=1)
+        
+        # Title
+        title_label = ttk.Label(main_frame, text="Future Purchasing Power Analysis", 
+                               font=("Arial", 16, "bold"))
+        title_label.grid(row=0, column=0, columnspan=2, pady=(0, 15))
+        
+        # Settings frame
+        settings_frame = ttk.LabelFrame(main_frame, text="Analysis Settings", padding="10")
+        settings_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        
+        # Budget period selection
+        ttk.Label(settings_frame, text="Base Budget Period:").grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
+        period_frame = ttk.Frame(settings_frame)
+        period_frame.grid(row=0, column=1, sticky=tk.W)
+        
+        ttk.Button(period_frame, text="Current Month", 
+                  command=lambda: self.set_period("current_month")).grid(row=0, column=0, padx=2)
+        ttk.Button(period_frame, text="Last 3 Months", 
+                  command=lambda: self.set_period("last_3_months")).grid(row=0, column=1, padx=2)
+        ttk.Button(period_frame, text="Last 6 Months", 
+                  command=lambda: self.set_period("last_6_months")).grid(row=0, column=2, padx=2)
+        ttk.Button(period_frame, text="Last 12 Months", 
+                  command=lambda: self.set_period("last_12_months")).grid(row=0, column=3, padx=2)
+        
+        # Inflation rate setting
+        ttk.Label(settings_frame, text="Annual Inflation Rate:").grid(row=1, column=0, sticky=tk.W, pady=(10, 0), padx=(0, 10))
+        inflation_frame = ttk.Frame(settings_frame)
+        inflation_frame.grid(row=1, column=1, sticky=tk.W, pady=(10, 0))
+        
+        self.inflation_var = tk.StringVar(value="8.0")
+        inflation_entry = ttk.Entry(inflation_frame, textvariable=self.inflation_var, width=10)
+        inflation_entry.grid(row=0, column=0)
+        ttk.Label(inflation_frame, text="%").grid(row=0, column=1, padx=(2, 10))
+        ttk.Button(inflation_frame, text="Update", command=self.update_inflation).grid(row=0, column=2)
+        
+        # Period info
+        self.period_info_label = ttk.Label(settings_frame, text="", font=("Arial", 9), foreground="blue")
+        self.period_info_label.grid(row=2, column=0, columnspan=2, pady=(10, 0), sticky=tk.W)
+        
+        # Results table frame
+        results_frame = ttk.LabelFrame(main_frame, text="Future Purchasing Power Projections", padding="10")
+        results_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Create treeview for results
+        columns = ("Years", "Current Budget", "Future Equivalent", "Reduction", "Bitcoin Price", "Purchasing Power Gain")
+        self.results_tree = ttk.Treeview(results_frame, columns=columns, show="headings", height=8)
+        
+        # Configure columns
+        self.results_tree.heading("Years", text="Years Ahead")
+        self.results_tree.heading("Current Budget", text="Current Budget")
+        self.results_tree.heading("Future Equivalent", text="Future Equivalent")
+        self.results_tree.heading("Reduction", text="Reduction")
+        self.results_tree.heading("Bitcoin Price", text="Bitcoin Price")
+        self.results_tree.heading("Purchasing Power Gain", text="Purchasing Power Gain")
+        
+        self.results_tree.column("Years", width=100)
+        self.results_tree.column("Current Budget", width=150)
+        self.results_tree.column("Future Equivalent", width=150)
+        self.results_tree.column("Reduction", width=120)
+        self.results_tree.column("Bitcoin Price", width=130)
+        self.results_tree.column("Purchasing Power Gain", width=180)
+        
+        self.results_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Scrollbar for treeview
+        scrollbar = ttk.Scrollbar(results_frame, orient=tk.VERTICAL, command=self.results_tree.yview)
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        self.results_tree.configure(yscrollcommand=scrollbar.set)
+        
+        results_frame.grid_rowconfigure(0, weight=1)
+        results_frame.grid_columnconfigure(0, weight=1)
+        
+        # Close button
+        ttk.Button(main_frame, text="Close", command=self.window.destroy).grid(row=4, column=0, columnspan=2, pady=(10, 0))
+    
+    def set_period(self, period_type):
+        """Set the budget calculation period"""
+        self.current_period = period_type
+        self.update_analysis()
+    
+    def update_inflation(self):
+        """Update inflation rate from user input"""
+        try:
+            self.inflation_rate = float(self.inflation_var.get()) / 100.0
+            self.update_analysis()
+        except ValueError:
+            messagebox.showerror("Error", "Please enter a valid inflation rate", parent=self.window)
+            self.inflation_var.set("8.0")
+    
+    def get_period_description(self):
+        """Get description of current budget period"""
+        if self.current_period == "current_month":
+            return f"Based on current month ({self.month}) budget"
+        elif self.current_period == "last_3_months":
+            start_date, end_date = get_date_range_for_period(self.month, "last_3_months")
+            return f"Based on average budget from {start_date} to {end_date}"
+        elif self.current_period == "last_6_months":
+            start_date, end_date = get_date_range_for_period(self.month, "last_6_months")
+            return f"Based on average budget from {start_date} to {end_date}"
+        elif self.current_period == "last_12_months":
+            start_date, end_date = get_date_range_for_period(self.month, "last_12_months")
+            return f"Based on average budget from {start_date} to {end_date}"
+        else:
+            return ""
+    
+    def get_base_budget(self):
+        """Calculate base budget based on selected period"""
+        if self.current_period == "current_month":
+            return get_total_allocated(self.month)
+        else:
+            # For multi-month periods, get average monthly allocation
+            start_date, end_date = get_date_range_for_period(self.month, self.current_period)
+            start_year, start_month = map(int, start_date[:7].split('-'))
+            end_year, end_month = map(int, end_date[:7].split('-'))
+            
+            total_allocated = 0
+            month_count = 0
+            
+            current_year, current_month = start_year, start_month
+            while (current_year < end_year) or (current_year == end_year and current_month <= end_month):
+                month_str = f"{current_year}-{current_month:02d}"
+                total_allocated += get_total_allocated(month_str)
+                month_count += 1
+                
+                current_month += 1
+                if current_month > 12:
+                    current_month = 1
+                    current_year += 1
+            
+            return total_allocated / month_count if month_count > 0 else 0
+    
+    def update_analysis(self):
+        """Update the purchasing power analysis table"""
+        # Clear existing results
+        for item in self.results_tree.get_children():
+            self.results_tree.delete(item)
+        
+        # Update period description
+        self.period_info_label.config(text=self.get_period_description())
+        
+        # Get base budget
+        base_budget = self.get_base_budget()
+        
+        if base_budget <= 0:
+            self.results_tree.insert("", "end", values=(
+                "No Data", "No budget data", "N/A", "N/A", "N/A", "N/A"
+            ))
+            return
+        
+        # Calculate projections for 1, 2, 5, and 10 years
+        years_ahead = [1, 2, 5, 10]
+        today = datetime.now()
+        current_days = get_days_since_genesis(today)
+        current_btc_price = calculate_btc_fair_value(current_days)
+        
+        for years in years_ahead:
+            future_budget, reduction_percentage = calculate_future_purchasing_power(
+                base_budget, years, self.inflation_rate
+            )
+            
+            # Calculate future Bitcoin price
+            future_date = today + timedelta(days=years * 365.25)
+            future_days = get_days_since_genesis(future_date)
+            future_btc_price = calculate_btc_fair_value(future_days)
+            
+            # Calculate purchasing power gain
+            btc_gain = ((future_btc_price / current_btc_price) - 1) * 100
+            
+            self.results_tree.insert("", "end", values=(
+                f"{years} year{'s' if years > 1 else ''}",
+                format_sats(int(base_budget)),
+                format_sats(int(future_budget)),
+                f"-{reduction_percentage:.1f}%",
+                f"${future_btc_price:,.0f}",
+                f"+{btc_gain:.1f}%"
+            ))
+
+
+def calculate_btc_fair_value(days_since_genesis):
+    """Calculate Bitcoin fair value using power law: 1.0117e-17 * days^5.82"""
+    return 1.0117e-17 * (days_since_genesis ** 5.82)
+
+
+def get_days_since_genesis(target_date):
+    """Get days since Bitcoin genesis block (Jan 3, 2009)"""
+    genesis_date = datetime(2009, 1, 3)
+    return (target_date - genesis_date).days
+
+
+def calculate_future_purchasing_power(current_budget_sats, years_ahead, inflation_rate=0.08):
+    """Calculate future purchasing power based on Bitcoin power law and inflation"""
+    today = datetime.now()
+    future_date = today + timedelta(days=years_ahead * 365.25)
+    
+    current_days = get_days_since_genesis(today)
+    future_days = get_days_since_genesis(future_date)
+    
+    current_btc_price = calculate_btc_fair_value(current_days)
+    future_btc_price = calculate_btc_fair_value(future_days)
+    
+    btc_multiplier = future_btc_price / current_btc_price
+    inflation_multiplier = (1 + inflation_rate) ** years_ahead
+    
+    future_budget = current_budget_sats * inflation_multiplier / btc_multiplier
+    reduction_percentage = (1 - future_budget / current_budget_sats) * 100
+    
+    return future_budget, reduction_percentage
 
 
 # === MAIN EXECUTION ===
