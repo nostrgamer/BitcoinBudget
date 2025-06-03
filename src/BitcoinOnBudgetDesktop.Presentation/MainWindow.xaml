@@ -1,0 +1,469 @@
+﻿<Window x:Class="BitcoinOnBudgetDesktop.Presentation.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Bitcoin Budget Desktop" Height="750" Width="1150"
+        WindowStartupLocation="CenterScreen">
+    
+    <Window.Resources>
+        <!-- Styles for better UI -->
+        <Style x:Key="HeaderTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+        
+        <Style x:Key="SectionBorderStyle" TargetType="Border">
+            <Setter Property="BorderBrush" Value="LightGray"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="Padding" Value="15"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Background" Value="White"/>
+        </Style>
+        
+        <Style x:Key="MoneyTextStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Consolas, Monaco, monospace"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+        
+        <Style x:Key="AvailableFundsStyle" TargetType="TextBlock" BasedOn="{StaticResource MoneyTextStyle}">
+            <Setter Property="Foreground" Value="Green"/>
+            <Setter Property="FontSize" Value="18"/>
+        </Style>
+        
+        <Style x:Key="AllocatedFundsStyle" TargetType="TextBlock" BasedOn="{StaticResource MoneyTextStyle}">
+            <Setter Property="Foreground" Value="Blue"/>
+        </Style>
+        
+        <Style x:Key="IncomeFundsStyle" TargetType="TextBlock" BasedOn="{StaticResource MoneyTextStyle}">
+            <Setter Property="Foreground" Value="Orange"/>
+        </Style>
+    </Window.Resources>
+    
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="2*"/>
+            <ColumnDefinition Width="3*"/>
+        </Grid.ColumnDefinitions>
+        
+        <!-- Left Panel: Budget Overview and Controls -->
+        <ScrollViewer Grid.Column="0" Margin="0,0,10,0" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                
+                <!-- Title -->
+                <TextBlock Text="Bitcoin Budget Desktop" 
+                           FontSize="24" FontWeight="Bold" 
+                           HorizontalAlignment="Center" 
+                           Margin="0,0,0,20"/>
+                
+                <!-- Budget Period Info -->
+                <Border Style="{StaticResource SectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Current Budget Period" Style="{StaticResource HeaderTextStyle}"/>
+                        <TextBlock Text="{Binding CurrentPeriodDisplay}" 
+                                   FontSize="16" FontWeight="SemiBold" 
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,10"/>
+                        
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Total Income:" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" 
+                                       Text="{Binding TotalIncomeDisplay}" 
+                                       Style="{StaticResource IncomeFundsStyle}"
+                                       HorizontalAlignment="Right"/>
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Total Allocated:" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" 
+                                       Text="{Binding TotalAllocatedDisplay}" 
+                                       Style="{StaticResource AllocatedFundsStyle}"
+                                       HorizontalAlignment="Right"/>
+                            
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Available to Assign:" VerticalAlignment="Center" FontWeight="Bold"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" 
+                                       Text="{Binding AvailableToAssignDisplay}" 
+                                       Style="{StaticResource AvailableFundsStyle}"
+                                       HorizontalAlignment="Right"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                
+                <!-- Add Income -->
+                <Border Style="{StaticResource SectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="💰 Add Income" Style="{StaticResource HeaderTextStyle}"/>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="Amount:" VerticalAlignment="Center" Margin="0,0,10,0" Width="70"/>
+                                <TextBox Text="{Binding IncomeAmount, UpdateSourceTrigger=PropertyChanged}" 
+                                         Width="120" Padding="5" Margin="0,0,5,0"/>
+                                <TextBlock Text="sats" VerticalAlignment="Center" Foreground="Gray"/>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="Description:" VerticalAlignment="Center" Margin="0,0,10,0" Width="70"/>
+                                <TextBox Text="{Binding IncomeDescription, UpdateSourceTrigger=PropertyChanged}" 
+                                         Width="200" Padding="5"/>
+                            </StackPanel>
+                            
+                            <Button Grid.Row="2" Content="💰 Add Income" 
+                                    Command="{Binding AddIncomeCommand}"
+                                    Padding="10,8" 
+                                    HorizontalAlignment="Left"
+                                    MinWidth="120"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                
+                <!-- Add Expense -->
+                <Border Style="{StaticResource SectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="💸 Add Expense" Style="{StaticResource HeaderTextStyle}"/>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="Amount:" VerticalAlignment="Center" Margin="0,0,10,0" Width="70"/>
+                                <TextBox Text="{Binding ExpenseAmount, UpdateSourceTrigger=PropertyChanged}" 
+                                         Width="120" Padding="5" Margin="0,0,5,0"/>
+                                <TextBlock Text="sats" VerticalAlignment="Center" Foreground="Gray"/>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="Category:" VerticalAlignment="Center" Margin="0,0,10,0" Width="70"/>
+                                <ComboBox ItemsSource="{Binding Categories}"
+                                          SelectedItem="{Binding SelectedExpenseCategory, Mode=TwoWay}"
+                                          DisplayMemberPath="Name"
+                                          Width="200" Padding="5"/>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="Description:" VerticalAlignment="Center" Margin="0,0,10,0" Width="70"/>
+                                <TextBox Text="{Binding ExpenseDescription, UpdateSourceTrigger=PropertyChanged}" 
+                                         Width="200" Padding="5"/>
+                            </StackPanel>
+                            
+                            <Button Grid.Row="3" Content="💸 Add Expense" 
+                                    Command="{Binding AddExpenseCommand}"
+                                    Padding="10,8" 
+                                    HorizontalAlignment="Left"
+                                    MinWidth="120"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                
+                <!-- Category Creation -->
+                <Border Style="{StaticResource SectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Create New Category" Style="{StaticResource HeaderTextStyle}"/>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="Name:" VerticalAlignment="Center" Margin="0,0,10,0" Width="70"/>
+                                <TextBox Text="{Binding CategoryName, UpdateSourceTrigger=PropertyChanged}" 
+                                         Width="200" Padding="5"/>
+                            </StackPanel>
+                            
+                            <Button Grid.Row="1" Content="📁 Create Category" 
+                                    Command="{Binding CreateCategoryCommand}"
+                                    Padding="10,8" 
+                                    HorizontalAlignment="Left"
+                                    MinWidth="120"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                
+                <!-- Allocation Controls -->
+                <Border Style="{StaticResource SectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Allocate Funds" Style="{StaticResource HeaderTextStyle}"/>
+                        
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="Amount:" VerticalAlignment="Center" Margin="0,0,10,0" Width="70"/>
+                                <TextBox Text="{Binding AllocationAmount, UpdateSourceTrigger=PropertyChanged}" 
+                                         Width="120" Padding="5" Margin="0,0,5,0"/>
+                                <TextBlock Text="sats" VerticalAlignment="Center" Foreground="Gray"/>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="To:" VerticalAlignment="Center" Margin="0,0,10,0" Width="70"/>
+                                <ComboBox ItemsSource="{Binding Categories}"
+                                          SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
+                                          DisplayMemberPath="Name"
+                                          Width="200" Padding="5"/>
+                            </StackPanel>
+                            
+                            <Button Grid.Row="2" Content="🎯 Allocate Funds" 
+                                    Command="{Binding AllocateCommand}"
+                                    Padding="10,8" 
+                                    HorizontalAlignment="Left"
+                                    MinWidth="120"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                
+                <!-- Delete Category -->
+                <Border Style="{StaticResource SectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="🗑️ Delete Category" Style="{StaticResource HeaderTextStyle}"/>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="Category:" VerticalAlignment="Center" Margin="0,0,10,0" Width="70"/>
+                                <ComboBox ItemsSource="{Binding Categories}"
+                                          SelectedItem="{Binding SelectedCategoryForDeletion, Mode=TwoWay}"
+                                          DisplayMemberPath="Name"
+                                          Width="200" Padding="5"/>
+                            </StackPanel>
+                            
+                            <Button Grid.Row="1" Content="🗑️ Delete Category" 
+                                    Command="{Binding DeleteCategoryCommand}"
+                                    Padding="10,8" 
+                                    HorizontalAlignment="Left"
+                                    MinWidth="120"
+                                    Background="LightCoral"
+                                    Foreground="White"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                
+                <!-- Reset Budget (DANGER ZONE) -->
+                <Border Style="{StaticResource SectionBorderStyle}" BorderBrush="Red" BorderThickness="2">
+                    <StackPanel>
+                        <TextBlock Text="⚠️ DANGER ZONE - Reset Budget" Style="{StaticResource HeaderTextStyle}" Foreground="Red"/>
+                        <TextBlock Text="This will permanently delete ALL transactions, categories, allocations, and budget periods!" 
+                                   FontWeight="Bold" 
+                                   Foreground="Red" 
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,10"/>
+                        
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <CheckBox Grid.Row="0" 
+                                      IsChecked="{Binding ResetBudgetConfirmation, Mode=TwoWay}" 
+                                      Content="I understand this action cannot be undone"
+                                      FontWeight="Bold"
+                                      Foreground="Red"
+                                      Margin="0,0,0,15"/>
+                            
+                            <Button Grid.Row="1" Content="⚠️ RESET BUDGET ⚠️" 
+                                    Command="{Binding ResetBudgetCommand}"
+                                    Padding="10,8" 
+                                    HorizontalAlignment="Left"
+                                    MinWidth="150"
+                                    Background="DarkRed"
+                                    Foreground="White"
+                                    FontWeight="Bold"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                
+                <!-- Refresh Button -->
+                <Button Content="🔄 Refresh Data" 
+                        Command="{Binding RefreshCommand}"
+                        Padding="10,8" 
+                        HorizontalAlignment="Center"
+                        MinWidth="120"
+                        Margin="0,10,0,0"/>
+                
+            </StackPanel>
+        </ScrollViewer>
+        
+        <!-- Right Panel: Categories List and Details -->
+        <DockPanel Grid.Column="1" Margin="10,0,0,0">
+            
+            <!-- Categories Header -->
+            <TextBlock DockPanel.Dock="Top" 
+                       Text="Budget Categories" 
+                       Style="{StaticResource HeaderTextStyle}"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,15"/>
+            
+            <!-- Categories List -->
+            <Border DockPanel.Dock="Top" Style="{StaticResource SectionBorderStyle}">
+                <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                    <DataGrid ItemsSource="{Binding Categories}"
+                              SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
+                              AutoGenerateColumns="False"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal"
+                              RowHeaderWidth="0"
+                              IsReadOnly="True"
+                              SelectionMode="Single"
+                              CanUserReorderColumns="False"
+                              CanUserResizeColumns="True"
+                              CanUserSortColumns="True">
+                        
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Category" 
+                                                Binding="{Binding Name}" 
+                                                Width="*" 
+                                                MinWidth="120"/>
+                            
+                            <DataGridTextColumn Header="Allocated" 
+                                                Binding="{Binding AllocatedAmount}" 
+                                                Width="100" 
+                                                ElementStyle="{StaticResource MoneyTextStyle}"/>
+                            
+                            <DataGridTextColumn Header="Spent" 
+                                                Binding="{Binding SpentAmount}" 
+                                                Width="100" 
+                                                ElementStyle="{StaticResource MoneyTextStyle}"/>
+                            
+                            <DataGridTextColumn Header="Remaining" 
+                                                Binding="{Binding RemainingAmount}" 
+                                                Width="100" 
+                                                ElementStyle="{StaticResource MoneyTextStyle}"/>
+                        </DataGrid.Columns>
+                        
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Setter Property="Height" Value="35"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="LightBlue"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
+                        
+                    </DataGrid>
+                </ScrollViewer>
+            </Border>
+            
+            <!-- Transaction History -->
+            <Border DockPanel.Dock="Top" Style="{StaticResource SectionBorderStyle}" Margin="0,10,0,0">
+                <StackPanel>
+                    <TextBlock Text="📋 Recent Transactions" Style="{StaticResource HeaderTextStyle}"/>
+                    <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
+                        <DataGrid ItemsSource="{Binding Transactions}"
+                                  SelectedItem="{Binding SelectedTransaction, Mode=TwoWay}"
+                                  AutoGenerateColumns="False"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  RowHeaderWidth="0"
+                                  IsReadOnly="True"
+                                  SelectionMode="Single"
+                                  CanUserReorderColumns="False"
+                                  CanUserResizeColumns="True"
+                                  CanUserSortColumns="True">
+                            
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Date" 
+                                                    Binding="{Binding DateDisplay}" 
+                                                    Width="80"/>
+                                
+                                <DataGridTextColumn Header="Type" 
+                                                    Binding="{Binding TransactionTypeDisplay}" 
+                                                    Width="60"/>
+                                
+                                <DataGridTextColumn Header="Category" 
+                                                    Binding="{Binding CategoryName}" 
+                                                    Width="*" 
+                                                    MinWidth="80"/>
+                                
+                                <DataGridTextColumn Header="Amount" 
+                                                    Binding="{Binding AmountDisplay}" 
+                                                    Width="80" 
+                                                    ElementStyle="{StaticResource MoneyTextStyle}"/>
+                                
+                                <DataGridTextColumn Header="Description" 
+                                                    Binding="{Binding Description}" 
+                                                    Width="*" 
+                                                    MinWidth="100"/>
+                            </DataGrid.Columns>
+                            
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow">
+                                    <Setter Property="Height" Value="30"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding TransactionType}" Value="Income">
+                                            <Setter Property="Background" Value="LightGreen"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding TransactionType}" Value="Expense">
+                                            <Setter Property="Background" Value="LightCoral"/>
+                                        </DataTrigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="LightBlue"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.RowStyle>
+                            
+                        </DataGrid>
+                    </ScrollViewer>
+                    
+                    <!-- Delete Transaction Button -->
+                    <Button Content="🗑️ Delete Selected Transaction" 
+                            Command="{Binding DeleteTransactionCommand}"
+                            Padding="10,8" 
+                            HorizontalAlignment="Center"
+                            MinWidth="160"
+                            Margin="0,10,0,0"
+                            Background="LightCoral"
+                            Foreground="White"/>
+                </StackPanel>
+            </Border>
+            
+            <!-- Status Messages -->
+            <Border DockPanel.Dock="Bottom" 
+                    Style="{StaticResource SectionBorderStyle}"
+                    Margin="0,10,0,0">
+                <StackPanel>
+                    <TextBlock Text="Status" Style="{StaticResource HeaderTextStyle}"/>
+                    <TextBlock Text="{Binding StatusMessage}" 
+                               FontFamily="Consolas"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               MaxWidth="400"
+                               Foreground="DarkBlue"/>
+                </StackPanel>
+            </Border>
+            
+        </DockPanel>
+        
+    </Grid>
+</Window>

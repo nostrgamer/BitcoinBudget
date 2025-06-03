@@ -1,0 +1,146 @@
+# Bitcoin Budget Desktop - Cursor Rules
+
+## Project Overview
+A simple envelope budgeting desktop application for Bitcoin users with manual transaction entry. Built with C# and .NET 8, following Clean Architecture principles.
+
+**Core Principle: Start Simple, Build Incrementally**
+
+## Technology Stack
+- **Framework**: .NET 8 with WPF
+- **Database**: SQLite with Entity Framework Core
+- **Architecture**: Clean Architecture + MVVM
+- **Testing**: xUnit with FluentAssertions
+
+## Project Structure
+```
+BitcoinOnBudgetDesktop/
+├── src/
+│   ├── Core/                    # Domain layer
+│   │   ├── Entities/           # Domain entities
+│   │   ├── ValueObjects/       # Value objects (SatoshiAmount, etc.)
+│   │   ├── Interfaces/         # Domain contracts
+│   │   └── Exceptions/         # Domain exceptions
+│   ├── Application/            # Application layer
+│   │   ├── Commands/          # CQRS commands
+│   │   ├── Queries/           # CQRS queries
+│   │   ├── Handlers/          # Command/Query handlers
+│   │   └── DTOs/              # Data transfer objects
+│   ├── Infrastructure/         # Infrastructure layer
+│   │   ├── Data/              # EF Core, repositories
+│   │   └── Configuration/     # App configuration
+│   ├── Presentation/           # Presentation layer (WPF)
+│   │   ├── ViewModels/        # MVVM view models
+│   │   ├── Views/             # WPF views/windows
+│   │   └── Converters/        # UI data converters
+│   └── Tests/
+│       ├── Core.Tests/        # Domain tests
+│       ├── Application.Tests/ # Application tests
+│       ├── Infrastructure.Tests/ # Infrastructure tests
+│       └── Presentation.Tests/ # UI tests
+```
+
+## Core Features (Phase 1)
+- **Categories**: Spending envelopes (groceries, rent, savings, etc.)
+- **Budget Allocation**: Assign sats to categories monthly
+- **Transactions**: Manual entry of Bitcoin movements
+- **Monthly Periods**: Budget cycles with rollover logic
+- **Balance Tracking**: Available funds and category balances
+
+## Development Philosophy
+- **Start with the simplest working version**
+- **Add one feature at a time**
+- **Test core domain logic, be pragmatic with simple CRUD**
+- **UI function over form initially**
+- **Avoid premature optimization**
+
+## Coding Standards
+
+### C# Style Guidelines
+- Use PascalCase for public members, camelCase for private fields
+- Prefix private fields with underscore: `_fieldName`
+- Use explicit types when clarity is important, `var` when obvious
+- Maximum line length: 120 characters
+- Use nullable reference types consistently
+
+### Namespace Convention
+- Root namespace: `BitcoinOnBudgetDesktop`
+- Layer namespaces: `BitcoinOnBudgetDesktop.Core`, `BitcoinOnBudgetDesktop.Application`, etc.
+- Feature namespaces: `BitcoinOnBudgetDesktop.Core.Entities`, etc.
+
+### Domain-Driven Design Rules
+- Entities should have identity and business logic
+- Value objects should be immutable and contain business validation
+- Repository interfaces belong in Core, implementations in Infrastructure
+- No dependencies from Core to other layers
+
+### MVVM Pattern Guidelines
+- ViewModels should not reference Views directly
+- Use Commands for user actions
+- Implement INotifyPropertyChanged for data binding
+- Keep ViewModels testable (no UI dependencies)
+
+### Bitcoin-Specific Rules
+- Always use `SatoshiAmount` value object for Bitcoin amounts
+- Never use `decimal` or `double` for Bitcoin calculations
+- All Bitcoin amounts are stored as `long` (satoshis)
+- Use domain validation for Bitcoin-specific business rules
+
+### Testing Standards
+- Focus testing on domain logic and business rules
+- Use AAA pattern (Arrange, Act, Assert)
+- One assertion per test method
+- Use meaningful test method names: `Should_ReturnError_When_InvalidAmount`
+- Don't over-test simple CRUD operations
+- Mock external dependencies
+
+### Error Handling
+- Use domain exceptions for business rule violations
+- Use Result pattern for operations that can fail
+- Provide user-friendly error messages
+- Log errors without sensitive data
+
+### Database Guidelines
+- Use Entity Framework Core conventions
+- Start with simple migrations, add complexity as needed
+- Use repository pattern for data access
+- Keep queries simple initially
+
+### UI Guidelines
+- Start with functional, simple UI
+- Focus on usability over aesthetics initially
+- Use standard WPF controls before custom ones
+- Implement proper data binding
+
+## File Organization
+- One class per file
+- File names match class names exactly
+- Group related files in appropriate folders
+- Use meaningful namespace hierarchy
+
+## Dependencies
+- Core layer has no external dependencies
+- Application layer only depends on Core
+- Infrastructure implements interfaces from Core/Application
+- Presentation depends on Application layer only
+
+## Development Workflow
+- Build the minimum viable feature first
+- Write tests for complex business logic
+- Ensure all tests pass before committing
+- Use conventional commit messages
+- Refactor when patterns emerge, not before
+
+## Envelope Budgeting Concepts
+- **Available to Assign**: Unallocated sats ready for budget assignment
+- **Categories**: Spending envelopes with allocated amounts
+- **Rollover**: Unspent category funds carry to next month
+- **Overspending**: Track when category spending exceeds allocation
+- **Monthly Reset**: New budget period with fresh allocations
+
+## Phase 1 Priority Order
+1. Create basic Category entity and management
+2. Implement SatoshiAmount value object
+3. Add Transaction entity with category assignment
+4. Create simple budget allocation system
+5. Implement basic monthly period logic
+6. Build minimal WPF UI for data entry 
