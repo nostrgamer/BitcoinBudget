@@ -1,169 +1,244 @@
-# Bitcoin Budget Desktop - Cursor Rules
+# Bitcoin Budget Desktop - Simple Python Rules
 
 ## Project Overview
-A simple envelope budgeting desktop application for Bitcoin users with manual transaction entry. Built with C# and .NET 8, following Clean Architecture principles.
+A **single-file Bitcoin budgeting application** using Python + Tkinter + SQLite. Maximum simplicity, minimum complexity.
 
-**Core Principle: Start Simple, Build Incrementally**
+**Core Principle: If you can do it in Excel with a few macros, it should be simple in code.**
 
 ## Technology Stack
-- **Framework**: .NET 8 with WPF
-- **Database**: SQLite with Entity Framework Core
-- **Architecture**: Clean Architecture + MVVM
-- **Testing**: xUnit with FluentAssertions
+- **Language**: Python 3.8+
+- **GUI**: Tkinter (built-in, no dependencies)
+- **Database**: SQLite (single file)
+- **Deployment**: PyInstaller (single executable)
+- **Target**: ~300-500 lines total in one file
 
-## Project Structure
+## Development Rules
+
+### File Structure (Keep It Simple)
 ```
-BitcoinOnBudgetDesktop/
-├── src/
-│   ├── Core/                    # Domain layer
-│   │   ├── Entities/           # Domain entities
-│   │   ├── ValueObjects/       # Value objects (SatoshiAmount, etc.)
-│   │   ├── Interfaces/         # Domain contracts
-│   │   └── Exceptions/         # Domain exceptions
-│   ├── Application/            # Application layer
-│   │   ├── Commands/          # CQRS commands
-│   │   ├── Queries/           # CQRS queries
-│   │   ├── Handlers/          # Command/Query handlers
-│   │   └── DTOs/              # Data transfer objects
-│   ├── Infrastructure/         # Infrastructure layer
-│   │   ├── Data/              # EF Core, repositories
-│   │   └── Configuration/     # App configuration
-│   ├── Presentation/           # Presentation layer (WPF)
-│   │   ├── ViewModels/        # MVVM view models
-│   │   ├── Views/             # WPF views/windows
-│   │   └── Converters/        # UI data converters
-│   └── Tests/
-│       ├── Core.Tests/        # Domain tests
-│       ├── Application.Tests/ # Application tests
-│       ├── Infrastructure.Tests/ # Infrastructure tests
-│       └── Presentation.Tests/ # UI tests
+bitcoin_budget/
+├── bitcoin_budget.py          # Everything goes here
+├── budget.db                  # SQLite database (auto-created)
+├── requirements.txt           # Just PyInstaller
+└── README.md                  # Usage instructions
 ```
 
-## Core Features (Phase 1)
-- **Categories**: Spending envelopes (groceries, rent, savings, etc.)
-- **Budget Allocation**: Assign sats to categories monthly
-- **Transactions**: Manual entry of Bitcoin movements
-- **Monthly Periods**: Budget cycles with rollover logic
-- **Balance Tracking**: Available funds and category balances
+### Code Organization (Single File)
+```python
+# bitcoin_budget.py structure:
+import sqlite3
+import tkinter as tk
+from tkinter import ttk, messagebox
+from datetime import datetime, date
+import calendar
 
-## Development Philosophy
-- **Start with the simplest working version**
-- **Add one feature at a time**
-- **Test core domain logic, be pragmatic with simple CRUD**
-- **UI function over form initially**
-- **Avoid premature optimization**
+# === DATABASE FUNCTIONS ===
+def init_database():
+    """Create tables if they don't exist"""
 
-## Coding Standards
+def add_income(amount_sats, description, date):
+    """Add income transaction"""
 
-### C# Style Guidelines
-- Use PascalCase for public members, camelCase for private fields
-- Prefix private fields with underscore: `_fieldName`
-- Use explicit types when clarity is important, `var` when obvious
-- Maximum line length: 120 characters
-- Use nullable reference types consistently
+def add_expense(amount_sats, description, category_id, date):
+    """Add expense transaction"""
 
-### Namespace Convention
-- Root namespace: `BitcoinOnBudgetDesktop`
-- Layer namespaces: `BitcoinOnBudgetDesktop.Core`, `BitcoinOnBudgetDesktop.Application`, etc.
-- Feature namespaces: `BitcoinOnBudgetDesktop.Core.Entities`, etc.
+# === BUDGET LOGIC ===
+def get_total_income(month=None):
+    """Get total income for month or all time"""
 
-### Domain-Driven Design Rules
-- Entities should have identity and business logic
-- Value objects should be immutable and contain business validation
-- Repository interfaces belong in Core, implementations in Infrastructure
-- No dependencies from Core to other layers
+def get_available_to_assign(month):
+    """Calculate unallocated income"""
 
-### MVVM Pattern Guidelines
-- ViewModels should not reference Views directly
-- Use Commands for user actions
-- Implement INotifyPropertyChanged for data binding
-- Keep ViewModels testable (no UI dependencies)
+def get_category_balance(category_id, month):
+    """Get envelope balance with rollover"""
 
-### Bitcoin-Specific Rules
-- Always use `SatoshiAmount` value object for Bitcoin amounts
-- Never use `decimal` or `double` for Bitcoin calculations
-- All Bitcoin amounts are stored as `long` (satoshis)
-- Use domain validation for Bitcoin-specific business rules
+# === GUI CLASSES ===
+class BitcoinBudgetApp:
+    def __init__(self):
+        """Main application window"""
 
-### Testing Standards
-- Focus testing on domain logic and business rules
-- Use AAA pattern (Arrange, Act, Assert)
-- One assertion per test method
-- Use meaningful test method names: `Should_ReturnError_When_InvalidAmount`
-- Don't over-test simple CRUD operations
-- Mock external dependencies
+    def create_widgets(self):
+        """Build the interface"""
 
-### Error Handling
-- Use domain exceptions for business rule violations
-- Use Result pattern for operations that can fail
-- Provide user-friendly error messages
-- Log errors without sensitive data
+    def refresh_display(self):
+        """Update all displays"""
+
+# === MAIN ===
+if __name__ == "__main__":
+    app = BitcoinBudgetApp()
+    app.run()
+```
+
+### Python Style Guidelines
+- **Functions**: Use `snake_case` for all functions and variables
+- **Classes**: Use `PascalCase` for class names
+- **Constants**: Use `UPPER_CASE` for constants
+- **Docstrings**: Simple one-line docstrings for functions
+- **Comments**: Only when the code isn't self-explanatory
+- **Line length**: Keep under 100 characters
 
 ### Database Guidelines
-- Use Entity Framework Core conventions
-- Start with simple migrations, add complexity as needed
-- Use repository pattern for data access
-- Keep queries simple initially
+- **Simple SQLite**: No ORM, just direct SQL
+- **Three tables**: transactions, categories, allocations
+- **Integer amounts**: Store satoshis as integers (no decimals)
+- **Text dates**: Store as 'YYYY-MM-DD' strings
+- **Foreign keys**: Use them for data integrity
 
-### UI Guidelines
-- Start with functional, simple UI
-- Focus on usability over aesthetics initially
-- Use standard WPF controls before custom ones
-- Implement proper data binding
+### GUI Guidelines
+- **Standard Tkinter**: No custom themes or complex layouts
+- **Grid layout**: Simple grid-based positioning
+- **Basic widgets**: Entry, Button, Label, Listbox, Frame
+- **Error handling**: Use messagebox for user errors
+- **Keep it functional**: UI follows function, not fashion
 
-## File Organization
-- One class per file
-- File names match class names exactly
-- Group related files in appropriate folders
-- Use meaningful namespace hierarchy
+### Bitcoin-Specific Rules
+- **Satoshis everywhere**: Always work in satoshis (integers)
+- **Display formatting**: Show as "1,000,000 sats" or "0.01000000 BTC"
+- **No decimals**: Avoid floating point for Bitcoin amounts
+- **Input validation**: Ensure positive integers for amounts
 
-## Dependencies
-- Core layer has no external dependencies
-- Application layer only depends on Core
-- Infrastructure implements interfaces from Core/Application
-- Presentation depends on Application layer only
+### Simplicity Rules
+❌ **NO** classes for simple data (use tuples/dicts)
+❌ **NO** complex inheritance hierarchies
+❌ **NO** design patterns unless absolutely necessary
+❌ **NO** configuration files or settings management
+❌ **NO** logging frameworks (use print() for debugging)
+❌ **NO** external libraries beyond Python stdlib
+❌ **NO** async/await unless truly needed
+❌ **NO** threads or multiprocessing
+❌ **NO** separate modules or packages
 
-## Development Workflow
-- Build the minimum viable feature first
-- Write tests for complex business logic
-- Ensure all tests pass before committing
-- Use conventional commit messages
-- Refactor when patterns emerge, not before
+✅ **YES** to simple functions
+✅ **YES** to direct database calls
+✅ **YES** to basic error handling
+✅ **YES** to readable code over clever code
+✅ **YES** to copy-paste over abstraction
+✅ **YES** to global variables if they simplify things
 
-## Envelope Budgeting Concepts
-- **Available to Assign**: Unallocated sats ready for budget assignment
-- **Categories**: Spending envelopes with allocated amounts
-- **Rollover**: Unspent category funds carry to next month
-- **Overspending**: Track when category spending exceeds allocation
-- **Monthly Reset**: New budget period with fresh allocations
+### Development Workflow
+1. **Start with database**: Get SQLite working first
+2. **Add core functions**: Income, expenses, categories
+3. **Build basic GUI**: One window, basic layout
+4. **Test everything**: Run functions in Python REPL
+5. **Polish UI**: Make it usable, not pretty
+6. **Build executable**: PyInstaller single file
 
-## Development Phases (Updated Status)
+### Error Handling
+- **User errors**: Show messagebox with helpful message
+- **Database errors**: Catch and show user-friendly message
+- **Input validation**: Check before database operations
+- **Graceful degradation**: App shouldn't crash on bad input
 
-### Phase 1: Core Foundation ✅ COMPLETE
-1. Create basic Category entity and management
-2. Implement SatoshiAmount value object
-3. Add Transaction entity with category assignment
-4. Create simple budget allocation system
-5. Implement basic monthly period logic
-6. Build minimal WPF UI for data entry
+### Testing Strategy
+- **Manual testing**: Click through the UI
+- **Function testing**: Run individual functions in REPL
+- **Database testing**: Check SQLite file with DB Browser
+- **No unit tests**: Keep it simple for this scope
 
-### Phase 2: Enhanced Allocation System ✅ COMPLETE
-1. Full budget allocation workflow
-2. Available to Assign calculation
-3. Budget period management
-4. Enhanced UI for allocations
+### Performance Guidelines
+- **It's a personal budget app**: Performance is not critical
+- **SQLite is fast enough**: No need for optimization
+- **Tkinter is responsive enough**: No need for threading
+- **Keep queries simple**: Basic SELECT/INSERT/UPDATE
 
-### Phase 3: Core Monthly Logic ✅ COMPLETE (Backend Only)
-1. Enhanced BudgetPeriod entity with rollover calculations
-2. Enhanced CategoryAllocation with rollover tracking
-3. TransitionToNextMonthCommand for automated transitions
-4. GetRolloverSummaryQuery for analysis
-5. Database migration for rollover fields
-6. **Note**: UI updates not yet implemented
+### Bitcoin Display Formats
+```python
+def format_sats(satoshis):
+    """Format satoshis for display"""
+    return f"{satoshis:,} sats"
 
-### Phase 4: UI for Monthly Features (NEXT)
-1. Rollover summary display
-2. Month transition interface
-3. Overspending indicators
-4. Enhanced budget period navigation
-5. Monthly rollover reports 
+def format_btc(satoshis):
+    """Format as BTC"""
+    btc = satoshis / 100_000_000
+    return f"{btc:.8f} BTC"
+
+def parse_amount_input(text):
+    """Parse user input to satoshis"""
+    # Handle "1000", "1,000", "0.001 BTC", etc.
+```
+
+### Month/Date Handling
+```python
+def get_current_month():
+    """Return current month as 'YYYY-MM'"""
+    return datetime.now().strftime('%Y-%m')
+
+def get_month_range(month_str):
+    """Return start and end dates for month"""
+    # '2025-06' -> ('2025-06-01', '2025-06-30')
+```
+
+### Common Patterns
+```python
+# Database connection (global is fine)
+conn = sqlite3.connect('budget.db')
+
+# Simple function pattern
+def add_category(name):
+    """Add a new spending category"""
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO categories (name) VALUES (?)", (name,))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False  # Duplicate name
+
+# GUI update pattern
+def refresh_categories(self):
+    """Update category display"""
+    self.category_listbox.delete(0, tk.END)
+    categories = get_all_categories()
+    for cat in categories:
+        self.category_listbox.insert(tk.END, f"{cat['name']}: {format_sats(cat['balance'])}")
+```
+
+### Anti-Patterns to Avoid
+❌ **Over-engineering**: Don't build for 10,000 users
+❌ **Premature abstraction**: Don't create classes for everything
+❌ **Complex state management**: Keep state in the database
+❌ **Fancy UI frameworks**: Tkinter is sufficient
+❌ **Multiple files**: One file is manageable for this scope
+❌ **Configuration systems**: Hard-code reasonable defaults
+❌ **Plugin architecture**: You ain't gonna need it
+
+### Success Criteria
+- ✅ **Works in one weekend**: Build and test completely
+- ✅ **Single executable**: PyInstaller creates standalone app
+- ✅ **Under 500 lines**: Readable in 10 minutes
+- ✅ **All YNAB features**: Income, expenses, categories, allocation
+- ✅ **No installation**: Just run the .exe
+- ✅ **No crashes**: Handle user errors gracefully
+
+### Example Function
+```python
+def get_category_balance(category_id, month):
+    """Get current balance for category envelope"""
+    cursor = conn.cursor()
+    
+    # Get allocated amount for this month
+    cursor.execute("""
+        SELECT amount FROM allocations 
+        WHERE category_id = ? AND month = ?
+    """, (category_id, month))
+    allocated = cursor.fetchone()
+    allocated = allocated[0] if allocated else 0
+    
+    # Get spent amount for this month
+    start_date = f"{month}-01"
+    end_date = f"{month}-{calendar.monthrange(int(month[:4]), int(month[5:]))[1]}"
+    cursor.execute("""
+        SELECT SUM(amount) FROM transactions 
+        WHERE category_id = ? AND type = 'expense' 
+        AND date BETWEEN ? AND ?
+    """, (category_id, start_date, end_date))
+    spent = cursor.fetchone()
+    spent = spent[0] if spent and spent[0] else 0
+    
+    # Get previous month balance (simplified rollover)
+    # ... rollover logic here ...
+    
+    return allocated - spent  # Simplified
+```
+
+Remember: **Simple is better than complex. Complex is better than complicated. Flat is better than nested.** 

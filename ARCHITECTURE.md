@@ -1,270 +1,237 @@
-# Bitcoin Budget Desktop - Architecture Documentation
+# Bitcoin Budget Desktop - Simple Architecture
 
-## Overview
+## Philosophy: Excel-Level Simplicity
 
-Bitcoin Budget Desktop is a simple envelope budgeting application for Bitcoin users. The application follows Clean Architecture principles with manual transaction entry, focusing on the core budgeting methodology without unnecessary complexity.
+This is a **simple, single-file budgeting application** for Bitcoin users. No over-engineering, no complex patterns, just straightforward envelope budgeting that works.
 
-## Architecture Principles
-
-### Clean Architecture
-The application is structured in layers with clear dependency rules:
-- **Dependencies point inward only**
-- **Core domain has no external dependencies**
-- **Infrastructure implements domain contracts**
-- **UI depends only on application layer**
-
-### Envelope Budgeting
-- **Monthly budget periods** with category allocations
-- **Rollover logic** for unspent funds
-- **Manual transaction entry** for privacy and control
-- **Available to assign** tracking for unallocated funds
-
-### MVVM Pattern
-- **Model**: Domain entities and DTOs
-- **View**: WPF views and controls
-- **ViewModel**: Presentation logic and data binding
+**Core Principle: If you can do it in Excel, it should be simple in code.**
 
 ## Technology Stack
 
-### Core Technologies
-- **.NET 8**: Latest LTS framework
-- **WPF**: Desktop UI framework with rich data binding
-- **Entity Framework Core**: ORM with SQLite provider
-- **SQLite**: Embedded database for local storage
+- **Language**: Python 3.8+
+- **GUI**: Tkinter (built into Python)
+- **Database**: SQLite (single file database)
+- **Deployment**: PyInstaller (single executable)
+- **Total Code**: ~300-500 lines in one file
 
-### Supporting Libraries
-- **xUnit**: Testing framework
-- **FluentAssertions**: Readable test assertions
-- **MediatR**: CQRS pattern implementation
+## Why This Stack?
 
-## Project Structure
+### Python + Tkinter
+- ✅ **Simple**: No complex frameworks to learn
+- ✅ **Cross-platform**: Works on Windows, Mac, Linux
+- ✅ **Self-contained**: No external dependencies
+- ✅ **Debuggable**: Step through every line of code
+- ✅ **Fast development**: Working prototype in hours
 
-```
-BitcoinBudget.Desktop/
-├── src/
-│   ├── BitcoinBudget.Core/              # Domain Layer
-│   │   ├── Entities/
-│   │   │   ├── Budget.cs               # Root aggregate
-│   │   │   ├── Category.cs             # Spending envelope
-│   │   │   ├── Transaction.cs          # Bitcoin transaction
-│   │   │   ├── BudgetPeriod.cs        # Monthly budget cycle
-│   │   │   └── CategoryAllocation.cs   # Budget allocation
-│   │   ├── ValueObjects/
-│   │   │   ├── SatoshiAmount.cs       # Immutable Bitcoin amount
-│   │   │   └── TransactionType.cs     # Transaction classification
-│   │   ├── Interfaces/
-│   │   │   └── Repositories/          # Data access contracts
-│   │   └── Exceptions/
-│   │       ├── DomainException.cs
-│   │       └── InsufficientFundsException.cs
-│   ├── BitcoinBudget.Application/       # Application Layer
-│   │   ├── Commands/
-│   │   │   ├── Categories/            # Category operations
-│   │   │   ├── Transactions/          # Transaction operations
-│   │   │   └── Budget/                # Budget operations
-│   │   ├── Queries/
-│   │   │   ├── Categories/            # Category queries
-│   │   │   ├── Transactions/          # Transaction queries
-│   │   │   └── Reports/               # Budget reports
-│   │   ├── Handlers/
-│   │   │   ├── CommandHandlers/       # Command implementations
-│   │   │   └── QueryHandlers/         # Query implementations
-│   │   └── DTOs/
-│   │       ├── CategoryDto.cs
-│   │       ├── TransactionDto.cs
-│   │       └── BudgetSummaryDto.cs
-│   ├── BitcoinBudget.Infrastructure/    # Infrastructure Layer
-│   │   ├── Data/
-│   │   │   ├── BudgetDbContext.cs     # EF Core context
-│   │   │   ├── Configurations/        # Entity configurations
-│   │   │   ├── Repositories/          # Repository implementations
-│   │   │   └── Migrations/            # Database migrations
-│   │   └── Configuration/
-│   │       └── DatabaseConfiguration.cs
-│   ├── BitcoinBudget.Presentation/      # Presentation Layer
-│   │   ├── ViewModels/
-│   │   │   ├── MainWindowViewModel.cs
-│   │   │   ├── CategoriesViewModel.cs
-│   │   │   ├── TransactionsViewModel.cs
-│   │   │   └── BudgetViewModel.cs
-│   │   ├── Views/
-│   │   │   ├── MainWindow.xaml
-│   │   │   ├── CategoriesView.xaml
-│   │   │   ├── TransactionsView.xaml
-│   │   │   └── BudgetView.xaml
-│   │   └── Converters/
-│   │       ├── SatoshiToStringConverter.cs
-│   │       └── BooleanToVisibilityConverter.cs
-│   └── Tests/
-│       ├── BitcoinBudget.Core.Tests/
-│       ├── BitcoinBudget.Application.Tests/
-│       ├── BitcoinBudget.Infrastructure.Tests/
-│       └── BitcoinBudget.Presentation.Tests/
-```
+### SQLite
+- ✅ **Zero configuration**: Just a file
+- ✅ **Reliable**: Used by millions of apps
+- ✅ **Portable**: Copy file = backup entire budget
+- ✅ **Fast**: More than sufficient for personal budgets
 
-## Domain Model
+### Single File Architecture
+- ✅ **No complexity**: All logic in one place
+- ✅ **Easy to understand**: Read the entire codebase in 10 minutes
+- ✅ **Easy to debug**: No layers hiding problems
+- ✅ **Easy to extend**: Just add functions
 
-### Core Entities
-
-#### Budget (Aggregate Root)
-- **Purpose**: Central aggregate containing all budget data
-- **Properties**: Id, Name, CreatedDate
-- **Relationships**: Categories, BudgetPeriods, Transactions
-
-#### Category
-- **Purpose**: Spending envelopes for budget organization
-- **Properties**: Id, Name, Description, Color
-- **Business Rules**: Category names must be unique
-
-#### Transaction
-- **Purpose**: Records Bitcoin movements
-- **Properties**: Id, Amount, Date, Description, CategoryId, TransactionType
-- **Business Rules**: Must reference valid category, amount validation
-
-#### BudgetPeriod
-- **Purpose**: Monthly budget cycles
-- **Properties**: Id, Year, Month, StartDate, EndDate, IsClosed, ClosedDate
-- **Business Rules**: No overlapping periods
-- **Phase 3 Enhancements**: Rollover calculations, period transitions, overspending detection
-
-#### CategoryAllocation
-- **Purpose**: Budget assignments to categories
-- **Properties**: Id, Amount, CategoryId, BudgetPeriodId, RolloverAmount, NewAllocation, CreatedDate, LastModified
-- **Business Rules**: Total allocations cannot exceed available funds
-- **Phase 3 Enhancements**: Rollover tracking, allocation analysis, audit fields
-
-### Value Objects
-
-#### SatoshiAmount
-- **Purpose**: Immutable Bitcoin amount representation
-- **Properties**: Value (long)
-- **Operations**: Add, Subtract, Multiply, Divide
-- **Validation**: Non-negative values, proper arithmetic
-
-#### TransactionType
-- **Purpose**: Classification of transactions
-- **Values**: Income, Expense, Transfer
-- **Business Rules**: Determines transaction behavior
-
-## Database Design
-
-### Simple Schema
+## Database Schema (3 Tables, That's It)
 
 ```sql
-CREATE TABLE Budgets (
-    Id INTEGER PRIMARY KEY,
-    Name TEXT NOT NULL,
-    CreatedDate TEXT NOT NULL
+-- Transactions: Income and expenses
+CREATE TABLE transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,              -- '2025-06-03'
+    description TEXT NOT NULL,
+    amount INTEGER NOT NULL,         -- satoshis (always positive)
+    category_id INTEGER,             -- NULL for income
+    type TEXT NOT NULL,              -- 'income' or 'expense'
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE Categories (
-    Id INTEGER PRIMARY KEY,
-    BudgetId INTEGER NOT NULL,
-    Name TEXT NOT NULL,
-    Description TEXT,
-    Color TEXT,
-    FOREIGN KEY (BudgetId) REFERENCES Budgets(Id),
-    UNIQUE(BudgetId, Name)
+-- Categories: Spending envelopes
+CREATE TABLE categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,       -- 'Groceries', 'Rent', etc.
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE BudgetPeriods (
-    Id INTEGER PRIMARY KEY,
-    BudgetId INTEGER NOT NULL,
-    Year INTEGER NOT NULL,
-    Month INTEGER NOT NULL,
-    StartDate TEXT NOT NULL,
-    EndDate TEXT NOT NULL,
-    IsClosed INTEGER NOT NULL DEFAULT 0,
-    ClosedDate TEXT,
-    FOREIGN KEY (BudgetId) REFERENCES Budgets(Id),
-    UNIQUE(BudgetId, Year, Month)
-);
-
-CREATE TABLE Transactions (
-    Id INTEGER PRIMARY KEY,
-    BudgetId INTEGER NOT NULL,
-    CategoryId INTEGER NOT NULL,
-    Amount INTEGER NOT NULL,
-    Date TEXT NOT NULL,
-    Description TEXT,
-    TransactionType INTEGER NOT NULL,
-    FOREIGN KEY (BudgetId) REFERENCES Budgets(Id),
-    FOREIGN KEY (CategoryId) REFERENCES Categories(Id)
-);
-
-CREATE TABLE CategoryAllocations (
-    Id INTEGER PRIMARY KEY,
-    BudgetPeriodId INTEGER NOT NULL,
-    CategoryId INTEGER NOT NULL,
-    Amount INTEGER NOT NULL,
-    RolloverAmount INTEGER NOT NULL DEFAULT 0,
-    NewAllocation INTEGER NOT NULL DEFAULT 0,
-    CreatedDate TEXT NOT NULL,
-    LastModified TEXT NOT NULL,
-    FOREIGN KEY (BudgetPeriodId) REFERENCES BudgetPeriods(Id),
-    FOREIGN KEY (CategoryId) REFERENCES Categories(Id),
-    UNIQUE(BudgetPeriodId, CategoryId)
+-- Allocations: Monthly budget assignments
+CREATE TABLE allocations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_id INTEGER NOT NULL,
+    month TEXT NOT NULL,             -- '2025-06'
+    amount INTEGER NOT NULL,         -- satoshis allocated to category
+    UNIQUE(category_id, month),
+    FOREIGN KEY(category_id) REFERENCES categories(id)
 );
 ```
 
-## Core Features
+## Core Logic (Simple Functions)
 
-### 1. Category Management
-- Create, edit, delete spending categories
-- Assign colors for visual organization
-- Track category balances
+### Budget Math
+```python
+def get_total_income(month=None):
+    """Get total income for a month (or all time if None)"""
+    return sum(amount for transactions where type='income')
 
-### 2. Budget Allocation
-- Assign available sats to categories monthly
-- Track "Available to Assign" amount
-- Validate allocations don't exceed available funds
+def get_available_to_assign(month):
+    """Unallocated income for the month"""
+    total_income = get_total_income(month)
+    total_allocated = sum(allocations for month)
+    return total_income - total_allocated
 
-### 3. Transaction Entry
-- Manual entry of Bitcoin transactions
-- Assign transactions to categories
-- Support income, expense, and transfer types
+def get_category_balance(category_id, month):
+    """Available balance in category envelope"""
+    allocated = get_allocation(category_id, month)
+    spent = sum(expenses for category in month)
+    previous_balance = get_category_balance(category_id, previous_month)
+    return previous_balance + allocated - spent
+```
 
-### 4. Monthly Budget Periods
-- Automatic monthly period creation
-- Rollover unspent funds to next month
-- Track overspending in categories
+### Bitcoin Units
+```python
+def sats_to_btc(satoshis):
+    """Convert satoshis to BTC display"""
+    return satoshis / 100_000_000
 
-### 5. Budget Reporting
-- Category balance summaries
-- Monthly spending reports
-- Available funds tracking
+def btc_to_sats(btc):
+    """Convert BTC to satoshis"""
+    return int(btc * 100_000_000)
 
-## Development Phases
+def format_sats(satoshis):
+    """Display satoshis with commas"""
+    return f"{satoshis:,} sats"
+```
 
-### Phase 1: Core Foundation ✅ COMPLETE (2-3 weeks)
-- Basic domain entities and value objects
-- SQLite database with EF Core
-- Simple WPF UI for categories and transactions
-- Basic budget allocation
+## File Structure
 
-### Phase 2: Enhanced Allocation System ✅ COMPLETE (2-3 weeks)
-- Full budget allocation workflow
-- Available to Assign calculation
-- Budget period management
-- Enhanced UI for allocations
+```
+bitcoin_budget/
+├── bitcoin_budget.py          # Main application (everything in one file)
+├── budget.db                  # SQLite database (created automatically)
+├── requirements.txt           # Just PyInstaller for building executable
+└── README.md                  # Simple usage instructions
+```
 
-### Phase 3: Core Monthly Logic ✅ COMPLETE - Backend Only (1-2 weeks)
-- Monthly budget periods with rollover
-- Rollover logic and calculations
-- Enhanced transaction categorization
-- Month transition automation
-- **Note**: UI updates not yet implemented
+## GUI Layout (Simple Tkinter)
 
-### Phase 4: UI for Monthly Features (NEXT - 1-2 weeks)
-- Rollover summary displays
-- Month transition interface
-- Overspending indicators
-- Enhanced budget period navigation
-- Monthly rollover reports
+```
+┌─────────────────────────────────────────┐
+│ Bitcoin Budget - June 2025             │
+├─────────────────────────────────────────┤
+│ Total Income: 1,000,000 sats           │
+│ Total Allocated: 750,000 sats          │
+│ Available to Assign: 250,000 sats      │
+├─────────────────────────────────────────┤
+│ Add Income: [Amount] [Description] [+] │
+├─────────────────────────────────────────┤
+│ Categories:                             │
+│ ┌─ Groceries ───────── 50,000 sats ─┐  │
+│ │  Allocated: 100,000 | Spent: 50,000│  │
+│ │  [+Allocate] [+Expense]            │  │
+│ └────────────────────────────────────┘  │
+│ ┌─ Rent ──────────── 200,000 sats ─┐   │
+│ │  Allocated: 200,000 | Spent: 0    │   │
+│ │  [+Allocate] [+Expense]            │   │
+│ └────────────────────────────────────┘   │
+│ [Add New Category]                      │
+├─────────────────────────────────────────┤
+│ Recent Transactions:                    │
+│ 2025-06-03  Income         +500,000     │
+│ 2025-06-03  Groceries      -25,000      │
+│ 2025-06-02  Rent           -200,000     │
+└─────────────────────────────────────────┘
+```
 
-### Phase 5: UI Polish (Future - 1-2 weeks)
-- Improved user interface design
-- Advanced data validation and error handling
-- Export/import functionality
+## Development Workflow
 
-This simplified architecture focuses on delivering a functional envelope budgeting system without unnecessary complexity, allowing for rapid development and easy maintenance. 
+### Phase 1: Basic Functions (1-2 hours)
+1. Create database and tables
+2. Add income/expense functions
+3. Basic category management
+
+### Phase 2: GUI (2-3 hours)
+1. Simple Tkinter interface
+2. Display totals and categories
+3. Basic input forms
+
+### Phase 3: Polish (1-2 hours)
+1. Month navigation
+2. Transaction history
+3. Error handling
+
+### Phase 4: Distribution (1 hour)
+1. PyInstaller executable
+2. Basic testing
+
+**Total Development Time: 1 weekend**
+
+## Key Benefits
+
+### For Users
+- **Instant startup**: No loading time
+- **Local data**: Everything stays on your machine
+- **Portable**: Copy `.exe` file anywhere
+- **Bitcoin-focused**: Satoshis as first-class citizen
+
+### For Developers
+- **Understandable**: Read entire codebase in 10 minutes
+- **Debuggable**: Set breakpoints anywhere
+- **Testable**: Run individual functions in Python REPL
+- **Extensible**: Just add more functions
+
+## Anti-Patterns We're Avoiding
+
+❌ **No Clean Architecture** - Just functions and classes  
+❌ **No CQRS** - Direct database calls  
+❌ **No Repository Pattern** - SQLite is simple enough  
+❌ **No Domain Events** - This isn't a distributed system  
+❌ **No Value Objects** - Python's built-in types are fine  
+❌ **No Dependency Injection** - Global SQLite connection  
+❌ **No MediatR** - Function calls are fine  
+❌ **No Multiple Projects** - One file, one executable  
+
+## Deployment
+
+### Building Executable
+```bash
+pip install pyinstaller
+pyinstaller --onefile --windowed bitcoin_budget.py
+```
+
+### Result
+- Single `.exe` file (~15MB)
+- No installation required
+- Runs anywhere
+
+## Comparison: Before vs After
+
+| Aspect | C# Clean Architecture | Python Simple |
+|--------|----------------------|---------------|
+| **Files** | 50+ files, 20+ classes | 1 file |
+| **Lines of Code** | 3,000+ lines | 300-500 lines |
+| **Concepts to Learn** | Clean Architecture, CQRS, DDD | Functions, SQLite |
+| **Time to Understand** | Hours/Days | 10 minutes |
+| **Time to Build** | Weeks | Weekend |
+| **Dependencies** | 10+ NuGet packages | Python stdlib |
+| **Executable Size** | 200MB+ (with .NET runtime) | 15MB |
+| **Startup Time** | 2-3 seconds | Instant |
+| **Debugging** | Complex layers | Straightforward |
+
+## Future Enhancements (If Needed)
+
+- **Web version**: Port core logic to HTML+JavaScript
+- **Mobile**: Use Kivy or React Native
+- **Prettier UI**: Switch to PyQt or web-based Electron
+- **Cloud sync**: Add simple file-based sync
+
+But start simple. Most users need basic envelope budgeting, not enterprise features.
+
+## Success Metrics
+
+- ✅ Working prototype in one weekend
+- ✅ Single executable under 20MB
+- ✅ All YNAB core features working
+- ✅ Zero configuration setup
+- ✅ Readable codebase under 500 lines 

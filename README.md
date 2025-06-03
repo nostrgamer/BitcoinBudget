@@ -1,196 +1,146 @@
 # Bitcoin Budget Desktop
 
-A simple envelope budgeting desktop application for Bitcoin users with manual transaction entry. Built with C# and .NET 8, following Clean Architecture principles.
+A simple, single-file envelope budgeting application for Bitcoin users.
 
-![.NET](https://img.shields.io/badge/.NET-8.0-purple)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
+## What It Does
 
-## 🎯 Project Overview
+- Track Bitcoin income and expenses in satoshis
+- Create spending categories (groceries, rent, etc.)
+- Allocate income to categories monthly
+- Track category balances with rollover
+- View transaction history
 
-**Core Principle: Start Simple, Build Incrementally**
+## Why This Approach?
 
-This application implements envelope budgeting specifically designed for Bitcoin users who prefer manual transaction entry over automatic bank connections. Each spending category acts as an "envelope" where you allocate satoshis for specific purposes.
+After trying complex enterprise architectures (Clean Architecture, CQRS, etc.), we went back to basics:
 
-## 🚀 Features
+- **One Python file** (~500 lines total)
+- **SQLite database** (one file, no setup)
+- **Tkinter GUI** (built into Python)
+- **Zero configuration** (just run it)
 
-### Phase 1 - Core Features ✅
-- **Categories**: Spending envelopes (groceries, rent, savings, etc.)
-- **Budget Allocation**: Assign sats to categories monthly
-- **Transactions**: Manual entry of Bitcoin movements
-- **Monthly Periods**: Budget cycles with rollover logic
-- **Balance Tracking**: Available funds and category balances
-- **Comprehensive Diagnostics**: Built-in system validation
+**Result**: What took weeks to build and debug in C# now works in a weekend.
 
-### Phase 2 - Budget Management ✅
-- **Income Management**: Add and track Bitcoin income
-- **Expense Tracking**: Record spending against categories
-- **Real-time Calculations**: Live updates of available funds
-- **Data Persistence**: SQLite database with Entity Framework
-- **Delete Operations**: Safe deletion with data integrity
-- **Budget Reset**: Complete data reset with safety features
+## Requirements
 
-### Phase 3 - Monthly System 🚧
-- **Month-to-Month Transitions**: Automatic new period creation
-- **Rollover Logic**: Carry unspent funds to next month
-- **Overspending Handling**: Track and manage category overruns
-- **Historical Navigation**: View past/future months
+- Python 3.8+ (comes with Tkinter)
+- That's it!
 
-## 🛠️ Technology Stack
+## Usage
 
-- **Framework**: .NET 8 with WPF
-- **Database**: SQLite with Entity Framework Core
-- **Architecture**: Clean Architecture + MVVM
-- **Testing**: xUnit with FluentAssertions
-- **Logging**: Serilog with file logging
-
-## 🏗️ Architecture
-
-### Clean Architecture Layers
-```
-BitcoinOnBudgetDesktop/
-├── src/
-│   ├── Core/                    # Domain layer
-│   │   ├── Entities/           # Domain entities
-│   │   ├── ValueObjects/       # Value objects (SatoshiAmount, etc.)
-│   │   ├── Interfaces/         # Domain contracts
-│   │   └── Exceptions/         # Domain exceptions
-│   ├── Application/            # Application layer
-│   │   ├── Commands/          # CQRS commands
-│   │   ├── Queries/           # CQRS queries
-│   │   ├── Handlers/          # Command/Query handlers
-│   │   └── DTOs/              # Data transfer objects
-│   ├── Infrastructure/         # Infrastructure layer
-│   │   ├── Data/              # EF Core, repositories
-│   │   └── Configuration/     # App configuration
-│   ├── Presentation/           # Presentation layer (WPF)
-│   │   ├── ViewModels/        # MVVM view models
-│   │   ├── Views/             # WPF views/windows
-│   │   └── Converters/        # UI data converters
-│   └── Tests/
-│       ├── Core.Tests/        # Domain tests
-│       ├── Application.Tests/ # Application tests
-│       ├── Infrastructure.Tests/ # Infrastructure tests
-│       └── Presentation.Tests/ # UI tests
-```
-
-### Key Patterns
-- **CQRS**: Command Query Responsibility Segregation
-- **Repository Pattern**: Data access abstraction
-- **MVVM**: Model-View-ViewModel for WPF
-- **Value Objects**: Bitcoin-safe `SatoshiAmount` calculations
-- **Domain-Driven Design**: Rich domain models with business logic
-
-## 🔗 Bitcoin-Specific Features
-
-- **SatoshiAmount Value Object**: Immutable, validated Bitcoin amounts
-- **No Floating Point**: All calculations use `long` integers (satoshis)
-- **Manual Entry**: No automatic bank connections or API dependencies
-- **Privacy-First**: All data stored locally in SQLite
-
-## 🚀 Getting Started
-
-### Prerequisites
-- .NET 8 SDK
-- Windows 10/11
-- Visual Studio 2022 or VS Code
-
-### Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/nostrgamer/BitcoinBudgetDesktop.git
-   cd BitcoinBudgetDesktop
-   ```
-
-2. Build the solution:
-   ```bash
-   dotnet build
-   ```
-
-3. Run the application:
-   ```bash
-   dotnet run --project src/BitcoinOnBudgetDesktop.Presentation
-   ```
-
-### First Run
-1. The application will automatically create a SQLite database
-2. Built-in diagnostics will validate system functionality
-3. Start by adding income and creating categories
-4. Allocate satoshis to categories and begin tracking expenses
-
-## 📊 Usage
-
-### Envelope Budgeting Workflow
-1. **Add Income**: Record Bitcoin received
-2. **Create Categories**: Define spending envelopes (rent, groceries, etc.)
-3. **Allocate Funds**: Assign satoshis to each category
-4. **Record Expenses**: Log spending against specific categories
-5. **Monitor Balances**: Track remaining funds in each envelope
-
-### Key Concepts
-- **Available to Assign**: Unallocated sats ready for budget assignment
-- **Rollover**: Unspent category funds carry to next month
-- **Overspending**: Track when category spending exceeds allocation
-- **Monthly Reset**: New budget period with fresh allocations
-
-## 🔧 Development
-
-### Running Tests
+### Run from Source
 ```bash
-dotnet test
+python bitcoin_budget.py
 ```
 
-### Building for Release
+### Build Executable
 ```bash
-dotnet publish -c Release -r win-x64 --self-contained
+pip install pyinstaller
+pyinstaller --onefile --windowed bitcoin_budget.py
 ```
 
-### Development Philosophy
-- Start with the simplest working version
-- Add one feature at a time
-- Test core domain logic, be pragmatic with simple CRUD
-- UI function over form initially
-- Avoid premature optimization
+This creates a single `bitcoin_budget.exe` file (~15MB) that runs anywhere.
 
-## 📝 Coding Standards
+## Features
 
-### C# Guidelines
-- Use PascalCase for public members, camelCase for private fields
-- Prefix private fields with underscore: `_fieldName`
-- Maximum line length: 120 characters
-- Use nullable reference types consistently
+### Core YNAB-Style Budgeting
+- ✅ Add income transactions
+- ✅ Create spending categories
+- ✅ Allocate income to categories
+- ✅ Add expenses to categories
+- ✅ Track category balances
+- ✅ Month-by-month navigation
+- ✅ Available to assign calculation
+- ✅ Transaction history
 
-### Bitcoin-Specific Rules
-- Always use `SatoshiAmount` value object for Bitcoin amounts
-- Never use `decimal` or `double` for Bitcoin calculations
-- All Bitcoin amounts stored as `long` (satoshis)
-- Use domain validation for Bitcoin-specific business rules
+### Bitcoin-Specific
+- ✅ All amounts in satoshis (no floating point errors)
+- ✅ Supports "1000" or "0.001 BTC" input formats
+- ✅ Displays as "1,000,000 sats"
+- ✅ No decimal confusion
 
-## 🤝 Contributing
+### Simple & Reliable
+- ✅ Single file you can read in 10 minutes
+- ✅ SQLite database (just copy file to backup)
+- ✅ No installation required
+- ✅ Works offline
+- ✅ No external dependencies
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a pull request
+## How It Works
 
-## 📄 License
+### Database (3 Tables)
+```sql
+transactions - all income/expenses with dates
+categories   - spending envelopes (groceries, rent, etc.)
+allocations  - monthly budget assignments
+```
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### Core Logic
+```python
+# Simple functions, no complexity
+def get_available_to_assign(month):
+    income = get_total_income(month)
+    allocated = get_total_allocated(month)
+    return income - allocated
 
-## 🙏 Acknowledgments
+def get_category_balance(category_id, month):
+    allocated = get_category_allocated(category_id, month)
+    spent = get_category_spent(category_id, month)
+    return allocated - spent
+```
 
-- Bitcoin community for inspiration
-- Clean Architecture principles by Robert C. Martin
-- Envelope budgeting methodology
-- .NET and WPF communities
+### GUI Layout
+```
+┌─────────────────────────────────────────┐
+│ Bitcoin Budget - June 2025             │
+├─────────────────────────────────────────┤
+│ Total Income: 1,000,000 sats           │
+│ Available to Assign: 250,000 sats      │
+├─────────────────────────────────────────┤
+│ Add Income: [Amount] [Description] [+] │
+├─────────────────────────────────────────┤
+│ Categories with balances and buttons    │
+├─────────────────────────────────────────┤
+│ Recent transaction history              │
+└─────────────────────────────────────────┘
+```
 
-## 📞 Support
+## Example Workflow
 
-- Create an [Issue](https://github.com/nostrgamer/BitcoinBudgetDesktop/issues) for bug reports
-- Start a [Discussion](https://github.com/nostrgamer/BitcoinBudgetDesktop/discussions) for questions
-- Check the [Wiki](https://github.com/nostrgamer/BitcoinBudgetDesktop/wiki) for documentation
+1. **Add Income**: Enter "500000" (sats) or "0.005 BTC", description "Salary"
+2. **Create Categories**: "Groceries", "Rent", "Savings"
+3. **Allocate Budget**: Assign 100,000 sats to Groceries, 300,000 to Rent
+4. **Add Expenses**: Spend 25,000 sats from Groceries category
+5. **Check Balances**: See remaining amounts in each envelope
 
----
+## File Structure
 
-**"Be your own bank with your own budget."** 🟠⚡ 
+```
+bitcoin_budget.py    # Everything in one file
+budget.db           # SQLite database (auto-created)
+requirements.txt    # Just PyInstaller
+README.md          # This file
+```
+
+## Benefits Over Enterprise Approach
+
+| Before (C#) | After (Python) |
+|-------------|----------------|
+| 50+ files | 1 file |
+| 3,000+ lines | 500 lines |
+| Hours to understand | 10 minutes |
+| Weeks to build | Weekend |
+| 200MB executable | 15MB executable |
+| Complex debugging | Straightforward |
+
+## Success Metrics ✅
+
+- ✅ Working prototype in one weekend
+- ✅ Single executable under 20MB  
+- ✅ All YNAB core features working
+- ✅ Zero configuration setup
+- ✅ Readable codebase under 500 lines
+- ✅ No crashes on user errors
+- ✅ Bitcoin-native (satoshis everywhere)
+
+Sometimes the simplest solution is the best solution. 
