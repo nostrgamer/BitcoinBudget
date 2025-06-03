@@ -178,10 +178,41 @@ def get_total_allocated(month):
 
 
 def get_available_to_assign(month):
-    """Calculate unallocated income for the month"""
-    total_income = get_total_income(month)
-    total_allocated = get_total_allocated(month)
-    return total_income - total_allocated
+    """Calculate unallocated income for the month including rollover from previous months"""
+    current_month_income = get_total_income(month)
+    current_month_allocated = get_total_allocated(month)
+    rollover_from_previous = get_rollover_amount(month)
+    
+    return current_month_income + rollover_from_previous - current_month_allocated
+
+
+def get_rollover_amount(month):
+    """Calculate total rollover available from previous month"""
+    year, month_num = map(int, month.split('-'))
+    
+    # Get previous month
+    if month_num == 1:
+        prev_month = f"{year-1}-12"
+    else:
+        prev_month = f"{year}-{month_num-1:02d}"
+    
+    # Base case - if this is the first month with any data, no rollover
+    prev_income = get_total_income(prev_month)
+    if prev_income == 0:
+        return 0
+    
+    # Calculate previous month's leftover
+    prev_available = get_total_income(prev_month) - get_total_allocated(prev_month)
+    
+    # Add unspent category balances from previous month
+    prev_category_balances = 0
+    categories = get_categories()
+    for cat in categories:
+        balance = get_category_balance(cat['id'], prev_month)
+        if balance > 0:  # Only positive balances roll forward
+            prev_category_balances += balance
+    
+    return prev_available + prev_category_balances
 
 
 def get_category_spent(category_id, month):
@@ -276,7 +307,7 @@ class BitcoinBudgetApp:
         """Initialize the main application"""
         self.root = tk.Tk()
         self.root.title("Bitcoin Budget Desktop")
-        self.root.geometry("800x600")
+        self.root.geometry("1000x700")  # Increased from 800x600
         
         self.current_month = get_current_month()
         
@@ -305,11 +336,14 @@ class BitcoinBudgetApp:
         self.income_label = ttk.Label(summary_frame, text="Total Income: 0 sats")
         self.income_label.grid(row=0, column=0, sticky=tk.W)
         
+        self.rollover_label = ttk.Label(summary_frame, text="Rollover: 0 sats")
+        self.rollover_label.grid(row=1, column=0, sticky=tk.W)
+        
         self.allocated_label = ttk.Label(summary_frame, text="Total Allocated: 0 sats")
-        self.allocated_label.grid(row=1, column=0, sticky=tk.W)
+        self.allocated_label.grid(row=2, column=0, sticky=tk.W)
         
         self.available_label = ttk.Label(summary_frame, text="Available to Assign: 0 sats")
-        self.available_label.grid(row=2, column=0, sticky=tk.W)
+        self.available_label.grid(row=3, column=0, sticky=tk.W)
         
         # Add Income section
         income_frame = ttk.LabelFrame(main_frame, text="Add Income", padding="10")
@@ -333,7 +367,7 @@ class BitcoinBudgetApp:
         list_frame = ttk.Frame(categories_frame)
         list_frame.grid(row=0, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        self.categories_listbox = tk.Listbox(list_frame, height=8)
+        self.categories_listbox = tk.Listbox(list_frame, height=8, width=60)
         self.categories_listbox.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.categories_listbox.yview)
@@ -380,10 +414,12 @@ class BitcoinBudgetApp:
         
         # Update budget summary
         total_income = get_total_income(self.current_month)
+        rollover = get_rollover_amount(self.current_month)
         total_allocated = get_total_allocated(self.current_month)
         available = get_available_to_assign(self.current_month)
         
         self.income_label.config(text=f"Total Income: {format_sats(total_income)}")
+        self.rollover_label.config(text=f"Rollover: {format_sats(rollover)}")
         self.allocated_label.config(text=f"Total Allocated: {format_sats(total_allocated)}")
         self.available_label.config(text=f"Available to Assign: {format_sats(available)}")
         
