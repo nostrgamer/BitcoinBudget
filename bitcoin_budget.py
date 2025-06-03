@@ -13,6 +13,17 @@ from datetime import datetime, date
 import calendar
 import os
 
+# Import matplotlib for charts (with Tkinter backend)
+try:
+    import matplotlib
+    matplotlib.use('TkAgg')  # Use Tkinter backend
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+    from matplotlib.figure import Figure
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+
 
 # === DATABASE FUNCTIONS ===
 
@@ -215,6 +226,43 @@ def get_transaction_with_details(transaction_id):
     result = cursor.fetchone()
     conn.close()
     return result
+
+
+def get_spending_breakdown(month):
+    """Get spending breakdown by category for a given month"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    start_date = f"{month}-01"
+    last_day = calendar.monthrange(int(month[:4]), int(month[5:]))[1]
+    end_date = f"{month}-{last_day:02d}"
+    
+    cursor.execute("""
+        SELECT c.name, SUM(t.amount) as total_spent
+        FROM transactions t
+        JOIN categories c ON t.category_id = c.id
+        WHERE t.type = 'expense' AND t.date BETWEEN ? AND ?
+        GROUP BY c.id, c.name
+        HAVING total_spent > 0
+        ORDER BY total_spent DESC
+    """, (start_date, end_date))
+    
+    results = cursor.fetchall()
+    conn.close()
+    
+    # Calculate total and percentages
+    breakdown = []
+    total_spent = sum(row[1] for row in results)
+    
+    for category_name, amount in results:
+        percentage = (amount / total_spent * 100) if total_spent > 0 else 0
+        breakdown.append({
+            'category': category_name,
+            'amount': amount,
+            'percentage': percentage
+        })
+    
+    return breakdown, total_spent
 
 
 # === BUDGET LOGIC ===
@@ -438,6 +486,9 @@ class BitcoinBudgetApp:
         self.month_label = ttk.Label(month_frame, text=self.current_month, font=("Arial", 14, "bold"))
         self.month_label.grid(row=0, column=1, padx=20)
         ttk.Button(month_frame, text="Next →", command=self.next_month).grid(row=0, column=2)
+        
+        # Add Reports button
+        ttk.Button(month_frame, text="📊 Reports", command=self.show_reports).grid(row=0, column=3, padx=(20, 0))
         
         # Budget summary
         summary_frame = ttk.LabelFrame(main_frame, text="Budget Summary", padding="10")
@@ -806,6 +857,15 @@ class BitcoinBudgetApp:
             else:
                 self.show_error("Error", "Failed to delete transaction")
     
+    def show_reports(self):
+        """Handle show reports button click"""
+        if not MATPLOTLIB_AVAILABLE:
+            self.show_error("Reports", "Matplotlib is required for reports.\nInstall with: pip install matplotlib")
+            return
+        
+        # Open spending report window
+        SpendingReportWindow(self.root, self.current_month)
+    
     def run(self):
         """Start the application"""
         self.root.mainloop()
@@ -829,6 +889,139 @@ class BitcoinBudgetApp:
             return simpledialog.askstring(title, prompt, initialvalue=initial_value, parent=self.root)
         else:
             return simpledialog.askstring(title, prompt, parent=self.root)
+
+
+class SpendingReportWindow:
+    def __init__(self, parent, month):
+        """Initialize the spending report window"""
+        self.parent = parent
+        self.month = month
+        
+        # Create new window
+        self.window = tk.Toplevel(parent)
+        self.window.title(f"Spending Breakdown - {month}")
+        self.window.geometry("1000x600")
+        self.window.transient(parent)
+        self.window.grab_set()
+        
+        self.create_widgets()
+        self.update_chart()
+    
+    def create_widgets(self):
+        """Create the report interface"""
+        # Main frame
+        main_frame = ttk.Frame(self.window, padding="10")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Configure grid weights
+        self.window.grid_rowconfigure(0, weight=1)
+        self.window.grid_columnconfigure(0, weight=1)
+        main_frame.grid_rowconfigure(1, weight=1)
+        main_frame.grid_columnconfigure(0, weight=1)
+        
+        # Title
+        title_label = ttk.Label(main_frame, text=f"Spending Breakdown - {self.month}", 
+                               font=("Arial", 16, "bold"))
+        title_label.grid(row=0, column=0, columnspan=2, pady=(0, 10))
+        
+        # Chart frame (left side)
+        chart_frame = ttk.Frame(main_frame)
+        chart_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
+        
+        # Create matplotlib figure
+        self.fig = Figure(figsize=(6, 6), dpi=100)
+        self.ax = self.fig.add_subplot(111)
+        
+        # Create canvas
+        self.canvas = FigureCanvasTkAgg(self.fig, chart_frame)
+        self.canvas.get_tk_widget().grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        chart_frame.grid_rowconfigure(0, weight=1)
+        chart_frame.grid_columnconfigure(0, weight=1)
+        
+        # Details frame (right side)
+        details_frame = ttk.LabelFrame(main_frame, text="Category Details", padding="10")
+        details_frame.grid(row=1, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Create treeview for category details
+        columns = ("Category", "Amount", "Percentage")
+        self.details_tree = ttk.Treeview(details_frame, columns=columns, show="headings", height=15)
+        
+        for col in columns:
+            self.details_tree.heading(col, text=col)
+            if col == "Category":
+                self.details_tree.column(col, width=150)
+            else:
+                self.details_tree.column(col, width=100)
+        
+        self.details_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Scrollbar for treeview
+        scrollbar = ttk.Scrollbar(details_frame, orient=tk.VERTICAL, command=self.details_tree.yview)
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        self.details_tree.configure(yscrollcommand=scrollbar.set)
+        
+        details_frame.grid_rowconfigure(0, weight=1)
+        details_frame.grid_columnconfigure(0, weight=1)
+        
+        # Close button
+        ttk.Button(main_frame, text="Close", command=self.window.destroy).grid(row=2, column=0, columnspan=2, pady=(10, 0))
+    
+    def update_chart(self):
+        """Update the pie chart and details"""
+        # Get spending data
+        breakdown, total_spent = get_spending_breakdown(self.month)
+        
+        if not breakdown:
+            # No spending data
+            self.ax.text(0.5, 0.5, 'No spending data for this month', 
+                        horizontalalignment='center', verticalalignment='center', 
+                        transform=self.ax.transAxes, fontsize=12)
+            self.ax.set_title(f"Total Spending: {format_sats(0)}", fontsize=14, fontweight='bold')
+            self.canvas.draw()
+            return
+        
+        # Clear previous chart
+        self.ax.clear()
+        
+        # Prepare data for pie chart
+        categories = [item['category'] for item in breakdown]
+        amounts = [item['amount'] for item in breakdown]
+        percentages = [item['percentage'] for item in breakdown]
+        
+        # Create color palette
+        colors = plt.cm.Set3(range(len(categories)))
+        
+        # Create pie chart
+        wedges, texts, autotexts = self.ax.pie(amounts, labels=categories, autopct='%1.1f%%', 
+                                              colors=colors, startangle=90)
+        
+        # Customize appearance
+        for autotext in autotexts:
+            autotext.set_color('white')
+            autotext.set_fontweight('bold')
+            autotext.set_fontsize(9)
+        
+        for text in texts:
+            text.set_fontsize(8)
+        
+        # Add title with total spending
+        self.ax.set_title(f"Total Spending: {format_sats(total_spent)}", 
+                         fontsize=14, fontweight='bold', pad=20)
+        
+        # Update details treeview
+        for item in self.details_tree.get_children():
+            self.details_tree.delete(item)
+        
+        for item in breakdown:
+            self.details_tree.insert("", "end", values=(
+                item['category'],
+                format_sats(item['amount']),
+                f"{item['percentage']:.1f}%"
+            ))
+        
+        # Draw the chart
+        self.canvas.draw()
 
 
 # === MAIN EXECUTION ===
