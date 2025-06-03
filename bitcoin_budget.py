@@ -979,17 +979,23 @@ class BitcoinBudgetApp:
         # Create a simple menu to choose report type
         menu_window = tk.Toplevel(self.root)
         menu_window.title("Choose Report Type")
-        menu_window.geometry("300x200")
+        menu_window.geometry("400x300")
         menu_window.transient(self.root)
         menu_window.grab_set()
         
         # Center the dialog
         menu_window.geometry("+%d+%d" % (self.root.winfo_rootx()+100, self.root.winfo_rooty()+100))
         
-        frame = ttk.Frame(menu_window, padding="20")
+        frame = ttk.Frame(menu_window, padding="30")
         frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        ttk.Label(frame, text="Select Report Type:", font=("Arial", 12, "bold")).grid(row=0, column=0, pady=10)
+        # Configure frame to expand
+        menu_window.grid_rowconfigure(0, weight=1)
+        menu_window.grid_columnconfigure(0, weight=1)
+        frame.grid_rowconfigure(4, weight=1)
+        frame.grid_columnconfigure(0, weight=1)
+        
+        ttk.Label(frame, text="Select Report Type:", font=("Arial", 14, "bold")).grid(row=0, column=0, pady=(0, 20))
         
         def open_spending_report():
             menu_window.destroy()
@@ -999,12 +1005,22 @@ class BitcoinBudgetApp:
             menu_window.destroy()
             NetWorthReportWindow(self.root, self.current_month)
         
-        ttk.Button(frame, text="📊 Spending Breakdown", 
-                  command=open_spending_report, width=20).grid(row=1, column=0, pady=5)
-        ttk.Button(frame, text="📈 Net Worth Analysis", 
-                  command=open_networth_report, width=20).grid(row=2, column=0, pady=5)
-        ttk.Button(frame, text="Cancel", 
-                  command=menu_window.destroy, width=20).grid(row=3, column=0, pady=10)
+        # Create larger, more readable buttons
+        spending_btn = ttk.Button(frame, text="📊 Spending Breakdown", 
+                  command=open_spending_report)
+        spending_btn.grid(row=1, column=0, pady=10, sticky=(tk.W, tk.E), ipadx=10, ipady=8)
+        
+        networth_btn = ttk.Button(frame, text="📈 Net Worth Analysis", 
+                  command=open_networth_report)
+        networth_btn.grid(row=2, column=0, pady=10, sticky=(tk.W, tk.E), ipadx=10, ipady=8)
+        
+        # Add separator
+        separator = ttk.Separator(frame, orient='horizontal')
+        separator.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=15)
+        
+        cancel_btn = ttk.Button(frame, text="Cancel", 
+                  command=menu_window.destroy)
+        cancel_btn.grid(row=4, column=0, pady=(10, 0), ipadx=10, ipady=5)
     
     def run(self):
         """Start the application"""
