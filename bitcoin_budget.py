@@ -144,6 +144,79 @@ def allocate_to_category(category_id, month, amount_sats):
         conn.close()
 
 
+def delete_transaction(transaction_id):
+    """Delete a transaction by ID"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM transactions WHERE id = ?", (transaction_id,))
+        conn.commit()
+        return cursor.rowcount > 0  # Returns True if a row was deleted
+    except Exception as e:
+        print(f"Error deleting transaction: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def delete_category(category_id):
+    """Delete a category and all its associated allocations and transactions"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # First check if category has transactions or allocations
+        cursor.execute("SELECT COUNT(*) FROM transactions WHERE category_id = ?", (category_id,))
+        transaction_count = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM allocations WHERE category_id = ?", (category_id,))
+        allocation_count = cursor.fetchone()[0]
+        
+        # Delete allocations first
+        cursor.execute("DELETE FROM allocations WHERE category_id = ?", (category_id,))
+        # Delete transactions
+        cursor.execute("DELETE FROM transactions WHERE category_id = ?", (category_id,))
+        # Delete the category
+        cursor.execute("DELETE FROM categories WHERE id = ?", (category_id,))
+        conn.commit()
+        
+        return True, transaction_count, allocation_count
+    except Exception as e:
+        print(f"Error deleting category: {e}")
+        return False, 0, 0
+    finally:
+        conn.close()
+
+
+def delete_allocation(category_id, month):
+    """Delete allocation for a specific category and month"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM allocations WHERE category_id = ? AND month = ?", (category_id, month))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Error deleting allocation: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def get_transaction_with_details(transaction_id):
+    """Get transaction details by ID"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT t.id, t.date, t.description, t.amount, t.type, c.name as category_name
+        FROM transactions t
+        LEFT JOIN categories c ON t.category_id = c.id
+        WHERE t.id = ?
+    """, (transaction_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return result
+
+
 # === BUDGET LOGIC ===
 
 def get_total_income(month=None):
@@ -180,7 +253,7 @@ def get_total_allocated(month):
 def get_available_to_assign(month):
     """Calculate unallocated income for the month including rollover from previous months"""
     current_month_income = get_total_income(month)
-    current_month_allocated = get_total_allocated(month)
+    current_month_allocated = get_total_allocated_direct(month)  # Use direct, not auto-rollover
     rollover_from_previous = get_rollover_amount(month)
     
     return current_month_income + rollover_from_previous - current_month_allocated
@@ -239,35 +312,12 @@ def get_category_spent(category_id, month):
 
 
 def get_category_allocated(category_id, month):
-    """Get amount allocated to category for month including rollover from previous month"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Get current month allocation
-    cursor.execute("""
-        SELECT amount FROM allocations WHERE category_id = ? AND month = ?
-    """, (category_id, month))
-    result = cursor.fetchone()
-    current_allocation = result[0] if result else 0
-    
-    # If no allocation this month, check for rollover from previous month
-    if current_allocation == 0:
-        rollover_balance = get_category_rollover_balance(category_id, month)
-        if rollover_balance > 0:
-            # Automatically allocate the rollover balance for this month
-            cursor.execute("""
-                INSERT OR REPLACE INTO allocations (category_id, month, amount)
-                VALUES (?, ?, ?)
-            """, (category_id, month, rollover_balance))
-            conn.commit()
-            current_allocation = rollover_balance
-    
-    conn.close()
-    return current_allocation
+    """Get amount allocated to category for month (direct allocation only, no auto-rollover)"""
+    return get_category_allocated_direct(category_id, month)
 
 
 def get_category_rollover_balance(category_id, month):
-    """Get the rollover balance for a category from the previous month"""
+    """Get the rollover balance for a category from the previous month only"""
     year, month_num = map(int, month.split('-'))
     
     # Get previous month
@@ -276,7 +326,12 @@ def get_category_rollover_balance(category_id, month):
     else:
         prev_month = f"{year}-{month_num-1:02d}"
     
-    # Get previous month's balance (allocated - spent)
+    # Base case - if no previous data, no rollover
+    prev_income = get_total_income(prev_month)
+    if prev_income == 0:
+        return 0
+    
+    # Get previous month's simple balance (allocated - spent) without recursion
     prev_allocated = get_category_allocated_direct(category_id, prev_month)
     prev_spent = get_category_spent(category_id, prev_month)
     prev_balance = prev_allocated - prev_spent
@@ -293,22 +348,27 @@ def get_category_allocated_direct(category_id, month):
     """, (category_id, month))
     result = cursor.fetchone()
     conn.close()
+    
     return result[0] if result else 0
 
 
 def get_category_balance(category_id, month):
-    """Get current balance for category envelope"""
-    allocated = get_category_allocated(category_id, month)
+    """Get current balance for category envelope including rollover from previous months"""
+    allocated = get_category_allocated_direct(category_id, month)
     spent = get_category_spent(category_id, month)
-    return allocated - spent
+    
+    # Add rollover from previous month
+    rollover = get_category_rollover_balance(category_id, month)
+    
+    return allocated + rollover - spent
 
 
 def get_recent_transactions(limit=10):
-    """Get recent transactions"""
+    """Get recent transactions with IDs"""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT t.date, t.description, t.amount, t.type, c.name as category_name
+        SELECT t.id, t.date, t.description, t.amount, t.type, c.name as category_name
         FROM transactions t
         LEFT JOIN categories c ON t.category_id = c.id
         ORDER BY t.date DESC, t.created_at DESC
@@ -399,15 +459,20 @@ class BitcoinBudgetApp:
         income_frame = ttk.LabelFrame(main_frame, text="Add Income", padding="10")
         income_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
         
-        ttk.Label(income_frame, text="Amount:").grid(row=0, column=0, sticky=tk.W)
+        ttk.Label(income_frame, text="Date (YYYY-MM-DD):").grid(row=0, column=0, sticky=tk.W)
+        self.income_date = ttk.Entry(income_frame, width=15)
+        self.income_date.grid(row=0, column=1, padx=5)
+        self.income_date.insert(0, datetime.now().strftime('%Y-%m-%d'))  # Default to today
+        
+        ttk.Label(income_frame, text="Amount:").grid(row=1, column=0, sticky=tk.W)
         self.income_amount = ttk.Entry(income_frame, width=15)
-        self.income_amount.grid(row=0, column=1, padx=5)
+        self.income_amount.grid(row=1, column=1, padx=5)
         
-        ttk.Label(income_frame, text="Description:").grid(row=1, column=0, sticky=tk.W)
+        ttk.Label(income_frame, text="Description:").grid(row=2, column=0, sticky=tk.W)
         self.income_desc = ttk.Entry(income_frame, width=20)
-        self.income_desc.grid(row=1, column=1, padx=5)
+        self.income_desc.grid(row=2, column=1, padx=5)
         
-        ttk.Button(income_frame, text="Add Income", command=self.add_income_clicked).grid(row=2, column=0, columnspan=2, pady=5)
+        ttk.Button(income_frame, text="Add Income", command=self.add_income_clicked).grid(row=3, column=0, columnspan=2, pady=5)
         
         # Categories section
         categories_frame = ttk.LabelFrame(main_frame, text="Categories", padding="10")
@@ -429,15 +494,25 @@ class BitcoinBudgetApp:
         ttk.Button(categories_frame, text="Allocate", command=self.allocate_clicked).grid(row=1, column=1, padx=5, pady=5)
         ttk.Button(categories_frame, text="Add Expense", command=self.add_expense_clicked).grid(row=1, column=2, pady=5)
         
+        # Row 2 for delete buttons
+        ttk.Button(categories_frame, text="Delete Category", command=self.delete_category_clicked).grid(row=2, column=0, pady=5)
+        ttk.Button(categories_frame, text="Remove Allocation", command=self.remove_allocation_clicked).grid(row=2, column=1, padx=5, pady=5)
+        
         # Recent transactions
         transactions_frame = ttk.LabelFrame(main_frame, text="Recent Transactions", padding="10")
         transactions_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 0))
         
-        # Transaction treeview
-        columns = ("Date", "Description", "Amount", "Category")
+        # Transaction treeview - add hidden ID column
+        columns = ("ID", "Date", "Description", "Amount", "Category")
         self.transactions_tree = ttk.Treeview(transactions_frame, columns=columns, show="headings", height=6)
         
-        for col in columns:
+        # Hide the ID column
+        self.transactions_tree.column("ID", width=0, stretch=False)
+        self.transactions_tree.heading("ID", text="")
+        
+        # Configure visible columns
+        visible_columns = ["Date", "Description", "Amount", "Category"]
+        for col in visible_columns:
             self.transactions_tree.heading(col, text=col)
             self.transactions_tree.column(col, width=150)
         
@@ -447,6 +522,12 @@ class BitcoinBudgetApp:
         trans_scrollbar = ttk.Scrollbar(transactions_frame, orient=tk.VERTICAL, command=self.transactions_tree.yview)
         trans_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
         self.transactions_tree.configure(yscrollcommand=trans_scrollbar.set)
+        
+        # Transaction buttons
+        trans_button_frame = ttk.Frame(transactions_frame)
+        trans_button_frame.grid(row=1, column=0, columnspan=2, pady=(5, 0))
+        
+        ttk.Button(trans_button_frame, text="Delete Selected Transaction", command=self.delete_transaction_clicked).grid(row=0, column=0, padx=5)
         
         # Configure grid weights
         main_frame.rowconfigure(3, weight=1)
@@ -489,7 +570,7 @@ class BitcoinBudgetApp:
         
         transactions = get_recent_transactions(20)
         for trans in transactions:
-            date_str, desc, amount, trans_type, category = trans
+            trans_id, date_str, desc, amount, trans_type, category = trans
             if trans_type == 'income':
                 amount_str = f"+{format_sats(amount)}"
                 category_str = "Income"
@@ -497,7 +578,8 @@ class BitcoinBudgetApp:
                 amount_str = f"-{format_sats(amount)}"
                 category_str = category or "Unknown"
             
-            self.transactions_tree.insert("", "end", values=(date_str, desc, amount_str, category_str))
+            # Store transaction ID in the item for deletion purposes
+            item_id = self.transactions_tree.insert("", "end", values=(trans_id, date_str, desc, amount_str, category_str))
     
     def prev_month(self):
         """Go to previous month"""
@@ -524,54 +606,63 @@ class BitcoinBudgetApp:
     def add_income_clicked(self):
         """Handle add income button click"""
         try:
+            date = self.income_date.get().strip()
             amount_text = self.income_amount.get()
             description = self.income_desc.get()
             
-            if not amount_text or not description:
-                messagebox.showerror("Error", "Please enter both amount and description")
+            if not date or not amount_text or not description:
+                self.show_error("Error", "Please enter all fields")
+                return
+            
+            # Validate date format
+            try:
+                datetime.strptime(date, '%Y-%m-%d')
+            except ValueError:
+                self.show_error("Error", "Invalid date format. Use YYYY-MM-DD")
                 return
             
             amount_sats = parse_amount_input(amount_text)
-            today = datetime.now().strftime('%Y-%m-%d')
             
-            if add_income(amount_sats, description, today):
+            if add_income(amount_sats, description, date):
+                self.income_date.delete(0, tk.END)
+                self.income_date.insert(0, datetime.now().strftime('%Y-%m-%d'))  # Reset to today
                 self.income_amount.delete(0, tk.END)
                 self.income_desc.delete(0, tk.END)
                 self.refresh_display()
-                messagebox.showinfo("Success", f"Added income: {format_sats(amount_sats)}")
+                self.show_info("Success", f"Added income: {format_sats(amount_sats)}")
             else:
-                messagebox.showerror("Error", "Failed to add income")
+                self.show_error("Error", "Failed to add income")
                 
         except ValueError:
-            messagebox.showerror("Error", "Invalid amount format")
+            self.show_error("Error", "Invalid amount format")
         except Exception as e:
-            messagebox.showerror("Error", f"Unexpected error: {e}")
+            self.show_error("Error", f"Unexpected error: {e}")
     
     def add_category_clicked(self):
         """Handle add category button click"""
-        name = simpledialog.askstring("Add Category", "Enter category name:")
+        name = self.ask_string("Add Category", "Enter category name:")
         if name:
             if add_category(name):
                 self.refresh_display()
-                messagebox.showinfo("Success", f"Added category: {name}")
+                self.show_info("Success", f"Added category: {name}")
             else:
-                messagebox.showerror("Error", "Category name already exists")
+                self.show_error("Error", "Category name already exists")
     
     def allocate_clicked(self):
         """Handle allocate button click"""
         selection = self.categories_listbox.curselection()
         if not selection:
-            messagebox.showerror("Error", "Please select a category")
+            self.show_error("Error", "Please select a category")
             return
         
         categories = get_categories()
         if selection[0] >= len(categories):
-            messagebox.showerror("Error", "Invalid category selection")
+            self.show_error("Error", "Invalid category selection")
             return
         
         category = categories[selection[0]]
         
-        amount_text = simpledialog.askstring("Allocate", f"Enter amount to allocate to {category['name']}:")
+        amount_text = self.ask_string("Allocate", f"Enter amount to allocate to {category['name']}:")
         if amount_text:
             try:
                 amount_sats = parse_amount_input(amount_text)
@@ -582,60 +673,162 @@ class BitcoinBudgetApp:
                 additional_needed = amount_sats - current_allocation
                 
                 if additional_needed > available:
-                    messagebox.showerror("Error", f"Not enough available to assign. Available: {format_sats(available)}")
+                    self.show_error("Error", f"Not enough available to assign. Available: {format_sats(available)}")
                     return
                 
                 if allocate_to_category(category['id'], self.current_month, amount_sats):
                     self.refresh_display()
-                    messagebox.showinfo("Success", f"Allocated {format_sats(amount_sats)} to {category['name']}")
+                    self.show_info("Success", f"Allocated {format_sats(amount_sats)} to {category['name']}")
                 else:
-                    messagebox.showerror("Error", "Failed to allocate")
+                    self.show_error("Error", "Failed to allocate")
                     
             except ValueError:
-                messagebox.showerror("Error", "Invalid amount format")
+                self.show_error("Error", "Invalid amount format")
     
     def add_expense_clicked(self):
         """Handle add expense button click"""
         selection = self.categories_listbox.curselection()
         if not selection:
-            messagebox.showerror("Error", "Please select a category")
+            self.show_error("Error", "Please select a category")
             return
         
         categories = get_categories()
         if selection[0] >= len(categories):
-            messagebox.showerror("Error", "Invalid category selection")
+            self.show_error("Error", "Invalid category selection")
             return
         
         category = categories[selection[0]]
         
+        # Get date
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        date = self.ask_string("Add Expense", f"Enter date (YYYY-MM-DD):", initial_value=today_str)
+        if not date:
+            return
+        
+        # Validate date format
+        try:
+            datetime.strptime(date.strip(), '%Y-%m-%d')
+        except ValueError:
+            self.show_error("Error", "Invalid date format. Use YYYY-MM-DD")
+            return
+        
         # Get amount
-        amount_text = simpledialog.askstring("Add Expense", f"Enter expense amount for {category['name']}:")
+        amount_text = self.ask_string("Add Expense", f"Enter expense amount for {category['name']}:")
         if not amount_text:
             return
         
         # Get description
-        description = simpledialog.askstring("Add Expense", "Enter description:")
+        description = self.ask_string("Add Expense", "Enter description:")
         if not description:
             return
         
         try:
             amount_sats = parse_amount_input(amount_text)
-            today = datetime.now().strftime('%Y-%m-%d')
             
-            if add_expense(amount_sats, description, category['id'], today):
+            if add_expense(amount_sats, description, category['id'], date.strip()):
                 self.refresh_display()
-                messagebox.showinfo("Success", f"Added expense: {format_sats(amount_sats)} to {category['name']}")
+                self.show_info("Success", f"Added expense: {format_sats(amount_sats)} to {category['name']}")
             else:
-                messagebox.showerror("Error", "Failed to add expense")
+                self.show_error("Error", "Failed to add expense")
                 
         except ValueError:
-            messagebox.showerror("Error", "Invalid amount format")
+            self.show_error("Error", "Invalid amount format")
         except Exception as e:
-            messagebox.showerror("Error", f"Unexpected error: {e}")
+            self.show_error("Error", f"Unexpected error: {e}")
+    
+    def delete_category_clicked(self):
+        """Handle delete category button click"""
+        selection = self.categories_listbox.curselection()
+        if not selection:
+            self.show_error("Error", "Please select a category")
+            return
+        
+        categories = get_categories()
+        if selection[0] >= len(categories):
+            self.show_error("Error", "Invalid category selection")
+            return
+        
+        category = categories[selection[0]]
+        
+        # Show confirmation with warning about associated data
+        message = f"Are you sure you want to delete the category '{category['name']}'?\n\n"
+        message += "This will also delete ALL transactions and allocations for this category.\n"
+        message += "This action cannot be undone!"
+        
+        if self.ask_yes_no("Confirm Deletion", message):
+            success, transaction_count, allocation_count = delete_category(category['id'])
+            if success:
+                self.refresh_display()
+                result_msg = f"Deleted category: {category['name']}\n"
+                result_msg += f"Also deleted {transaction_count} transactions and {allocation_count} allocations."
+                self.show_info("Success", result_msg)
+            else:
+                self.show_error("Error", "Failed to delete category")
+    
+    def remove_allocation_clicked(self):
+        """Handle remove allocation button click"""
+        selection = self.categories_listbox.curselection()
+        if not selection:
+            self.show_error("Error", "Please select a category")
+            return
+        
+        categories = get_categories()
+        if selection[0] >= len(categories):
+            self.show_error("Error", "Invalid category selection")
+            return
+        
+        category = categories[selection[0]]
+        
+        if self.ask_yes_no("Confirm Removal", f"Are you sure you want to remove all allocations for the category '{category['name']}'?"):
+            if delete_allocation(category['id'], self.current_month):
+                self.refresh_display()
+                self.show_info("Success", f"Removed all allocations for: {category['name']}")
+            else:
+                self.show_error("Error", "Failed to remove allocation")
+    
+    def delete_transaction_clicked(self):
+        """Handle delete transaction button click"""
+        selection = self.transactions_tree.selection()
+        if not selection:
+            self.show_error("Error", "Please select a transaction")
+            return
+        
+        # Get the selected item
+        item = selection[0]
+        # Get all values including the hidden ID
+        values = self.transactions_tree.item(item, "values")
+        trans_id, date_str, desc, amount_str, category_str = values
+        
+        if self.ask_yes_no("Confirm Deletion", f"Are you sure you want to delete this transaction?\n\nDate: {date_str}\nDescription: {desc}\nAmount: {amount_str}\nCategory: {category_str}"):
+            if delete_transaction(trans_id):
+                self.refresh_display()
+                self.show_info("Success", f"Deleted transaction: {desc}")
+            else:
+                self.show_error("Error", "Failed to delete transaction")
     
     def run(self):
         """Start the application"""
         self.root.mainloop()
+
+    # Dialog helper methods to ensure dialogs stay on top
+    def show_error(self, title, message):
+        """Show error message that stays on top"""
+        messagebox.showerror(title, message, parent=self.root)
+    
+    def show_info(self, title, message):
+        """Show info message that stays on top"""
+        messagebox.showinfo(title, message, parent=self.root)
+    
+    def ask_yes_no(self, title, message):
+        """Ask yes/no question that stays on top"""
+        return messagebox.askyesno(title, message, parent=self.root)
+    
+    def ask_string(self, title, prompt, initial_value=""):
+        """Ask for string input that stays on top"""
+        if initial_value:
+            return simpledialog.askstring(title, prompt, initialvalue=initial_value, parent=self.root)
+        else:
+            return simpledialog.askstring(title, prompt, parent=self.root)
 
 
 # === MAIN EXECUTION ===
