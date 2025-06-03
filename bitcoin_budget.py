@@ -187,7 +187,7 @@ def get_available_to_assign(month):
 
 
 def get_rollover_amount(month):
-    """Calculate total rollover available from previous month"""
+    """Calculate unallocated income rollover from previous month (not category balances)"""
     year, month_num = map(int, month.split('-'))
     
     # Get previous month
@@ -201,18 +201,22 @@ def get_rollover_amount(month):
     if prev_income == 0:
         return 0
     
-    # Calculate previous month's leftover
-    prev_available = get_total_income(prev_month) - get_total_allocated(prev_month)
+    # Calculate previous month's unallocated income only
+    # Use direct allocation to avoid recursion
+    prev_allocated = get_total_allocated_direct(prev_month)
+    prev_unallocated = prev_income - prev_allocated
     
-    # Add unspent category balances from previous month
-    prev_category_balances = 0
-    categories = get_categories()
-    for cat in categories:
-        balance = get_category_balance(cat['id'], prev_month)
-        if balance > 0:  # Only positive balances roll forward
-            prev_category_balances += balance
-    
-    return prev_available + prev_category_balances
+    return max(0, prev_unallocated)  # Only positive unallocated amounts roll forward
+
+
+def get_total_allocated_direct(month):
+    """Get total allocated for month without rollover logic"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT SUM(amount) FROM allocations WHERE month = ?", (month,))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result[0] else 0
 
 
 def get_category_spent(category_id, month):
@@ -235,7 +239,53 @@ def get_category_spent(category_id, month):
 
 
 def get_category_allocated(category_id, month):
-    """Get amount allocated to category for month"""
+    """Get amount allocated to category for month including rollover from previous month"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get current month allocation
+    cursor.execute("""
+        SELECT amount FROM allocations WHERE category_id = ? AND month = ?
+    """, (category_id, month))
+    result = cursor.fetchone()
+    current_allocation = result[0] if result else 0
+    
+    # If no allocation this month, check for rollover from previous month
+    if current_allocation == 0:
+        rollover_balance = get_category_rollover_balance(category_id, month)
+        if rollover_balance > 0:
+            # Automatically allocate the rollover balance for this month
+            cursor.execute("""
+                INSERT OR REPLACE INTO allocations (category_id, month, amount)
+                VALUES (?, ?, ?)
+            """, (category_id, month, rollover_balance))
+            conn.commit()
+            current_allocation = rollover_balance
+    
+    conn.close()
+    return current_allocation
+
+
+def get_category_rollover_balance(category_id, month):
+    """Get the rollover balance for a category from the previous month"""
+    year, month_num = map(int, month.split('-'))
+    
+    # Get previous month
+    if month_num == 1:
+        prev_month = f"{year-1}-12"
+    else:
+        prev_month = f"{year}-{month_num-1:02d}"
+    
+    # Get previous month's balance (allocated - spent)
+    prev_allocated = get_category_allocated_direct(category_id, prev_month)
+    prev_spent = get_category_spent(category_id, prev_month)
+    prev_balance = prev_allocated - prev_spent
+    
+    return max(0, prev_balance)  # Only positive balances roll forward
+
+
+def get_category_allocated_direct(category_id, month):
+    """Get amount allocated to category for month without rollover logic"""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
