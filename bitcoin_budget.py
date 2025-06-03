@@ -228,14 +228,10 @@ def get_transaction_with_details(transaction_id):
     return result
 
 
-def get_spending_breakdown(month):
-    """Get spending breakdown by category for a given month"""
+def get_spending_breakdown(start_date, end_date):
+    """Get spending breakdown by category for a given date range"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    start_date = f"{month}-01"
-    last_day = calendar.monthrange(int(month[:4]), int(month[5:]))[1]
-    end_date = f"{month}-{last_day:02d}"
     
     cursor.execute("""
         SELECT c.name, SUM(t.amount) as total_spent
@@ -263,6 +259,63 @@ def get_spending_breakdown(month):
         })
     
     return breakdown, total_spent
+
+
+def get_date_range_for_period(base_month, period_type):
+    """Get start and end dates for different time periods"""
+    year, month = map(int, base_month.split('-'))
+    
+    if period_type == "current_month":
+        start_date = f"{base_month}-01"
+        last_day = calendar.monthrange(year, month)[1]
+        end_date = f"{base_month}-{last_day:02d}"
+        return start_date, end_date
+    
+    elif period_type == "last_3_months":
+        # Go back 3 months from the current month
+        start_year, start_month = year, month
+        for _ in range(2):  # Go back 2 more months (total 3 including current)
+            start_month -= 1
+            if start_month == 0:
+                start_month = 12
+                start_year -= 1
+        
+        start_date = f"{start_year}-{start_month:02d}-01"
+        last_day = calendar.monthrange(year, month)[1]
+        end_date = f"{year}-{month:02d}-{last_day:02d}"
+        return start_date, end_date
+    
+    elif period_type == "last_6_months":
+        # Go back 6 months from the current month
+        start_year, start_month = year, month
+        for _ in range(5):  # Go back 5 more months (total 6 including current)
+            start_month -= 1
+            if start_month == 0:
+                start_month = 12
+                start_year -= 1
+        
+        start_date = f"{start_year}-{start_month:02d}-01"
+        last_day = calendar.monthrange(year, month)[1]
+        end_date = f"{year}-{month:02d}-{last_day:02d}"
+        return start_date, end_date
+    
+    elif period_type == "last_12_months":
+        # Go back 12 months from the current month
+        start_year, start_month = year, month
+        for _ in range(11):  # Go back 11 more months (total 12 including current)
+            start_month -= 1
+            if start_month == 0:
+                start_month = 12
+                start_year -= 1
+        
+        start_date = f"{start_year}-{start_month:02d}-01"
+        last_day = calendar.monthrange(year, month)[1]
+        end_date = f"{year}-{month:02d}-{last_day:02d}"
+        return start_date, end_date
+    
+    else:
+        # Default to current month
+        return get_date_range_for_period(base_month, "current_month")
 
 
 # === BUDGET LOGIC ===
@@ -896,11 +949,14 @@ class SpendingReportWindow:
         """Initialize the spending report window"""
         self.parent = parent
         self.month = month
+        self.current_period = "current_month"
+        self.custom_start_date = ""
+        self.custom_end_date = ""
         
         # Create new window
         self.window = tk.Toplevel(parent)
-        self.window.title(f"Spending Breakdown - {month}")
-        self.window.geometry("1000x600")
+        self.window.title(f"Spending Breakdown")
+        self.window.geometry("1200x700")  # Made wider for controls
         self.window.transient(parent)
         self.window.grab_set()
         
@@ -916,17 +972,37 @@ class SpendingReportWindow:
         # Configure grid weights
         self.window.grid_rowconfigure(0, weight=1)
         self.window.grid_columnconfigure(0, weight=1)
-        main_frame.grid_rowconfigure(1, weight=1)
+        main_frame.grid_rowconfigure(2, weight=1)
         main_frame.grid_columnconfigure(0, weight=1)
         
         # Title
-        title_label = ttk.Label(main_frame, text=f"Spending Breakdown - {self.month}", 
+        self.title_label = ttk.Label(main_frame, text=f"Spending Breakdown - {self.month}", 
                                font=("Arial", 16, "bold"))
-        title_label.grid(row=0, column=0, columnspan=2, pady=(0, 10))
+        self.title_label.grid(row=0, column=0, columnspan=2, pady=(0, 10))
+        
+        # Time period controls
+        period_frame = ttk.LabelFrame(main_frame, text="Time Period", padding="10")
+        period_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        
+        # Period selection buttons
+        ttk.Button(period_frame, text="Current Month", 
+                  command=lambda: self.set_period("current_month")).grid(row=0, column=0, padx=5)
+        ttk.Button(period_frame, text="Last 3 Months", 
+                  command=lambda: self.set_period("last_3_months")).grid(row=0, column=1, padx=5)
+        ttk.Button(period_frame, text="Last 6 Months", 
+                  command=lambda: self.set_period("last_6_months")).grid(row=0, column=2, padx=5)
+        ttk.Button(period_frame, text="Last 12 Months", 
+                  command=lambda: self.set_period("last_12_months")).grid(row=0, column=3, padx=5)
+        ttk.Button(period_frame, text="Custom Range", 
+                  command=self.set_custom_period).grid(row=0, column=4, padx=5)
+        
+        # Period info label
+        self.period_info_label = ttk.Label(period_frame, text="", font=("Arial", 9))
+        self.period_info_label.grid(row=1, column=0, columnspan=5, pady=(5, 0))
         
         # Chart frame (left side)
         chart_frame = ttk.Frame(main_frame)
-        chart_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
+        chart_frame.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
         
         # Create matplotlib figure
         self.fig = Figure(figsize=(6, 6), dpi=100)
@@ -941,7 +1017,7 @@ class SpendingReportWindow:
         
         # Details frame (right side)
         details_frame = ttk.LabelFrame(main_frame, text="Category Details", padding="10")
-        details_frame.grid(row=1, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
+        details_frame.grid(row=2, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Create treeview for category details
         columns = ("Category", "Amount", "Percentage")
@@ -965,19 +1041,110 @@ class SpendingReportWindow:
         details_frame.grid_columnconfigure(0, weight=1)
         
         # Close button
-        ttk.Button(main_frame, text="Close", command=self.window.destroy).grid(row=2, column=0, columnspan=2, pady=(10, 0))
+        ttk.Button(main_frame, text="Close", command=self.window.destroy).grid(row=3, column=0, columnspan=2, pady=(10, 0))
+    
+    def set_period(self, period_type):
+        """Set the time period and update the chart"""
+        self.current_period = period_type
+        self.update_chart()
+    
+    def set_custom_period(self):
+        """Set a custom date range"""
+        # Create custom date range dialog
+        custom_window = tk.Toplevel(self.window)
+        custom_window.title("Custom Date Range")
+        custom_window.geometry("350x200")
+        custom_window.transient(self.window)
+        custom_window.grab_set()
+        
+        # Center the dialog
+        custom_window.geometry("+%d+%d" % (self.window.winfo_rootx()+50, self.window.winfo_rooty()+50))
+        
+        frame = ttk.Frame(custom_window, padding="20")
+        frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        ttk.Label(frame, text="Start Date (YYYY-MM-DD):").grid(row=0, column=0, sticky=tk.W, pady=5)
+        start_entry = ttk.Entry(frame, width=20)
+        start_entry.grid(row=0, column=1, padx=10, pady=5)
+        start_entry.insert(0, self.custom_start_date or f"{self.month}-01")
+        
+        ttk.Label(frame, text="End Date (YYYY-MM-DD):").grid(row=1, column=0, sticky=tk.W, pady=5)
+        end_entry = ttk.Entry(frame, width=20)
+        end_entry.grid(row=1, column=1, padx=10, pady=5)
+        end_entry.insert(0, self.custom_end_date or f"{self.month}-28")
+        
+        def apply_custom():
+            start_date = start_entry.get().strip()
+            end_date = end_entry.get().strip()
+            
+            # Validate dates
+            try:
+                datetime.strptime(start_date, '%Y-%m-%d')
+                datetime.strptime(end_date, '%Y-%m-%d')
+                
+                if start_date <= end_date:
+                    self.custom_start_date = start_date
+                    self.custom_end_date = end_date
+                    self.current_period = "custom"
+                    custom_window.destroy()
+                    self.update_chart()
+                else:
+                    messagebox.showerror("Error", "Start date must be before end date", parent=custom_window)
+            except ValueError:
+                messagebox.showerror("Error", "Invalid date format. Use YYYY-MM-DD", parent=custom_window)
+        
+        button_frame = ttk.Frame(frame)
+        button_frame.grid(row=2, column=0, columnspan=2, pady=20)
+        
+        ttk.Button(button_frame, text="Apply", command=apply_custom).grid(row=0, column=0, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=custom_window.destroy).grid(row=0, column=1, padx=5)
+    
+    def get_period_description(self):
+        """Get a description of the current time period"""
+        if self.current_period == "current_month":
+            return f"Current Month: {self.month}"
+        elif self.current_period == "last_3_months":
+            start_date, end_date = get_date_range_for_period(self.month, "last_3_months")
+            return f"Last 3 Months: {start_date} to {end_date}"
+        elif self.current_period == "last_6_months":
+            start_date, end_date = get_date_range_for_period(self.month, "last_6_months")
+            return f"Last 6 Months: {start_date} to {end_date}"
+        elif self.current_period == "last_12_months":
+            start_date, end_date = get_date_range_for_period(self.month, "last_12_months")
+            return f"Last 12 Months: {start_date} to {end_date}"
+        elif self.current_period == "custom":
+            return f"Custom Range: {self.custom_start_date} to {self.custom_end_date}"
+        else:
+            return ""
     
     def update_chart(self):
         """Update the pie chart and details"""
+        # Get date range based on current period
+        if self.current_period == "custom":
+            start_date = self.custom_start_date
+            end_date = self.custom_end_date
+        else:
+            start_date, end_date = get_date_range_for_period(self.month, self.current_period)
+        
         # Get spending data
-        breakdown, total_spent = get_spending_breakdown(self.month)
+        breakdown, total_spent = get_spending_breakdown(start_date, end_date)
+        
+        # Update title and period info
+        self.title_label.config(text="Spending Breakdown")
+        self.period_info_label.config(text=self.get_period_description())
         
         if not breakdown:
             # No spending data
-            self.ax.text(0.5, 0.5, 'No spending data for this month', 
+            self.ax.clear()
+            self.ax.text(0.5, 0.5, 'No spending data for this period', 
                         horizontalalignment='center', verticalalignment='center', 
                         transform=self.ax.transAxes, fontsize=12)
             self.ax.set_title(f"Total Spending: {format_sats(0)}", fontsize=14, fontweight='bold')
+            
+            # Clear details
+            for item in self.details_tree.get_children():
+                self.details_tree.delete(item)
+            
             self.canvas.draw()
             return
         
