@@ -42,28 +42,28 @@ public class GetCurrentBudgetPeriodQueryHandler : IRequestHandler<GetCurrentBudg
         var currentYear = now.Year;
         var currentMonth = now.Month;
 
-        // Try to get existing period
-        var budgetPeriod = await _budgetPeriodRepository.GetByBudgetAndDateAsync(
+        // Try to find existing budget period for current month
+        var existingPeriod = await _budgetPeriodRepository.GetByMonthAsync(
             request.BudgetId, currentYear, currentMonth);
 
         // Auto-create if doesn't exist
-        if (budgetPeriod == null)
+        if (existingPeriod == null)
         {
-            budgetPeriod = new BudgetPeriod(request.BudgetId, currentYear, currentMonth);
-            budgetPeriod = await _budgetPeriodRepository.AddAsync(budgetPeriod);
+            existingPeriod = new BudgetPeriod(request.BudgetId, currentYear, currentMonth);
+            existingPeriod = await _budgetPeriodRepository.AddAsync(existingPeriod);
         }
 
         // Convert to DTO
         return new BudgetPeriodDto(
-            Id: budgetPeriod.Id,
-            BudgetId: budgetPeriod.BudgetId,
-            Year: budgetPeriod.Year,
-            Month: budgetPeriod.Month,
-            StartDate: budgetPeriod.StartDate,
-            EndDate: budgetPeriod.EndDate,
-            TotalAllocated: budgetPeriod.GetTotalAllocated(),
-            DisplayName: budgetPeriod.GetDisplayName(),
-            CategoryAllocations: budgetPeriod.CategoryAllocations.Select(ca => 
+            Id: existingPeriod.Id,
+            BudgetId: existingPeriod.BudgetId,
+            Year: existingPeriod.Year,
+            Month: existingPeriod.Month,
+            StartDate: existingPeriod.StartDate,
+            EndDate: existingPeriod.EndDate,
+            TotalAllocated: existingPeriod.GetTotalAllocated(),
+            DisplayName: existingPeriod.GetDisplayName(),
+            CategoryAllocations: existingPeriod.CategoryAllocations.Select(ca => 
                 new CategoryAllocationDto(
                     Id: ca.Id,
                     CategoryId: ca.CategoryId,

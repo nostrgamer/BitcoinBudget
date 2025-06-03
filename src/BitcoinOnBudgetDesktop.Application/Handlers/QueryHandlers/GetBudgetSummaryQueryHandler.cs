@@ -66,8 +66,12 @@ public class GetBudgetSummaryQueryHandler : IRequestHandler<GetBudgetSummaryQuer
                 Description: category.Description,
                 Color: category.Color,
                 AllocatedAmount: allocatedAmount,
+                RolloverAmount: SatoshiAmount.Zero,
+                NewAllocation: allocatedAmount,
                 SpentAmount: spentAmount,
-                RemainingAmount: remainingAmount
+                RemainingAmount: remainingAmount,
+                HasRollover: false,
+                RolloverPercentage: 0
             ));
         }
 

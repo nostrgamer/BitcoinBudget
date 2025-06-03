@@ -20,4 +20,6 @@ public interface ITransactionRepository
     Task<SatoshiAmount> GetTotalIncomeAsync(int budgetId);
     Task<SatoshiAmount> GetTotalExpensesAsync(int budgetId);
     Task<SatoshiAmount> GetCategoryExpensesAsync(int budgetId, int categoryId);
+    Task<SatoshiAmount> GetCategoryExpensesAsync(int budgetId, int categoryId, DateTime startDate, DateTime endDate);
+    Task<int> DeleteByBudgetIdAsync(int budgetId);
 } 

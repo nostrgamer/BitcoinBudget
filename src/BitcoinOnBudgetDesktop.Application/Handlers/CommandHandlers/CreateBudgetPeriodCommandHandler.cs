@@ -21,12 +21,9 @@ public class CreateBudgetPeriodCommandHandler : IRequestHandler<CreateBudgetPeri
     {
         try
         {
-            // Check if period already exists
-            var existingPeriod = await _budgetPeriodRepository.GetByBudgetAndDateAsync(
-                request.BudgetId, 
-                request.Year, 
-                request.Month
-            );
+            // Check if budget period already exists
+            var existingPeriod = await _budgetPeriodRepository.GetByMonthAsync(
+                request.BudgetId, request.Year, request.Month);
 
             if (existingPeriod != null)
             {

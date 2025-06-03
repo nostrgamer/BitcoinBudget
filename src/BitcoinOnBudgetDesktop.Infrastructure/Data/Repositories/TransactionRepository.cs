@@ -110,12 +110,36 @@ public class TransactionRepository : ITransactionRepository
     public async Task<SatoshiAmount> GetCategoryExpensesAsync(int budgetId, int categoryId)
     {
         var transactions = await _context.Transactions
-            .Where(t => t.BudgetId == budgetId && 
-                       t.CategoryId == categoryId && 
-                       t.TransactionType == TransactionType.Expense)
+            .Where(t => t.BudgetId == budgetId && t.CategoryId == categoryId && t.TransactionType == TransactionType.Expense)
             .ToListAsync();
         
         var total = transactions.Sum(t => t.Amount.Value);
         return new SatoshiAmount(total);
+    }
+
+    public async Task<SatoshiAmount> GetCategoryExpensesAsync(int budgetId, int categoryId, DateTime startDate, DateTime endDate)
+    {
+        var transactions = await _context.Transactions
+            .Where(t => t.BudgetId == budgetId && 
+                       t.CategoryId == categoryId && 
+                       t.TransactionType == TransactionType.Expense &&
+                       t.Date >= startDate && 
+                       t.Date <= endDate)
+            .ToListAsync();
+        
+        var total = transactions.Sum(t => t.Amount.Value);
+        return new SatoshiAmount(total);
+    }
+
+    public async Task<int> DeleteByBudgetIdAsync(int budgetId)
+    {
+        var transactions = await _context.Transactions
+            .Where(t => t.BudgetId == budgetId)
+            .ToListAsync();
+
+        _context.Transactions.RemoveRange(transactions);
+        await _context.SaveChangesAsync();
+        
+        return transactions.Count;
     }
 } 

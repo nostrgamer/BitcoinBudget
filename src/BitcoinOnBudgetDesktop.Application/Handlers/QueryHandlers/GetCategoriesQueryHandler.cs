@@ -44,8 +44,12 @@ public class GetCategoriesQueryHandler : IRequestHandler<GetCategoriesQuery, IEn
                 Description: category.Description,
                 Color: category.Color,
                 AllocatedAmount: allocatedAmount,
+                RolloverAmount: SatoshiAmount.Zero, // TODO: Calculate actual rollover from allocation
+                NewAllocation: allocatedAmount, // TODO: Split allocation into rollover vs new
                 SpentAmount: spentAmount,
-                RemainingAmount: remainingAmount
+                RemainingAmount: remainingAmount,
+                HasRollover: false, // TODO: Check if allocation has rollover
+                RolloverPercentage: 0 // TODO: Calculate rollover percentage
             );
         });
     }

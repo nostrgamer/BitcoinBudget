@@ -123,13 +123,15 @@ BitcoinBudget.Desktop/
 
 #### BudgetPeriod
 - **Purpose**: Monthly budget cycles
-- **Properties**: Id, Year, Month, StartDate, EndDate
+- **Properties**: Id, Year, Month, StartDate, EndDate, IsClosed, ClosedDate
 - **Business Rules**: No overlapping periods
+- **Phase 3 Enhancements**: Rollover calculations, period transitions, overspending detection
 
 #### CategoryAllocation
 - **Purpose**: Budget assignments to categories
-- **Properties**: Id, Amount, CategoryId, BudgetPeriodId
+- **Properties**: Id, Amount, CategoryId, BudgetPeriodId, RolloverAmount, NewAllocation, CreatedDate, LastModified
 - **Business Rules**: Total allocations cannot exceed available funds
+- **Phase 3 Enhancements**: Rollover tracking, allocation analysis, audit fields
 
 ### Value Objects
 
@@ -172,6 +174,8 @@ CREATE TABLE BudgetPeriods (
     Month INTEGER NOT NULL,
     StartDate TEXT NOT NULL,
     EndDate TEXT NOT NULL,
+    IsClosed INTEGER NOT NULL DEFAULT 0,
+    ClosedDate TEXT,
     FOREIGN KEY (BudgetId) REFERENCES Budgets(Id),
     UNIQUE(BudgetId, Year, Month)
 );
@@ -193,6 +197,10 @@ CREATE TABLE CategoryAllocations (
     BudgetPeriodId INTEGER NOT NULL,
     CategoryId INTEGER NOT NULL,
     Amount INTEGER NOT NULL,
+    RolloverAmount INTEGER NOT NULL DEFAULT 0,
+    NewAllocation INTEGER NOT NULL DEFAULT 0,
+    CreatedDate TEXT NOT NULL,
+    LastModified TEXT NOT NULL,
     FOREIGN KEY (BudgetPeriodId) REFERENCES BudgetPeriods(Id),
     FOREIGN KEY (CategoryId) REFERENCES Categories(Id),
     UNIQUE(BudgetPeriodId, CategoryId)
@@ -228,21 +236,35 @@ CREATE TABLE CategoryAllocations (
 
 ## Development Phases
 
-### Phase 1: Core Foundation (2-3 weeks)
+### Phase 1: Core Foundation ✅ COMPLETE (2-3 weeks)
 - Basic domain entities and value objects
 - SQLite database with EF Core
 - Simple WPF UI for categories and transactions
 - Basic budget allocation
 
-### Phase 2: Enhanced Features (2-3 weeks)
-- Monthly budget periods
-- Rollover logic
-- Transaction categorization
-- Basic reporting
+### Phase 2: Enhanced Allocation System ✅ COMPLETE (2-3 weeks)
+- Full budget allocation workflow
+- Available to Assign calculation
+- Budget period management
+- Enhanced UI for allocations
 
-### Phase 3: UI Polish (1-2 weeks)
-- Improved user interface
-- Data validation and error handling
+### Phase 3: Core Monthly Logic ✅ COMPLETE - Backend Only (1-2 weeks)
+- Monthly budget periods with rollover
+- Rollover logic and calculations
+- Enhanced transaction categorization
+- Month transition automation
+- **Note**: UI updates not yet implemented
+
+### Phase 4: UI for Monthly Features (NEXT - 1-2 weeks)
+- Rollover summary displays
+- Month transition interface
+- Overspending indicators
+- Enhanced budget period navigation
+- Monthly rollover reports
+
+### Phase 5: UI Polish (Future - 1-2 weeks)
+- Improved user interface design
+- Advanced data validation and error handling
 - Export/import functionality
 
 This simplified architecture focuses on delivering a functional envelope budgeting system without unnecessary complexity, allowing for rapid development and easy maintenance. 

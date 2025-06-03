@@ -137,10 +137,33 @@ BitcoinOnBudgetDesktop/
 - **Overspending**: Track when category spending exceeds allocation
 - **Monthly Reset**: New budget period with fresh allocations
 
-## Phase 1 Priority Order
+## Development Phases (Updated Status)
+
+### Phase 1: Core Foundation ✅ COMPLETE
 1. Create basic Category entity and management
 2. Implement SatoshiAmount value object
 3. Add Transaction entity with category assignment
 4. Create simple budget allocation system
 5. Implement basic monthly period logic
-6. Build minimal WPF UI for data entry 
+6. Build minimal WPF UI for data entry
+
+### Phase 2: Enhanced Allocation System ✅ COMPLETE
+1. Full budget allocation workflow
+2. Available to Assign calculation
+3. Budget period management
+4. Enhanced UI for allocations
+
+### Phase 3: Core Monthly Logic ✅ COMPLETE (Backend Only)
+1. Enhanced BudgetPeriod entity with rollover calculations
+2. Enhanced CategoryAllocation with rollover tracking
+3. TransitionToNextMonthCommand for automated transitions
+4. GetRolloverSummaryQuery for analysis
+5. Database migration for rollover fields
+6. **Note**: UI updates not yet implemented
+
+### Phase 4: UI for Monthly Features (NEXT)
+1. Rollover summary display
+2. Month transition interface
+3. Overspending indicators
+4. Enhanced budget period navigation
+5. Monthly rollover reports 

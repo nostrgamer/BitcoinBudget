@@ -81,7 +81,9 @@ public class BudgetDbContext : DbContext
             entity.Property(e => e.Month).IsRequired();
             entity.Property(e => e.StartDate).IsRequired();
             entity.Property(e => e.EndDate).IsRequired();
-
+            entity.Property(e => e.IsClosed).IsRequired();
+            entity.Property(e => e.ClosedDate);
+            
             entity.HasOne(e => e.Budget)
                   .WithMany(b => b.BudgetPeriods)
                   .HasForeignKey(e => e.BudgetId)
@@ -101,6 +103,23 @@ public class BudgetDbContext : DbContext
                       v => v.Value,
                       v => new SatoshiAmount(v))
                   .IsRequired();
+
+            // Convert RolloverAmount to long for storage
+            entity.Property(e => e.RolloverAmount)
+                  .HasConversion(
+                      v => v.Value,
+                      v => new SatoshiAmount(v))
+                  .IsRequired();
+
+            // Convert NewAllocation to long for storage
+            entity.Property(e => e.NewAllocation)
+                  .HasConversion(
+                      v => v.Value,
+                      v => new SatoshiAmount(v))
+                  .IsRequired();
+
+            entity.Property(e => e.CreatedDate).IsRequired();
+            entity.Property(e => e.LastModified);
 
             entity.HasOne(e => e.BudgetPeriod)
                   .WithMany(bp => bp.CategoryAllocations)
