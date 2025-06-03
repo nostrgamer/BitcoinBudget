@@ -261,6 +261,66 @@ def get_spending_breakdown(start_date, end_date):
     return breakdown, total_spent
 
 
+def get_net_worth_data(start_date, end_date):
+    """Get monthly income vs expenses data for net worth analysis"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get monthly income and expenses
+    cursor.execute("""
+        SELECT 
+            strftime('%Y-%m', date) as month,
+            type,
+            SUM(amount) as total
+        FROM transactions 
+        WHERE date BETWEEN ? AND ?
+        GROUP BY strftime('%Y-%m', date), type
+        ORDER BY month
+    """, (start_date, end_date))
+    
+    results = cursor.fetchall()
+    conn.close()
+    
+    # Organize data by month
+    monthly_data = {}
+    all_months = set()
+    
+    for month, transaction_type, total in results:
+        all_months.add(month)
+        if month not in monthly_data:
+            monthly_data[month] = {'income': 0, 'expenses': 0}
+        
+        if transaction_type == 'income':
+            monthly_data[month]['income'] = total
+        elif transaction_type == 'expense':
+            monthly_data[month]['expenses'] = total
+    
+    # Fill in missing months with zero values
+    for month in all_months:
+        if month not in monthly_data:
+            monthly_data[month] = {'income': 0, 'expenses': 0}
+    
+    # Convert to sorted list and calculate net worth progression
+    months = sorted(all_months)
+    net_worth_data = []
+    cumulative_net_worth = 0
+    
+    for month in months:
+        data = monthly_data.get(month, {'income': 0, 'expenses': 0})
+        monthly_net = data['income'] - data['expenses']
+        cumulative_net_worth += monthly_net
+        
+        net_worth_data.append({
+            'month': month,
+            'income': data['income'],
+            'expenses': data['expenses'],
+            'monthly_net': monthly_net,
+            'cumulative_net_worth': cumulative_net_worth
+        })
+    
+    return net_worth_data
+
+
 def get_date_range_for_period(base_month, period_type):
     """Get start and end dates for different time periods"""
     year, month = map(int, base_month.split('-'))
@@ -916,8 +976,35 @@ class BitcoinBudgetApp:
             self.show_error("Reports", "Matplotlib is required for reports.\nInstall with: pip install matplotlib")
             return
         
-        # Open spending report window
-        SpendingReportWindow(self.root, self.current_month)
+        # Create a simple menu to choose report type
+        menu_window = tk.Toplevel(self.root)
+        menu_window.title("Choose Report Type")
+        menu_window.geometry("300x200")
+        menu_window.transient(self.root)
+        menu_window.grab_set()
+        
+        # Center the dialog
+        menu_window.geometry("+%d+%d" % (self.root.winfo_rootx()+100, self.root.winfo_rooty()+100))
+        
+        frame = ttk.Frame(menu_window, padding="20")
+        frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        ttk.Label(frame, text="Select Report Type:", font=("Arial", 12, "bold")).grid(row=0, column=0, pady=10)
+        
+        def open_spending_report():
+            menu_window.destroy()
+            SpendingReportWindow(self.root, self.current_month)
+        
+        def open_networth_report():
+            menu_window.destroy()
+            NetWorthReportWindow(self.root, self.current_month)
+        
+        ttk.Button(frame, text="📊 Spending Breakdown", 
+                  command=open_spending_report, width=20).grid(row=1, column=0, pady=5)
+        ttk.Button(frame, text="📈 Net Worth Analysis", 
+                  command=open_networth_report, width=20).grid(row=2, column=0, pady=5)
+        ttk.Button(frame, text="Cancel", 
+                  command=menu_window.destroy, width=20).grid(row=3, column=0, pady=10)
     
     def run(self):
         """Start the application"""
@@ -1186,6 +1273,231 @@ class SpendingReportWindow:
                 format_sats(item['amount']),
                 f"{item['percentage']:.1f}%"
             ))
+        
+        # Draw the chart
+        self.canvas.draw()
+
+
+class NetWorthReportWindow:
+    def __init__(self, parent, month):
+        """Initialize the net worth report window"""
+        self.parent = parent
+        self.month = month
+        self.current_period = "last_6_months"  # Default to 6 months for better visualization
+        self.custom_start_date = ""
+        self.custom_end_date = ""
+        
+        # Create new window
+        self.window = tk.Toplevel(parent)
+        self.window.title(f"Net Worth Analysis")
+        self.window.geometry("1200x700")
+        self.window.transient(parent)
+        self.window.grab_set()
+        
+        self.create_widgets()
+        self.update_chart()
+    
+    def create_widgets(self):
+        """Create the report interface"""
+        # Main frame
+        main_frame = ttk.Frame(self.window, padding="10")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Configure grid weights
+        self.window.grid_rowconfigure(0, weight=1)
+        self.window.grid_columnconfigure(0, weight=1)
+        main_frame.grid_rowconfigure(2, weight=1)
+        main_frame.grid_columnconfigure(0, weight=1)
+        
+        # Title
+        self.title_label = ttk.Label(main_frame, text="Net Worth Analysis", 
+                               font=("Arial", 16, "bold"))
+        self.title_label.grid(row=0, column=0, columnspan=2, pady=(0, 10))
+        
+        # Time period controls (reuse from spending report)
+        period_frame = ttk.LabelFrame(main_frame, text="Time Period", padding="10")
+        period_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        
+        # Period selection buttons
+        ttk.Button(period_frame, text="Current Month", 
+                  command=lambda: self.set_period("current_month")).grid(row=0, column=0, padx=5)
+        ttk.Button(period_frame, text="Last 3 Months", 
+                  command=lambda: self.set_period("last_3_months")).grid(row=0, column=1, padx=5)
+        ttk.Button(period_frame, text="Last 6 Months", 
+                  command=lambda: self.set_period("last_6_months")).grid(row=0, column=2, padx=5)
+        ttk.Button(period_frame, text="Last 12 Months", 
+                  command=lambda: self.set_period("last_12_months")).grid(row=0, column=3, padx=5)
+        ttk.Button(period_frame, text="Custom Range", 
+                  command=self.set_custom_period).grid(row=0, column=4, padx=5)
+        
+        # Period info label
+        self.period_info_label = ttk.Label(period_frame, text="", font=("Arial", 9))
+        self.period_info_label.grid(row=1, column=0, columnspan=5, pady=(5, 0))
+        
+        # Chart frame (takes full width)
+        chart_frame = ttk.Frame(main_frame)
+        chart_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        
+        # Create matplotlib figure
+        self.fig = Figure(figsize=(12, 6), dpi=100)
+        self.ax1 = self.fig.add_subplot(111)
+        
+        # Create canvas
+        self.canvas = FigureCanvasTkAgg(self.fig, chart_frame)
+        self.canvas.get_tk_widget().grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        chart_frame.grid_rowconfigure(0, weight=1)
+        chart_frame.grid_columnconfigure(0, weight=1)
+        
+        # Close button
+        ttk.Button(main_frame, text="Close", command=self.window.destroy).grid(row=3, column=0, columnspan=2, pady=(10, 0))
+    
+    def set_period(self, period_type):
+        """Set the time period and update the chart"""
+        self.current_period = period_type
+        self.update_chart()
+    
+    def set_custom_period(self):
+        """Set a custom date range (reuse logic from spending report)"""
+        # Create custom date range dialog
+        custom_window = tk.Toplevel(self.window)
+        custom_window.title("Custom Date Range")
+        custom_window.geometry("350x200")
+        custom_window.transient(self.window)
+        custom_window.grab_set()
+        
+        # Center the dialog
+        custom_window.geometry("+%d+%d" % (self.window.winfo_rootx()+50, self.window.winfo_rooty()+50))
+        
+        frame = ttk.Frame(custom_window, padding="20")
+        frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        ttk.Label(frame, text="Start Date (YYYY-MM-DD):").grid(row=0, column=0, sticky=tk.W, pady=5)
+        start_entry = ttk.Entry(frame, width=20)
+        start_entry.grid(row=0, column=1, padx=10, pady=5)
+        start_entry.insert(0, self.custom_start_date or f"{self.month}-01")
+        
+        ttk.Label(frame, text="End Date (YYYY-MM-DD):").grid(row=1, column=0, sticky=tk.W, pady=5)
+        end_entry = ttk.Entry(frame, width=20)
+        end_entry.grid(row=1, column=1, padx=10, pady=5)
+        end_entry.insert(0, self.custom_end_date or f"{self.month}-28")
+        
+        def apply_custom():
+            start_date = start_entry.get().strip()
+            end_date = end_entry.get().strip()
+            
+            # Validate dates
+            try:
+                datetime.strptime(start_date, '%Y-%m-%d')
+                datetime.strptime(end_date, '%Y-%m-%d')
+                
+                if start_date <= end_date:
+                    self.custom_start_date = start_date
+                    self.custom_end_date = end_date
+                    self.current_period = "custom"
+                    custom_window.destroy()
+                    self.update_chart()
+                else:
+                    messagebox.showerror("Error", "Start date must be before end date", parent=custom_window)
+            except ValueError:
+                messagebox.showerror("Error", "Invalid date format. Use YYYY-MM-DD", parent=custom_window)
+        
+        button_frame = ttk.Frame(frame)
+        button_frame.grid(row=2, column=0, columnspan=2, pady=20)
+        
+        ttk.Button(button_frame, text="Apply", command=apply_custom).grid(row=0, column=0, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=custom_window.destroy).grid(row=0, column=1, padx=5)
+    
+    def get_period_description(self):
+        """Get a description of the current time period"""
+        if self.current_period == "current_month":
+            return f"Current Month: {self.month}"
+        elif self.current_period == "last_3_months":
+            start_date, end_date = get_date_range_for_period(self.month, "last_3_months")
+            return f"Last 3 Months: {start_date} to {end_date}"
+        elif self.current_period == "last_6_months":
+            start_date, end_date = get_date_range_for_period(self.month, "last_6_months")
+            return f"Last 6 Months: {start_date} to {end_date}"
+        elif self.current_period == "last_12_months":
+            start_date, end_date = get_date_range_for_period(self.month, "last_12_months")
+            return f"Last 12 Months: {start_date} to {end_date}"
+        elif self.current_period == "custom":
+            return f"Custom Range: {self.custom_start_date} to {self.custom_end_date}"
+        else:
+            return ""
+    
+    def update_chart(self):
+        """Update the bar chart and analysis"""
+        # Get date range based on current period
+        if self.current_period == "custom":
+            start_date = self.custom_start_date
+            end_date = self.custom_end_date
+        else:
+            start_date, end_date = get_date_range_for_period(self.month, self.current_period)
+        
+        # Get net worth data
+        net_worth_data = get_net_worth_data(start_date, end_date)
+        
+        # Update period info
+        self.period_info_label.config(text=self.get_period_description())
+        
+        # Clear previous chart
+        self.ax1.clear()
+        
+        if not net_worth_data:
+            # No data
+            self.ax1.text(0.5, 0.5, 'No financial data for this period', 
+                         horizontalalignment='center', verticalalignment='center', 
+                         transform=self.ax1.transAxes, fontsize=12)
+            self.ax1.set_title("Net Worth Analysis", fontsize=14, fontweight='bold')
+            self.canvas.draw()
+            return
+        
+        # Prepare data for bar chart
+        months = [item['month'] for item in net_worth_data]
+        income = [item['income'] for item in net_worth_data]
+        expenses = [item['expenses'] for item in net_worth_data]
+        cumulative_net_worth = [item['cumulative_net_worth'] for item in net_worth_data]
+        
+        # Create bar chart
+        x = range(len(months))
+        width = 0.35
+        
+        # Income bars (green)
+        bars1 = self.ax1.bar([i - width/2 for i in x], income, width, 
+                            label='Income', color='#2E8B57', alpha=0.8)
+        
+        # Expense bars (red)
+        bars2 = self.ax1.bar([i + width/2 for i in x], expenses, width,
+                            label='Expenses', color='#DC143C', alpha=0.8)
+        
+        # Format y-axis to show satoshis nicely
+        self.ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{int(x/1000)}K' if x >= 1000 else f'{int(x)}'))
+        
+        # Set labels and title
+        self.ax1.set_xlabel('Month')
+        self.ax1.set_ylabel('Amount (sats)')
+        self.ax1.set_title('Monthly Income vs Expenses', fontsize=14, fontweight='bold')
+        self.ax1.set_xticks(x)
+        self.ax1.set_xticklabels(months, rotation=45)
+        self.ax1.legend()
+        self.ax1.grid(True, alpha=0.3)
+        
+        # Add cumulative net worth line on secondary y-axis
+        ax2 = self.ax1.twinx()
+        line = ax2.plot(x, cumulative_net_worth, color='#4169E1', linewidth=3, 
+                       marker='o', markersize=6, label='Cumulative Net Worth')
+        ax2.set_ylabel('Cumulative Net Worth (sats)', color='#4169E1')
+        ax2.tick_params(axis='y', labelcolor='#4169E1')
+        ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{int(x/1000)}K' if x >= 1000 else f'{int(x)}'))
+        
+        # Add legend for line
+        lines, labels = self.ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        self.ax1.legend(lines + lines2, labels + labels2, loc='upper left')
+        
+        # Adjust layout to prevent clipping
+        self.fig.tight_layout()
         
         # Draw the chart
         self.canvas.draw()

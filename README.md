@@ -20,6 +20,7 @@ A simple, single-file envelope budgeting application for Bitcoin users.
 ## Requirements
 
 - Python 3.8+ (comes with Tkinter)
+- matplotlib (for reports - installed automatically)
 - That's it!
 
 ## Usage
@@ -55,6 +56,12 @@ This creates a single `bitcoin_budget.exe` file (~15MB) that runs anywhere.
 - ✅ Displays as "1,000,000 sats"
 - ✅ No decimal confusion
 
+### Reports & Analytics
+- ✅ Spending breakdown by category (pie chart)
+- ✅ Net worth analysis (bar chart with trend line)
+- ✅ Multiple time periods (current month, 3/6/12 months, custom range)
+- ✅ Visual charts using matplotlib
+
 ### Simple & Reliable
 - ✅ Single file you can read in 10 minutes
 - ✅ SQLite database (just copy file to backup)
@@ -88,7 +95,7 @@ def get_category_balance(category_id, month):
 ### GUI Layout
 ```
 ┌─────────────────────────────────────────┐
-│ Bitcoin Budget - June 2025             │
+│ Bitcoin Budget - June 2025    📊 Reports│
 ├─────────────────────────────────────────┤
 │ Total Income: 1,000,000 sats           │
 │ Available to Assign: 250,000 sats      │
@@ -108,6 +115,7 @@ def get_category_balance(category_id, month):
 3. **Allocate Budget**: Assign 100,000 sats to Groceries, 300,000 to Rent
 4. **Add Expenses**: Spend 25,000 sats from Groceries category
 5. **Check Balances**: See remaining amounts in each envelope
+6. **View Reports**: 📊 Reports → Spending Breakdown or Net Worth Analysis
 
 ## File Structure
 

@@ -11,8 +11,9 @@ This is a **simple, single-file budgeting application** for Bitcoin users. No ov
 - **Language**: Python 3.8+
 - **GUI**: Tkinter (built into Python)
 - **Database**: SQLite (single file database)
+- **Charts**: matplotlib (for reports and analytics)
 - **Deployment**: PyInstaller (single executable)
-- **Total Code**: ~300-500 lines in one file
+- **Total Code**: ~500-600 lines in one file
 
 ## Why This Stack?
 
@@ -104,6 +105,21 @@ def format_sats(satoshis):
     return f"{satoshis:,} sats"
 ```
 
+### Reports & Analytics
+```python
+def get_spending_breakdown(start_date, end_date):
+    """Get spending by category for pie chart"""
+    return [(category, amount, percentage) for each category]
+
+def get_net_worth_data(start_date, end_date):
+    """Get monthly income vs expenses for bar chart"""
+    return monthly_data_with_cumulative_net_worth
+
+def get_date_range_for_period(base_month, period_type):
+    """Convert period (3 months, 6 months, etc.) to date range"""
+    return start_date, end_date
+```
+
 ## File Structure
 
 ```
@@ -118,7 +134,7 @@ bitcoin_budget/
 
 ```
 ┌─────────────────────────────────────────┐
-│ Bitcoin Budget - June 2025             │
+│ Bitcoin Budget - June 2025    📊 Reports│
 ├─────────────────────────────────────────┤
 │ Total Income: 1,000,000 sats           │
 │ Total Allocated: 750,000 sats          │
@@ -161,11 +177,17 @@ bitcoin_budget/
 2. Transaction history
 3. Error handling
 
-### Phase 4: Distribution (1 hour)
+### Phase 4: Reports (2-3 hours)
+1. matplotlib integration
+2. Spending breakdown pie chart
+3. Net worth analysis bar chart
+4. Time period selection
+
+### Phase 5: Distribution (1 hour)
 1. PyInstaller executable
 2. Basic testing
 
-**Total Development Time: 1 weekend**
+**Total Development Time: 1-2 weekends**
 
 ## Key Benefits
 
@@ -196,21 +218,18 @@ bitcoin_budget/
 
 ### Building Executable
 ```bash
-pip install pyinstaller
+pip install pyinstaller matplotlib
 pyinstaller --onefile --windowed bitcoin_budget.py
 ```
 
-### Result
-- Single `.exe` file (~15MB)
-- No installation required
-- Runs anywhere
+This creates a single ~20MB executable that includes Python, Tkinter, SQLite, and matplotlib.
 
 ## Comparison: Before vs After
 
 | Aspect | C# Clean Architecture | Python Simple |
 |--------|----------------------|---------------|
 | **Files** | 50+ files, 20+ classes | 1 file |
-| **Lines of Code** | 3,000+ lines | 300-500 lines |
+| **Lines of Code** | 3,000+ lines | 500-600 lines |
 | **Concepts to Learn** | Clean Architecture, CQRS, DDD | Functions, SQLite |
 | **Time to Understand** | Hours/Days | 10 minutes |
 | **Time to Build** | Weeks | Weekend |
@@ -234,4 +253,4 @@ But start simple. Most users need basic envelope budgeting, not enterprise featu
 - ✅ Single executable under 20MB
 - ✅ All YNAB core features working
 - ✅ Zero configuration setup
-- ✅ Readable codebase under 500 lines 
+- ✅ Readable codebase under 600 lines 
