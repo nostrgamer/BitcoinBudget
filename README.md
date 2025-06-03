@@ -12,14 +12,10 @@ A simple, single-file envelope budgeting application for Bitcoin users.
 
 ## Why This Approach?
 
-After trying complex enterprise architectures (Clean Architecture, CQRS, etc.), we went back to basics:
-
 - **One Python file** (~500 lines total)
 - **SQLite database** (one file, no setup)
 - **Tkinter GUI** (built into Python)
 - **Zero configuration** (just run it)
-
-**Result**: What took weeks to build and debug in C# now works in a weekend.
 
 ## Requirements
 
@@ -43,7 +39,7 @@ This creates a single `bitcoin_budget.exe` file (~15MB) that runs anywhere.
 
 ## Features
 
-### Core YNAB-Style Budgeting
+### Core Zero Balance Budget-Style Budgeting
 - ✅ Add income transactions
 - ✅ Create spending categories
 - ✅ Allocate income to categories
@@ -121,26 +117,3 @@ budget.db           # SQLite database (auto-created)
 requirements.txt    # Just PyInstaller
 README.md          # This file
 ```
-
-## Benefits Over Enterprise Approach
-
-| Before (C#) | After (Python) |
-|-------------|----------------|
-| 50+ files | 1 file |
-| 3,000+ lines | 500 lines |
-| Hours to understand | 10 minutes |
-| Weeks to build | Weekend |
-| 200MB executable | 15MB executable |
-| Complex debugging | Straightforward |
-
-## Success Metrics ✅
-
-- ✅ Working prototype in one weekend
-- ✅ Single executable under 20MB  
-- ✅ All YNAB core features working
-- ✅ Zero configuration setup
-- ✅ Readable codebase under 500 lines
-- ✅ No crashes on user errors
-- ✅ Bitcoin-native (satoshis everywhere)
-
-Sometimes the simplest solution is the best solution. 
