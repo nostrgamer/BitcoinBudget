@@ -435,50 +435,93 @@ def main_page():
     st.markdown("---")
 
     # === MAIN FUNCTIONALITY TABS ===
-    tab1, tab2, tab3, tab4 = st.tabs(["💰 Add Income", "📁 Categories", "💸 Expenses", "📋 Transactions"])
+    tab1, tab2, tab3 = st.tabs(["💳 Enter Transaction", "📁 Categories", "📋 Transactions"])
     
-    # === TAB 1: ADD INCOME ===
+    # === TAB 1: ENTER TRANSACTION (Combined Income/Expense) ===
     with tab1:
-        st.markdown("### 💰 Add Income")
+        st.markdown("### 💳 Enter Transaction")
         
-        with st.form("add_income_form"):
+        with st.form("add_transaction_form"):
             col1, col2 = st.columns(2)
             
             with col1:
-                income_date = st.date_input(
+                transaction_date = st.date_input(
                     "Date",
                     value=datetime.now().date(),
-                    help="Date of income receipt"
+                    help="Date of transaction"
                 )
                 
-                income_amount = st.text_input(
+                transaction_type = st.selectbox(
+                    "Transaction Type",
+                    options=["Income", "Expense"],
+                    help="Select whether this is income or an expense"
+                )
+                
+                transaction_amount = st.text_input(
                     "Amount",
                     placeholder="1000000 or 0.01 BTC",
                     help="Enter amount in sats or BTC"
                 )
             
             with col2:
-                income_description = st.text_input(
+                transaction_description = st.text_input(
                     "Description",
-                    placeholder="Salary, freelance, etc.",
-                    help="Brief description of income source"
+                    placeholder="Salary, groceries, coffee, etc.",
+                    help="Brief description of transaction"
                 )
+                
+                # Category selection (only for expenses)
+                if transaction_type == "Expense":
+                    categories = get_categories()
+                    if categories:
+                        transaction_category = st.selectbox(
+                            "Category",
+                            options=[cat['name'] for cat in categories],
+                            help="Select spending category"
+                        )
+                    else:
+                        st.warning("⚠️ Add categories first before recording expenses.")
+                        transaction_category = None
+                else:
+                    transaction_category = None
             
-            submitted = st.form_submit_button("➕ Add Income", use_container_width=True, type="primary")
+            # Submit button
+            button_text = "💰 Add Income" if transaction_type == "Income" else "💸 Add Expense"
+            submitted = st.form_submit_button(button_text, use_container_width=True, type="primary")
             
             if submitted:
-                if income_amount and income_description:
+                if transaction_amount and transaction_description:
                     try:
-                        amount_sats = parse_amount_input(income_amount)
-                        if add_income(amount_sats, income_description, str(income_date)):
-                            st.success(f"✅ Added income: {format_sats(amount_sats)} - {income_description}")
-                            st.rerun()
-                        else:
-                            st.error("❌ Failed to add income")
+                        amount_sats = parse_amount_input(transaction_amount)
+                        
+                        if transaction_type == "Income":
+                            if add_income(amount_sats, transaction_description, str(transaction_date)):
+                                st.success(f"✅ Added income: {format_sats(amount_sats)} - {transaction_description}")
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to add income")
+                        else:  # Expense
+                            if transaction_category:
+                                # Find category ID
+                                category_id = None
+                                categories = get_categories()
+                                for cat in categories:
+                                    if cat['name'] == transaction_category:
+                                        category_id = cat['id']
+                                        break
+                                
+                                if category_id:
+                                    if add_expense(amount_sats, transaction_description, category_id, str(transaction_date)):
+                                        st.success(f"✅ Added expense: {format_sats(amount_sats)} - {transaction_description}")
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Failed to add expense")
+                            else:
+                                st.error("❌ Please select a category for expenses")
                     except ValueError:
                         st.error("❌ Invalid amount format")
                 else:
-                    st.error("❌ Please fill in all fields")
+                    st.error("❌ Please fill in all required fields")
 
     # === TAB 2: CATEGORIES ===
     with tab2:
@@ -570,64 +613,8 @@ def main_page():
         else:
             st.info("No categories yet. Add your first category above!")
 
-    # === TAB 3: EXPENSES ===
+    # === TAB 3: TRANSACTIONS ===
     with tab3:
-        st.markdown("### 💸 Add Expense")
-        
-        categories = get_categories()
-        if categories:
-            with st.form("add_expense_form"):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    expense_date = st.date_input(
-                        "Date",
-                        value=datetime.now().date()
-                    )
-                    
-                    expense_category = st.selectbox(
-                        "Category",
-                        options=[cat['name'] for cat in categories]
-                    )
-                
-                with col2:
-                    expense_amount = st.text_input(
-                        "Amount",
-                        placeholder="50000 or 0.0005 BTC"
-                    )
-                    
-                    expense_description = st.text_input(
-                        "Description",
-                        placeholder="Coffee, groceries, etc."
-                    )
-                
-                if st.form_submit_button("💸 Add Expense", type="primary"):
-                    if expense_amount and expense_description:
-                        try:
-                            amount_sats = parse_amount_input(expense_amount)
-                            
-                            # Find category ID
-                            category_id = None
-                            for cat in categories:
-                                if cat['name'] == expense_category:
-                                    category_id = cat['id']
-                                    break
-                            
-                            if category_id:
-                                if add_expense(amount_sats, expense_description, category_id, str(expense_date)):
-                                    st.success(f"✅ Added expense: {format_sats(amount_sats)} - {expense_description}")
-                                    st.rerun()
-                                else:
-                                    st.error("❌ Failed to add expense")
-                        except ValueError:
-                            st.error("❌ Invalid amount format")
-                    else:
-                        st.error("❌ Please fill in all fields")
-        else:
-            st.warning("⚠️ Add categories first before recording expenses.")
-
-    # === TAB 4: TRANSACTIONS ===
-    with tab4:
         st.markdown("### 📋 Recent Transactions")
         
         transactions = get_recent_transactions(20)

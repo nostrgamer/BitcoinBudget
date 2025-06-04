@@ -391,6 +391,9 @@ def net_worth_report():
     
     st.info(f"📅 **{period_descriptions[st.session_state.networth_period]}**")
     
+    # Add spacing
+    st.markdown("---")
+    
     # Get net worth data
     net_worth_data = get_net_worth_data(start_date, end_date)
     
@@ -401,11 +404,11 @@ def net_worth_report():
         expenses = [item['expenses'] for item in net_worth_data]
         cumulative = [item['cumulative_net_worth'] for item in net_worth_data]
         
-        # Create subplots
+        # Create subplots with increased height and spacing
         fig = make_subplots(
             rows=2, cols=1,
             subplot_titles=('Monthly Income vs Expenses', 'Cumulative Net Worth'),
-            vertical_spacing=0.1,
+            vertical_spacing=0.15,  # Increased spacing between charts
             specs=[[{"secondary_y": False}], [{"secondary_y": False}]]
         )
         
@@ -428,21 +431,27 @@ def net_worth_report():
             row=2, col=1
         )
         
-        # Update layout
+        # Update layout with increased height
         fig.update_layout(
-            height=700,
+            height=800,  # Increased from 700
             title_text="Net Worth Analysis",
-            showlegend=True
+            showlegend=True,
+            title_font_size=16,
+            margin=dict(t=80, b=80, l=80, r=80)  # Added margins
         )
         
-        # Format y-axes
-        fig.update_yaxes(title_text="Amount (sats)", row=1, col=1)
-        fig.update_yaxes(title_text="Cumulative Net Worth (sats)", row=2, col=1)
-        fig.update_xaxes(title_text="Month", row=2, col=1)
+        # Format y-axes with better formatting
+        fig.update_yaxes(title_text="Amount (sats)", row=1, col=1, title_font_size=14)
+        fig.update_yaxes(title_text="Cumulative Net Worth (sats)", row=2, col=1, title_font_size=14)
+        fig.update_xaxes(title_text="Month", row=2, col=1, title_font_size=14)
         
         st.plotly_chart(fig, use_container_width=True)
         
-        # Summary metrics
+        # Add spacing before summary
+        st.markdown("---")
+        st.markdown("### 📊 Summary Metrics")
+        
+        # Summary metrics with more spacing
         col1, col2, col3, col4 = st.columns(4)
         
         total_income = sum(income)
@@ -570,13 +579,10 @@ def future_purchasing_power_report():
                 'BTC Gain': f"+{btc_gain:.1f}%"
             })
         
-        # Display projections table
-        st.markdown("### 📈 Future Purchasing Power Projections")
-        df = pd.DataFrame(projections)
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        
+        # === VISUALIZATION FIRST (moved above table) ===
         # Create visualization using the monthly breakdown
         if monthly_breakdown:
+            st.markdown("---")
             st.markdown("### 🥧 Spending Comparison: Current vs Future")
             
             # Create comparison for 5-year projection
@@ -598,7 +604,7 @@ def future_purchasing_power_report():
                         names='category',
                         title=f'Current Monthly Spending\n{format_sats(int(monthly_total_spending))}'
                     )
-                    fig1.update_layout(height=400)
+                    fig1.update_layout(height=500)  # Increased height
                     st.plotly_chart(fig1, use_container_width=True)
                 
                 with col2:
@@ -629,8 +635,15 @@ def future_purchasing_power_report():
                         names='category',
                         title=f'Future Monthly Spending ({years_ahead} years)\nSame purchasing power: {format_sats(int(future_budget))}'
                     )
-                    fig2.update_layout(height=400)
+                    fig2.update_layout(height=500)  # Increased height
                     st.plotly_chart(fig2, use_container_width=True)
+        
+        # === PROJECTIONS TABLE (moved below visualization) ===
+        st.markdown("---")
+        st.markdown("### 📈 Future Purchasing Power Projections")
+        df = pd.DataFrame(projections)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        
     else:
         if monthly_total_spending <= 0:
             st.warning("No spending data found for the selected period.")
