@@ -92,86 +92,100 @@ def get_db_connection():
 
 def add_income(amount_sats, description, transaction_date):
     """Add income transaction"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("""
-            INSERT INTO transactions (date, description, amount, type)
-            VALUES (?, ?, ?, 'income')
-        """, (transaction_date, description, amount_sats))
-        conn.commit()
+        transaction = {
+            'id': st.session_state.user_data['next_transaction_id'],
+            'date': str(transaction_date),
+            'description': description,
+            'amount': amount_sats,
+            'type': 'income',
+            'category_id': None
+        }
+        st.session_state.user_data['transactions'].append(transaction)
+        st.session_state.user_data['next_transaction_id'] += 1
         return True
     except Exception as e:
         st.error(f"Error adding income: {e}")
         return False
-    finally:
-        conn.close()
 
 def add_expense(amount_sats, description, category_id, transaction_date):
     """Add expense transaction"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("""
-            INSERT INTO transactions (date, description, amount, category_id, type)
-            VALUES (?, ?, ?, ?, 'expense')
-        """, (transaction_date, description, amount_sats, category_id))
-        conn.commit()
+        transaction = {
+            'id': st.session_state.user_data['next_transaction_id'],
+            'date': str(transaction_date),
+            'description': description,
+            'amount': amount_sats,
+            'type': 'expense',
+            'category_id': category_id
+        }
+        st.session_state.user_data['transactions'].append(transaction)
+        st.session_state.user_data['next_transaction_id'] += 1
         return True
     except Exception as e:
         st.error(f"Error adding expense: {e}")
         return False
-    finally:
-        conn.close()
 
 def add_category(name):
     """Add a new spending category"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO categories (name) VALUES (?)", (name,))
-        conn.commit()
+        # Check for duplicate name
+        for cat in st.session_state.user_data['categories']:
+            if cat['name'] == name:
+                return False  # Duplicate name
+        
+        category = {
+            'id': st.session_state.user_data['next_category_id'],
+            'name': name,
+            'master_category_id': None
+        }
+        st.session_state.user_data['categories'].append(category)
+        st.session_state.user_data['next_category_id'] += 1
         return True
-    except sqlite3.IntegrityError:
-        return False  # Duplicate name
-    finally:
-        conn.close()
+    except Exception:
+        return False
 
 def add_master_category(name):
     """Add a new master category"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO master_categories (name) VALUES (?)", (name,))
-        conn.commit()
+        # Check for duplicate name
+        for mc in st.session_state.user_data['master_categories']:
+            if mc['name'] == name:
+                return False  # Duplicate name
+        
+        master_category = {
+            'id': st.session_state.user_data['next_master_category_id'],
+            'name': name
+        }
+        st.session_state.user_data['master_categories'].append(master_category)
+        st.session_state.user_data['next_master_category_id'] += 1
         return True
-    except sqlite3.IntegrityError:
-        return False  # Duplicate name
-    finally:
-        conn.close()
+    except Exception:
+        return False
 
 def get_master_categories():
     """Get all master categories"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name FROM master_categories ORDER BY sort_order, name")
-    master_categories = cursor.fetchall()
-    conn.close()
-    return [{'id': row[0], 'name': row[1]} for row in master_categories]
+    return st.session_state.user_data['master_categories'].copy()
 
 def get_categories():
     """Get all categories with their master category information"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT c.id, c.name, c.master_category_id, mc.name as master_category_name
-        FROM categories c
-        LEFT JOIN master_categories mc ON c.master_category_id = mc.id
-        ORDER BY mc.sort_order, mc.name, c.name
-    """)
-    categories = cursor.fetchall()
-    conn.close()
-    return [{'id': row[0], 'name': row[1], 'master_category_id': row[2], 'master_category_name': row[3]} for row in categories]
+    categories = []
+    for cat in st.session_state.user_data['categories']:
+        master_category_name = None
+        if cat['master_category_id']:
+            for mc in st.session_state.user_data['master_categories']:
+                if mc['id'] == cat['master_category_id']:
+                    master_category_name = mc['name']
+                    break
+        
+        categories.append({
+            'id': cat['id'],
+            'name': cat['name'],
+            'master_category_id': cat['master_category_id'],
+            'master_category_name': master_category_name
+        })
+    
+    return categories
 
 def get_categories_grouped():
     """Get categories grouped by master category"""
@@ -188,182 +202,179 @@ def get_categories_grouped():
 
 def assign_category_to_master(category_id, master_category_id):
     """Assign a category to a master category"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("""
-            UPDATE categories SET master_category_id = ? WHERE id = ?
-        """, (master_category_id, category_id))
-        conn.commit()
-        return True
+        for category in st.session_state.user_data['categories']:
+            if category['id'] == category_id:
+                category['master_category_id'] = master_category_id
+                return True
+        return False
     except Exception as e:
         st.error(f"Error assigning category: {e}")
         return False
-    finally:
-        conn.close()
 
 def rename_master_category(master_category_id, new_name):
     """Rename a master category"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("""
-            UPDATE master_categories SET name = ? WHERE id = ?
-        """, (new_name, master_category_id))
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False  # Duplicate name
+        # Check for duplicate name
+        for mc in st.session_state.user_data['master_categories']:
+            if mc['name'] == new_name and mc['id'] != master_category_id:
+                return False  # Duplicate name
+        
+        # Update the name
+        for mc in st.session_state.user_data['master_categories']:
+            if mc['id'] == master_category_id:
+                mc['name'] = new_name
+                return True
+        
+        return False
     except Exception as e:
         st.error(f"Error renaming master category: {e}")
         return False
-    finally:
-        conn.close()
 
 def rename_category(category_id, new_name):
     """Rename a category"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("""
-            UPDATE categories SET name = ? WHERE id = ?
-        """, (new_name, category_id))
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False  # Duplicate name
+        # Check for duplicate name
+        for cat in st.session_state.user_data['categories']:
+            if cat['name'] == new_name and cat['id'] != category_id:
+                return False  # Duplicate name
+        
+        # Update the name
+        for cat in st.session_state.user_data['categories']:
+            if cat['id'] == category_id:
+                cat['name'] = new_name
+                return True
+        
+        return False
     except Exception as e:
         st.error(f"Error renaming category: {e}")
         return False
-    finally:
-        conn.close()
 
 def allocate_to_category(category_id, month, amount_sats):
     """Allocate amount to category for specific month"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("""
-            INSERT OR REPLACE INTO allocations (category_id, month, amount)
-            VALUES (?, ?, ?)
-        """, (category_id, month, amount_sats))
-        conn.commit()
+        # Find existing allocation for this category and month
+        existing_allocation = None
+        for i, alloc in enumerate(st.session_state.user_data['allocations']):
+            if alloc['category_id'] == category_id and alloc['month'] == month:
+                existing_allocation = i
+                break
+        
+        if existing_allocation is not None:
+            # Update existing allocation
+            st.session_state.user_data['allocations'][existing_allocation]['amount'] = amount_sats
+        else:
+            # Create new allocation
+            allocation = {
+                'id': st.session_state.user_data['next_allocation_id'],
+                'category_id': category_id,
+                'month': month,
+                'amount': amount_sats
+            }
+            st.session_state.user_data['allocations'].append(allocation)
+            st.session_state.user_data['next_allocation_id'] += 1
+        
         return True
     except Exception as e:
         st.error(f"Error allocating to category: {e}")
         return False
-    finally:
-        conn.close()
 
 def delete_transaction(transaction_id):
     """Delete a transaction by ID"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM transactions WHERE id = ?", (transaction_id,))
-        conn.commit()
-        return cursor.rowcount > 0
+        for i, transaction in enumerate(st.session_state.user_data['transactions']):
+            if transaction['id'] == transaction_id:
+                del st.session_state.user_data['transactions'][i]
+                return True
+        return False
     except Exception as e:
         st.error(f"Error deleting transaction: {e}")
         return False
-    finally:
-        conn.close()
 
 def update_transaction(transaction_id, date, description, amount, category_id=None):
     """Update a transaction"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        if category_id is not None:
-            # Expense transaction
-            cursor.execute("""
-                UPDATE transactions 
-                SET date = ?, description = ?, amount = ?, category_id = ?
-                WHERE id = ?
-            """, (date, description, amount, category_id, transaction_id))
-        else:
-            # Income transaction (no category)
-            cursor.execute("""
-                UPDATE transactions 
-                SET date = ?, description = ?, amount = ?
-                WHERE id = ?
-            """, (date, description, amount, transaction_id))
-        
-        conn.commit()
-        return cursor.rowcount > 0
+        for transaction in st.session_state.user_data['transactions']:
+            if transaction['id'] == transaction_id:
+                transaction['date'] = str(date)
+                transaction['description'] = description
+                transaction['amount'] = amount
+                if category_id is not None:
+                    transaction['category_id'] = category_id
+                return True
+        return False
     except Exception as e:
         st.error(f"Error updating transaction: {e}")
         return False
-    finally:
-        conn.close()
 
 def delete_category(category_id):
     """Delete a category and all its associated allocations and transactions"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("SELECT COUNT(*) FROM transactions WHERE category_id = ?", (category_id,))
-        transaction_count = cursor.fetchone()[0]
+        transaction_count = 0
+        allocation_count = 0
         
-        cursor.execute("SELECT COUNT(*) FROM allocations WHERE category_id = ?", (category_id,))
-        allocation_count = cursor.fetchone()[0]
+        # Count and delete transactions
+        for i in range(len(st.session_state.user_data['transactions']) - 1, -1, -1):
+            if st.session_state.user_data['transactions'][i]['category_id'] == category_id:
+                del st.session_state.user_data['transactions'][i]
+                transaction_count += 1
         
-        cursor.execute("DELETE FROM allocations WHERE category_id = ?", (category_id,))
-        cursor.execute("DELETE FROM transactions WHERE category_id = ?", (category_id,))
-        cursor.execute("DELETE FROM categories WHERE id = ?", (category_id,))
-        conn.commit()
+        # Count and delete allocations
+        for i in range(len(st.session_state.user_data['allocations']) - 1, -1, -1):
+            if st.session_state.user_data['allocations'][i]['category_id'] == category_id:
+                del st.session_state.user_data['allocations'][i]
+                allocation_count += 1
+        
+        # Delete category
+        for i, category in enumerate(st.session_state.user_data['categories']):
+            if category['id'] == category_id:
+                del st.session_state.user_data['categories'][i]
+                break
         
         return True, transaction_count, allocation_count
     except Exception as e:
         st.error(f"Error deleting category: {e}")
         return False, 0, 0
-    finally:
-        conn.close()
 
 def delete_allocation(category_id, month):
     """Delete allocation for a specific category and month"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM allocations WHERE category_id = ? AND month = ?", (category_id, month))
-        conn.commit()
-        return cursor.rowcount > 0
+        for i, allocation in enumerate(st.session_state.user_data['allocations']):
+            if allocation['category_id'] == category_id and allocation['month'] == month:
+                del st.session_state.user_data['allocations'][i]
+                return True
+        return False
     except Exception as e:
         st.error(f"Error deleting allocation: {e}")
         return False
-    finally:
-        conn.close()
 
 # === BUDGET LOGIC (UNCHANGED FROM ORIGINAL) ===
 
 def get_total_income(month=None):
     """Get total income for month or all time"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    total = 0
     
-    if month:
-        start_date = f"{month}-01"
-        last_day = calendar.monthrange(int(month[:4]), int(month[5:]))[1]
-        end_date = f"{month}-{last_day:02d}"
-        cursor.execute("""
-            SELECT SUM(amount) FROM transactions 
-            WHERE type = 'income' AND date BETWEEN ? AND ?
-        """, (start_date, end_date))
-    else:
-        cursor.execute("SELECT SUM(amount) FROM transactions WHERE type = 'income'")
+    for transaction in st.session_state.user_data['transactions']:
+        if transaction['type'] == 'income':
+            if month:
+                # Check if transaction is in the specified month
+                trans_date = transaction['date']
+                if trans_date.startswith(month):
+                    total += transaction['amount']
+            else:
+                total += transaction['amount']
     
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result[0] else 0
+    return total
 
 def get_total_allocated(month):
     """Get total allocated for month"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT SUM(amount) FROM allocations WHERE month = ?", (month,))
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result[0] else 0
+    total = 0
+    
+    for allocation in st.session_state.user_data['allocations']:
+        if allocation['month'] == month:
+            total += allocation['amount']
+    
+    return total
 
 def get_available_to_assign(month):
     """Calculate unallocated income for the month including rollover from previous months"""
@@ -393,30 +404,19 @@ def get_rollover_amount(month):
 
 def get_total_allocated_direct(month):
     """Get total allocated for month without rollover logic"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT SUM(amount) FROM allocations WHERE month = ?", (month,))
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result[0] else 0
+    return get_total_allocated(month)  # Same as get_total_allocated now
 
 def get_category_spent(category_id, month):
     """Get amount spent in category for month"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    total = 0
     
-    start_date = f"{month}-01"
-    last_day = calendar.monthrange(int(month[:4]), int(month[5:]))[1]
-    end_date = f"{month}-{last_day:02d}"
+    for transaction in st.session_state.user_data['transactions']:
+        if (transaction['type'] == 'expense' and 
+            transaction['category_id'] == category_id and
+            transaction['date'].startswith(month)):
+            total += transaction['amount']
     
-    cursor.execute("""
-        SELECT SUM(amount) FROM transactions 
-        WHERE category_id = ? AND type = 'expense' AND date BETWEEN ? AND ?
-    """, (category_id, start_date, end_date))
-    
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result[0] else 0
+    return total
 
 def get_category_allocated(category_id, month):
     """Get amount allocated to category for month"""
@@ -443,15 +443,11 @@ def get_category_rollover_balance(category_id, month):
 
 def get_category_allocated_direct(category_id, month):
     """Get amount allocated to category for month without rollover logic"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT amount FROM allocations WHERE category_id = ? AND month = ?
-    """, (category_id, month))
-    result = cursor.fetchone()
-    conn.close()
+    for allocation in st.session_state.user_data['allocations']:
+        if allocation['category_id'] == category_id and allocation['month'] == month:
+            return allocation['amount']
     
-    return result[0] if result else 0
+    return 0
 
 def get_category_balance(category_id, month):
     """Get current balance for category envelope including rollover from previous months"""
@@ -463,33 +459,65 @@ def get_category_balance(category_id, month):
 
 def get_recent_transactions(limit=20):
     """Get recent transactions with IDs"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT t.id, t.date, t.description, t.amount, t.type, c.name as category_name
-        FROM transactions t
-        LEFT JOIN categories c ON t.category_id = c.id
-        ORDER BY t.date DESC, t.created_at DESC
-        LIMIT ?
-    """, (limit,))
-    transactions = cursor.fetchall()
-    conn.close()
+    transactions = []
+    
+    # Sort transactions by date (most recent first)
+    sorted_transactions = sorted(
+        st.session_state.user_data['transactions'], 
+        key=lambda x: x['date'], 
+        reverse=True
+    )[:limit]
+    
+    for transaction in sorted_transactions:
+        category_name = None
+        if transaction['category_id']:
+            for cat in st.session_state.user_data['categories']:
+                if cat['id'] == transaction['category_id']:
+                    category_name = cat['name']
+                    break
+        
+        transactions.append((
+            transaction['id'],
+            transaction['date'],
+            transaction['description'],
+            transaction['amount'],
+            transaction['type'],
+            category_name
+        ))
+    
     return transactions
 
 def get_expense_transactions(limit=50):
     """Get recent expense transactions for lifecycle cost analysis"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT t.id, t.date, t.description, t.amount, c.name as category_name
-        FROM transactions t
-        JOIN categories c ON t.category_id = c.id
-        WHERE t.type = 'expense'
-        ORDER BY t.date DESC, t.created_at DESC
-        LIMIT ?
-    """, (limit,))
-    transactions = cursor.fetchall()
-    conn.close()
+    transactions = []
+    
+    # Filter and sort expense transactions by date (most recent first)
+    expense_transactions = [
+        t for t in st.session_state.user_data['transactions'] 
+        if t['type'] == 'expense'
+    ]
+    sorted_transactions = sorted(
+        expense_transactions, 
+        key=lambda x: x['date'], 
+        reverse=True
+    )[:limit]
+    
+    for transaction in sorted_transactions:
+        category_name = None
+        if transaction['category_id']:
+            for cat in st.session_state.user_data['categories']:
+                if cat['id'] == transaction['category_id']:
+                    category_name = cat['name']
+                    break
+        
+        transactions.append((
+            transaction['id'],
+            transaction['date'],
+            transaction['description'],
+            transaction['amount'],
+            category_name
+        ))
+    
     return transactions
 
 # === UTILITY FUNCTIONS (UNCHANGED FROM ORIGINAL) ===
@@ -520,13 +548,44 @@ def get_current_month():
 # === STREAMLIT APPLICATION ===
 
 def initialize_session_state():
-    """Initialize session state variables"""
+    """Initialize session state variables and user data"""
     if 'current_month' not in st.session_state:
         st.session_state.current_month = get_current_month()
     if 'page' not in st.session_state:
         st.session_state.page = 'landing'
     if 'first_visit' not in st.session_state:
         st.session_state.first_visit = True
+    
+    # Initialize user's private data structures
+    if 'user_data' not in st.session_state:
+        st.session_state.user_data = {
+            'transactions': [],  # List of transaction dicts
+            'categories': [],    # List of category dicts
+            'master_categories': [],  # List of master category dicts
+            'allocations': [],   # List of allocation dicts
+            'next_transaction_id': 1,
+            'next_category_id': 1,
+            'next_master_category_id': 1,
+            'next_allocation_id': 1
+        }
+        
+        # Add some default master categories and categories for demo
+        default_master_cats = [
+            {'id': 1, 'name': 'Fixed Expenses'},
+            {'id': 2, 'name': 'Variable Expenses'},
+            {'id': 3, 'name': 'Savings'}
+        ]
+        
+        default_categories = [
+            {'id': 1, 'name': 'Rent', 'master_category_id': 1},
+            {'id': 2, 'name': 'Food', 'master_category_id': 2},
+            {'id': 3, 'name': 'Bitcoin Stack', 'master_category_id': 3}
+        ]
+        
+        st.session_state.user_data['master_categories'] = default_master_cats
+        st.session_state.user_data['categories'] = default_categories
+        st.session_state.user_data['next_master_category_id'] = 4
+        st.session_state.user_data['next_category_id'] = 4
 
 def landing_page():
     """Beautiful landing page explaining how to use the Bitcoin Budget app"""
@@ -919,6 +978,9 @@ def landing_page():
             st.session_state.page = 'main'
             st.session_state.first_visit = False
             st.rerun()
+    
+    # Security notice
+    st.info("🔒 **Privacy Notice**: Your data is stored securely in your browser session only. Each user has their own private data that is not shared with others. Data persists during your session but will be lost when you close your browser.")
 
 def main_page():
     """Main budget application page"""
@@ -1024,13 +1086,14 @@ def main_page():
                                     
                                     if master_id:
                                         # Get the newly created category ID
-                                        conn = get_db_connection()
-                                        cursor = conn.cursor()
-                                        cursor.execute("SELECT id FROM categories WHERE name = ?", (new_category,))
-                                        category_id = cursor.fetchone()[0]
-                                        conn.close()
+                                        category_id = None
+                                        for cat in st.session_state.user_data['categories']:
+                                            if cat['name'] == new_category:
+                                                category_id = cat['id']
+                                                break
                                         
-                                        assign_category_to_master(category_id, master_id)
+                                        if category_id:
+                                            assign_category_to_master(category_id, master_id)
                                 
                                 st.success(f"✅ Added category: {new_category}")
                                 st.rerun()
@@ -1287,17 +1350,16 @@ def main_page():
                                 st.warning(f"⚠️ Moved {len(categories_in_master)} categories to Uncategorized before deleting master category")
                             
                             # Delete master category
-                            conn = get_db_connection()
-                            cursor = conn.cursor()
                             try:
-                                cursor.execute("DELETE FROM master_categories WHERE id = ?", (master_id,))
-                                conn.commit()
+                                for i, mc in enumerate(st.session_state.user_data['master_categories']):
+                                    if mc['id'] == master_id:
+                                        del st.session_state.user_data['master_categories'][i]
+                                        break
+                                
                                 st.success(f"✅ Deleted master category: {selected_master_to_delete}")
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"❌ Failed to delete master category: {e}")
-                            finally:
-                                conn.close()
                 else:
                     st.info("No master categories to delete")
             
