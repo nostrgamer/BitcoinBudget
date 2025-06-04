@@ -1,36 +1,46 @@
-# Bitcoin Budget Desktop - Simple Python Rules
+# Bitcoin Budget - Streamlit Web Application Rules
 
 ## Project Overview
-A **single-file Bitcoin budgeting application** using Python + Tkinter + SQLite. Maximum simplicity, minimum complexity.
+A **modern, web-based Bitcoin budgeting application** using Python + Streamlit + Plotly + SQLite. Maximum simplicity with professional web UI.
 
-**Core Principle: If you can do it in Excel with a few macros, it should be simple in code.**
+**Core Principle: If you can do it in Excel with a few macros, it should be simple in code - now with a modern web interface.**
 
 ## Technology Stack
 - **Language**: Python 3.8+
-- **GUI**: Tkinter (built-in, no dependencies)
+- **Web Framework**: Streamlit (modern web UI)
+- **Charts**: Plotly (interactive visualizations)
+- **Data**: Pandas (data handling)
 - **Database**: SQLite (single file)
-- **Deployment**: PyInstaller (single executable)
-- **Target**: ~300-500 lines total in one file
+- **Deployment**: Streamlit Cloud, Heroku, or self-hosted
+- **Target**: ~1600 lines total across 2-3 files
 
 ## Development Rules
 
-### File Structure (Keep It Simple)
+### File Structure (Clean Web Architecture)
 ```
 bitcoin_budget/
-├── bitcoin_budget.py          # Everything goes here
-├── budget.db                  # SQLite database (auto-created)
-├── requirements.txt           # Just PyInstaller
-└── README.md                  # Usage instructions
+├── streamlit_app.py           # Main application (~750 lines)
+├── pages/
+│   ├── __init__.py           # Package initialization
+│   └── reports.py            # All reports functionality (~870 lines)
+├── budget.db                 # SQLite database (auto-created)
+├── requirements_streamlit.txt # Streamlit + dependencies
+└── README.md                 # Usage instructions
 ```
 
-### Code Organization (Single File)
+### Code Organization (Streamlit Structure)
 ```python
-# bitcoin_budget.py structure:
+# streamlit_app.py structure:
+import streamlit as st
 import sqlite3
-import tkinter as tk
-from tkinter import ttk, messagebox
-from datetime import datetime, date
+import pandas as pd
+from datetime import datetime, timedelta
 import calendar
+import plotly.express as px
+import plotly.graph_objects as go
+
+# === STREAMLIT PAGE CONFIG ===
+st.set_page_config(page_title="Bitcoin Budget", layout="wide")
 
 # === DATABASE FUNCTIONS ===
 def init_database():
@@ -52,21 +62,19 @@ def get_available_to_assign(month):
 def get_category_balance(category_id, month):
     """Get envelope balance with rollover"""
 
-# === GUI CLASSES ===
-class BitcoinBudgetApp:
-    def __init__(self):
-        """Main application window"""
+# === STREAMLIT UI FUNCTIONS ===
+def initialize_session_state():
+    """Initialize Streamlit session state"""
 
-    def create_widgets(self):
-        """Build the interface"""
+def main_page():
+    """Main budget application page"""
 
-    def refresh_display(self):
-        """Update all displays"""
+def sidebar_navigation():
+    """Sidebar for navigation and month selection"""
 
 # === MAIN ===
 if __name__ == "__main__":
-    app = BitcoinBudgetApp()
-    app.run()
+    main()
 ```
 
 ### Python Style Guidelines
@@ -84,12 +92,13 @@ if __name__ == "__main__":
 - **Text dates**: Store as 'YYYY-MM-DD' strings
 - **Foreign keys**: Use them for data integrity
 
-### GUI Guidelines
-- **Standard Tkinter**: No custom themes or complex layouts
-- **Grid layout**: Simple grid-based positioning
-- **Basic widgets**: Entry, Button, Label, Listbox, Frame
-- **Error handling**: Use messagebox for user errors
-- **Keep it functional**: UI follows function, not fashion
+### Streamlit UI Guidelines
+- **Built-in components**: Use st.form, st.columns, st.tabs, st.sidebar
+- **Interactive widgets**: Date inputs, selectboxes, sliders with validation
+- **Data display**: st.dataframe, st.metric, st.plotly_chart
+- **Layout**: Wide layout with responsive columns
+- **Navigation**: Sidebar with session state management
+- **Error handling**: Use st.error, st.warning, st.success for user feedback
 
 ### Bitcoin-Specific Rules
 - **Satoshis everywhere**: Always work in satoshis (integers)
@@ -98,48 +107,50 @@ if __name__ == "__main__":
 - **Input validation**: Ensure positive integers for amounts
 
 ### Simplicity Rules
-❌ **NO** classes for simple data (use tuples/dicts)
-❌ **NO** complex inheritance hierarchies
-❌ **NO** design patterns unless absolutely necessary
-❌ **NO** configuration files or settings management
-❌ **NO** logging frameworks (use print() for debugging)
-❌ **NO** external libraries beyond Python stdlib
+❌ **NO** complex state management beyond st.session_state
+❌ **NO** custom CSS or complex styling
+❌ **NO** external APIs or integrations
+❌ **NO** authentication systems
+❌ **NO** multiple database connections
 ❌ **NO** async/await unless truly needed
-❌ **NO** threads or multiprocessing
-❌ **NO** separate modules or packages
+❌ **NO** complex JavaScript or custom components
 
-✅ **YES** to simple functions
+✅ **YES** to simple Streamlit functions
 ✅ **YES** to direct database calls
-✅ **YES** to basic error handling
-✅ **YES** to readable code over clever code
-✅ **YES** to copy-paste over abstraction
-✅ **YES** to global variables if they simplify things
+✅ **YES** to built-in Streamlit components
+✅ **YES** to Plotly for charts (built-in integration)
+✅ **YES** to session state for navigation
+✅ **YES** to pandas DataFrames for data display
+✅ **YES** to responsive layouts with st.columns
 
 ### Development Workflow
 1. **Start with database**: Get SQLite working first
 2. **Add core functions**: Income, expenses, categories
-3. **Build basic GUI**: One window, basic layout
-4. **Test everything**: Run functions in Python REPL
-5. **Polish UI**: Make it usable, not pretty
-6. **Build executable**: PyInstaller single file
+3. **Build Streamlit pages**: Main app with sidebar navigation
+4. **Add reports module**: Separate file for analytics
+5. **Test in browser**: Run `streamlit run streamlit_app.py`
+6. **Deploy to web**: Streamlit Cloud or production hosting
 
 ### Error Handling
-- **User errors**: Show messagebox with helpful message
+- **User errors**: Show st.error with helpful message
 - **Database errors**: Catch and show user-friendly message
 - **Input validation**: Check before database operations
+- **Form validation**: Use Streamlit form submission patterns
 - **Graceful degradation**: App shouldn't crash on bad input
 
 ### Testing Strategy
-- **Manual testing**: Click through the UI
+- **Manual testing**: Click through the web interface
 - **Function testing**: Run individual functions in REPL
 - **Database testing**: Check SQLite file with DB Browser
+- **Browser testing**: Test responsiveness and mobile compatibility
 - **No unit tests**: Keep it simple for this scope
 
 ### Performance Guidelines
-- **It's a personal budget app**: Performance is not critical
+- **Personal budget app**: Performance is not critical
 - **SQLite is fast enough**: No need for optimization
-- **Tkinter is responsive enough**: No need for threading
+- **Streamlit handles caching**: Use @st.cache_data when needed
 - **Keep queries simple**: Basic SELECT/INSERT/UPDATE
+- **Pandas for display**: DataFrame operations are efficient enough
 
 ### Bitcoin Display Formats
 ```python
@@ -157,88 +168,77 @@ def parse_amount_input(text):
     # Handle "1000", "1,000", "0.001 BTC", etc.
 ```
 
-### Month/Date Handling
+### Streamlit-Specific Patterns
 ```python
-def get_current_month():
-    """Return current month as 'YYYY-MM'"""
-    return datetime.now().strftime('%Y-%m')
+# Session state management
+if 'current_month' not in st.session_state:
+    st.session_state.current_month = get_current_month()
 
-def get_month_range(month_str):
-    """Return start and end dates for month"""
-    # '2025-06' -> ('2025-06-01', '2025-06-30')
-```
+# Form handling with validation
+with st.form("add_income_form"):
+    amount = st.text_input("Amount", placeholder="1000000 or 0.01 BTC")
+    description = st.text_input("Description")
+    submitted = st.form_submit_button("Add Income")
+    
+    if submitted and amount and description:
+        try:
+            amount_sats = parse_amount_input(amount)
+            if add_income(amount_sats, description, date.today()):
+                st.success("Income added successfully!")
+                st.rerun()
+        except ValueError:
+            st.error("Invalid amount format")
 
-### Common Patterns
-```python
-# Database connection (global is fine)
-conn = sqlite3.connect('budget.db')
+# Interactive charts
+fig = px.pie(breakdown_data, values='amount', names='category',
+             title='Spending Breakdown')
+st.plotly_chart(fig, use_container_width=True)
 
-# Simple function pattern
-def add_category(name):
-    """Add a new spending category"""
-    cursor = conn.cursor()
-    try:
-        cursor.execute("INSERT INTO categories (name) VALUES (?)", (name,))
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False  # Duplicate name
-
-# GUI update pattern
-def refresh_categories(self):
-    """Update category display"""
-    self.category_listbox.delete(0, tk.END)
-    categories = get_all_categories()
-    for cat in categories:
-        self.category_listbox.insert(tk.END, f"{cat['name']}: {format_sats(cat['balance'])}")
+# Navigation with sidebar
+with st.sidebar:
+    if st.button("📊 Reports"):
+        st.session_state.page = 'reports'
+        st.rerun()
 ```
 
 ### Anti-Patterns to Avoid
-❌ **Over-engineering**: Don't build for 10,000 users
-❌ **Premature abstraction**: Don't create classes for everything
-❌ **Complex state management**: Keep state in the database
-❌ **Fancy UI frameworks**: Tkinter is sufficient
-❌ **Multiple files**: One file is manageable for this scope
-❌ **Configuration systems**: Hard-code reasonable defaults
-❌ **Plugin architecture**: You ain't gonna need it
+❌ **Over-engineering**: Don't build complex multi-page apps
+❌ **Custom components**: Stick to built-in Streamlit widgets
+❌ **Complex state**: Keep state in database and session_state only
+❌ **External dependencies**: Minimize additional packages
+❌ **Custom styling**: Use default Streamlit appearance
+❌ **Multiple files**: Limit to main app + reports module
 
 ### Success Criteria
-- ✅ **Works in one weekend**: Build and test completely
-- ✅ **Single executable**: PyInstaller creates standalone app
-- ✅ **Under 500 lines**: Readable in 10 minutes
+- ✅ **Works in browser**: Accessible via web interface
+- ✅ **Mobile friendly**: Responsive design works on phones/tablets
+- ✅ **Interactive charts**: Plotly visualizations with hover details
+- ✅ **Fast development**: Build and test quickly with hot reload
+- ✅ **Easy deployment**: One-click deploy to Streamlit Cloud
 - ✅ **All YNAB features**: Income, expenses, categories, allocation
-- ✅ **No installation**: Just run the .exe
+- ✅ **Advanced analytics**: Visual reports with opportunity cost analysis
 - ✅ **No crashes**: Handle user errors gracefully
 
-### Example Function
+### Example Streamlit Function
 ```python
-def get_category_balance(category_id, month):
-    """Get current balance for category envelope"""
-    cursor = conn.cursor()
+def main_page():
+    """Main budget application page"""
+    current_month = st.session_state.current_month
     
-    # Get allocated amount for this month
-    cursor.execute("""
-        SELECT amount FROM allocations 
-        WHERE category_id = ? AND month = ?
-    """, (category_id, month))
-    allocated = cursor.fetchone()
-    allocated = allocated[0] if allocated else 0
+    st.title(f"₿ Bitcoin Budget - {current_month}")
     
-    # Get spent amount for this month
-    start_date = f"{month}-01"
-    end_date = f"{month}-{calendar.monthrange(int(month[:4]), int(month[5:]))[1]}"
-    cursor.execute("""
-        SELECT SUM(amount) FROM transactions 
-        WHERE category_id = ? AND type = 'expense' 
-        AND date BETWEEN ? AND ?
-    """, (category_id, start_date, end_date))
-    spent = cursor.fetchone()
-    spent = spent[0] if spent and spent[0] else 0
+    # Budget summary metrics
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Total Income", format_sats(get_total_income(current_month)))
     
-    # Get previous month balance (simplified rollover)
-    # ... rollover logic here ...
+    # Tabbed interface
+    tab1, tab2, tab3, tab4 = st.tabs(["💰 Income", "📁 Categories", "💸 Expenses", "📋 Transactions"])
     
-    return allocated - spent  # Simplified
+    with tab1:
+        with st.form("add_income"):
+            # Income form with validation
+            pass
 ```
 
-Remember: **Simple is better than complex. Complex is better than complicated. Flat is better than nested.** 
+Remember: **Simple is better than complex. Web-native is better than desktop porting. Interactive is better than static.** 
