@@ -28,6 +28,16 @@ def init_database():
     conn = sqlite3.connect('budget.db')
     cursor = conn.cursor()
     
+    # Master Categories table - groups for organizing categories
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS master_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
     # Transactions table - all income and expenses
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS transactions (
@@ -42,12 +52,14 @@ def init_database():
         )
     ''')
     
-    # Categories table - spending envelopes
+    # Categories table - spending envelopes (now with master category grouping)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS categories (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            master_category_id INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(master_category_id) REFERENCES master_categories(id)
         )
     ''')
     
@@ -63,6 +75,12 @@ def init_database():
             FOREIGN KEY(category_id) REFERENCES categories(id)
         )
     ''')
+    
+    # Add master_category_id column to existing categories table if it doesn't exist
+    cursor.execute("PRAGMA table_info(categories)")
+    columns = [column[1] for column in cursor.fetchall()]
+    if 'master_category_id' not in columns:
+        cursor.execute("ALTER TABLE categories ADD COLUMN master_category_id INTEGER REFERENCES master_categories(id)")
     
     conn.commit()
     conn.close()
@@ -118,14 +136,106 @@ def add_category(name):
     finally:
         conn.close()
 
-def get_categories():
-    """Get all categories"""
+def add_master_category(name):
+    """Add a new master category"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name FROM categories ORDER BY name")
+    try:
+        cursor.execute("INSERT INTO master_categories (name) VALUES (?)", (name,))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False  # Duplicate name
+    finally:
+        conn.close()
+
+def get_master_categories():
+    """Get all master categories"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name FROM master_categories ORDER BY sort_order, name")
+    master_categories = cursor.fetchall()
+    conn.close()
+    return [{'id': row[0], 'name': row[1]} for row in master_categories]
+
+def get_categories():
+    """Get all categories with their master category information"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT c.id, c.name, c.master_category_id, mc.name as master_category_name
+        FROM categories c
+        LEFT JOIN master_categories mc ON c.master_category_id = mc.id
+        ORDER BY mc.sort_order, mc.name, c.name
+    """)
     categories = cursor.fetchall()
     conn.close()
-    return [{'id': row[0], 'name': row[1]} for row in categories]
+    return [{'id': row[0], 'name': row[1], 'master_category_id': row[2], 'master_category_name': row[3]} for row in categories]
+
+def get_categories_grouped():
+    """Get categories grouped by master category"""
+    categories = get_categories()
+    grouped = {}
+    
+    for cat in categories:
+        master_name = cat['master_category_name'] or 'Uncategorized'
+        if master_name not in grouped:
+            grouped[master_name] = []
+        grouped[master_name].append(cat)
+    
+    return grouped
+
+def assign_category_to_master(category_id, master_category_id):
+    """Assign a category to a master category"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE categories SET master_category_id = ? WHERE id = ?
+        """, (master_category_id, category_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        st.error(f"Error assigning category: {e}")
+        return False
+    finally:
+        conn.close()
+
+def rename_master_category(master_category_id, new_name):
+    """Rename a master category"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE master_categories SET name = ? WHERE id = ?
+        """, (new_name, master_category_id))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False  # Duplicate name
+    except Exception as e:
+        st.error(f"Error renaming master category: {e}")
+        return False
+    finally:
+        conn.close()
+
+def rename_category(category_id, new_name):
+    """Rename a category"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE categories SET name = ? WHERE id = ?
+        """, (new_name, category_id))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False  # Duplicate name
+    except Exception as e:
+        st.error(f"Error renaming category: {e}")
+        return False
+    finally:
+        conn.close()
 
 def allocate_to_category(category_id, month, amount_sats):
     """Allocate amount to category for specific month"""
@@ -419,11 +529,21 @@ def main_page():
         )
     
     with col3:
-        st.metric(
-            label="📋 Allocated",
-            value=format_sats(total_allocated),
-            delta=None
-        )
+        # Check if over budget (allocated > income + rollover)
+        total_available = total_income + rollover
+        if total_allocated > total_available:
+            st.metric(
+                label="📋 Allocated",
+                value=format_sats(total_allocated),
+                delta="⚠️ Over Budget",
+                delta_color="inverse"
+            )
+        else:
+            st.metric(
+                label="📋 Allocated",
+                value=format_sats(total_allocated),
+                delta=None
+            )
     
     with col4:
         st.metric(
@@ -435,76 +555,450 @@ def main_page():
     st.markdown("---")
 
     # === MAIN FUNCTIONALITY TABS ===
-    tab1, tab2, tab3 = st.tabs(["💳 Enter Transaction", "📁 Categories", "📋 Transactions"])
+    tab1, tab2 = st.tabs(["📁 Categories", "💳 Transactions"])
     
-    # === TAB 1: ENTER TRANSACTION (Combined Income/Expense) ===
+    # === TAB 1: CATEGORIES (Now the primary/default tab) ===
     with tab1:
-        st.markdown("### 💳 Enter Transaction")
+        st.markdown("### 📁 Category Management")
         
-        with st.form("add_transaction_form"):
+        # Add new master category and category sections
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            with st.expander("➕ Add Master Category", expanded=False):
+                with st.form("add_master_category_form"):
+                    new_master_category = st.text_input("Master Category Name", placeholder="e.g., Fixed Expenses, Variable Expenses, Savings")
+                    if st.form_submit_button("Add Master Category"):
+                        if new_master_category:
+                            if add_master_category(new_master_category):
+                                st.success(f"✅ Added master category: {new_master_category}")
+                                st.rerun()
+                            else:
+                                st.error("❌ Master category name already exists")
+                        else:
+                            st.error("❌ Please enter a master category name")
+        
+        with col2:
+            with st.expander("➕ Add Category", expanded=False):
+                with st.form("add_category_form"):
+                    new_category = st.text_input("Category Name", placeholder="e.g., Transportation")
+                    
+                    # Master category selection
+                    master_categories = get_master_categories()
+                    master_options = ['None'] + [mc['name'] for mc in master_categories]
+                    selected_master = st.selectbox("Assign to Master Category", master_options)
+                    
+                    if st.form_submit_button("Add Category"):
+                        if new_category:
+                            if add_category(new_category):
+                                # Assign to master category if selected
+                                if selected_master != 'None':
+                                    master_id = None
+                                    for mc in master_categories:
+                                        if mc['name'] == selected_master:
+                                            master_id = mc['id']
+                                            break
+                                    
+                                    if master_id:
+                                        # Get the newly created category ID
+                                        conn = get_db_connection()
+                                        cursor = conn.cursor()
+                                        cursor.execute("SELECT id FROM categories WHERE name = ?", (new_category,))
+                                        category_id = cursor.fetchone()[0]
+                                        conn.close()
+                                        
+                                        assign_category_to_master(category_id, master_id)
+                                
+                                st.success(f"✅ Added category: {new_category}")
+                                st.rerun()
+                            else:
+                                st.error("❌ Category name already exists")
+                        else:
+                            st.error("❌ Please enter a category name")
+
+        st.markdown("---")
+
+        # Get all master categories and categories
+        master_categories = get_master_categories()
+        all_categories = get_categories()
+        
+        if master_categories or all_categories:
+            # Build unified table data with proper grouping
+            table_data = []
+            grand_allocated = 0
+            grand_spent = 0
+            grand_balance = 0
+            
+            # Get all master category names (including empty ones)
+            master_names = [mc['name'] for mc in master_categories]
+            
+            # Add "Uncategorized" for categories without master category
+            master_names.append('Uncategorized')
+            
+            # Group categories by master category
+            for master_name in master_names:
+                # Find categories for this master category
+                if master_name == 'Uncategorized':
+                    categories_in_group = [cat for cat in all_categories if cat['master_category_id'] is None]
+                else:
+                    master_id = next((mc['id'] for mc in master_categories if mc['name'] == master_name), None)
+                    categories_in_group = [cat for cat in all_categories if cat['master_category_id'] == master_id]
+                
+                # Calculate master category totals
+                master_allocated = 0
+                master_spent = 0
+                master_balance = 0
+                
+                # Add master category header row
+                table_data.append({
+                    'ID': f"master_{master_name}",
+                    'Type': 'master',
+                    'Category': f"📂 {master_name}",
+                    'Master_Category_Assignment': master_name,
+                    'Allocated': 0,  # Will be calculated
+                    'Spent': 0,      # Will be calculated
+                    'Balance': 0,    # Will be calculated
+                    'Status': '📊 Total'
+                })
+                
+                # Add individual categories under this master category
+                for cat in categories_in_group:
+                    allocated = get_category_allocated(cat['id'], current_month)
+                    spent = get_category_spent(cat['id'], current_month)
+                    balance = get_category_balance(cat['id'], current_month)
+                    
+                    master_allocated += allocated
+                    master_spent += spent
+                    master_balance += balance
+                    
+                    # Get master category options for reassignment
+                    master_options_for_cat = ['Uncategorized'] + [mc['name'] for mc in master_categories]
+                    current_master = cat['master_category_name'] or 'Uncategorized'
+                    
+                    table_data.append({
+                        'ID': cat['id'],
+                        'Type': 'category',
+                        'Category': f"    {cat['name']}", # Indent to show hierarchy
+                        'Master_Category_Assignment': current_master,
+                        'Allocated': allocated,
+                        'Spent': spent,
+                        'Balance': balance,
+                        'Status': '✅ Good' if balance >= 0 else '⚠️ Overspent'
+                    })
+                
+                # Update master category totals in the header row
+                for row in table_data:
+                    if row['ID'] == f"master_{master_name}":
+                        row['Allocated'] = master_allocated
+                        row['Spent'] = master_spent
+                        row['Balance'] = master_balance
+                        row['Status'] = '📊 Total' if master_balance >= 0 else '⚠️ Over'
+                        break
+                
+                # Add to grand totals
+                grand_allocated += master_allocated
+                grand_spent += master_spent
+                grand_balance += master_balance
+            
+            # Add grand total row
+            table_data.append({
+                'ID': 'grand_total',
+                'Type': 'grand_total',
+                'Category': '📊 GRAND TOTAL',
+                'Master_Category_Assignment': 'Grand Total',
+                'Allocated': grand_allocated,
+                'Spent': grand_spent,
+                'Balance': grand_balance,
+                'Status': '🎯 Total' if grand_balance >= 0 else '⚠️ Over'
+            })
+            
+            # Create DataFrame
+            df = pd.DataFrame(table_data)
+            
+            # Display editable table
+            edited_df = st.data_editor(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "ID": None,  # Hide ID column
+                    "Type": None,  # Hide type column
+                    "Category": st.column_config.TextColumn(
+                        "Category", 
+                        help="Click to rename categories or master categories",
+                        width="large"
+                    ),
+                    "Master_Category_Assignment": st.column_config.SelectboxColumn(
+                        "Master Category",
+                        help="Click dropdown to reassign category to different master category",
+                        options=['Uncategorized'] + [mc['name'] for mc in master_categories]
+                    ),
+                    "Allocated": st.column_config.NumberColumn(
+                        "Allocated (sats)",
+                        help="Enter allocation amount in satoshis (only works for individual categories)",
+                        min_value=0,
+                        step=1,
+                        format="%d"
+                    ),
+                    "Spent": st.column_config.NumberColumn(
+                        "Spent (sats)", 
+                        disabled=True,
+                        format="%d"
+                    ),
+                    "Balance": st.column_config.NumberColumn(
+                        "Balance (sats)", 
+                        disabled=True,
+                        format="%d"
+                    ),
+                    "Status": st.column_config.TextColumn("Status", disabled=True)
+                },
+                key="unified_categories"
+            )
+            
+            # Process changes
+            if not edited_df.equals(df):
+                changes_made = False
+                for idx, row in edited_df.iterrows():
+                    row_type = row['Type']
+                    
+                    # Check for category/master category name changes
+                    original_category_name = df.iloc[idx]['Category']
+                    new_category_name = row['Category']
+                    
+                    if original_category_name != new_category_name:
+                        if row_type == 'master':
+                            # Rename master category
+                            master_name = original_category_name.replace('📂 ', '')
+                            new_master_name = new_category_name.replace('📂 ', '')
+                            
+                            master_id = next((mc['id'] for mc in master_categories if mc['name'] == master_name), None)
+                            if master_id and new_master_name.strip():
+                                if rename_master_category(master_id, new_master_name.strip()):
+                                    st.success(f"✅ Renamed master category from '{master_name}' to '{new_master_name}'")
+                                    changes_made = True
+                                else:
+                                    st.error(f"❌ Failed to rename master category (name may already exist)")
+                        
+                        elif row_type == 'category':
+                            # Rename individual category
+                            old_name = original_category_name.strip()
+                            new_name = new_category_name.strip()
+                            
+                            category_id = row['ID']
+                            if new_name:
+                                if rename_category(category_id, new_name):
+                                    st.success(f"✅ Renamed category from '{old_name}' to '{new_name}'")
+                                    changes_made = True
+                                else:
+                                    st.error(f"❌ Failed to rename category (name may already exist)")
+                    
+                    if row_type == 'category':  # Only process other changes for individual categories
+                        # Check for allocation changes
+                        original_allocated = df.iloc[idx]['Allocated']
+                        new_allocated = row['Allocated']
+                        
+                        if original_allocated != new_allocated:
+                            category_id = row['ID']
+                            
+                            if new_allocated == 0 or pd.isna(new_allocated):
+                                if delete_allocation(category_id, current_month):
+                                    st.success(f"✅ Removed allocation for {row['Category'].strip()}")
+                                    changes_made = True
+                                else:
+                                    st.error(f"❌ Failed to remove allocation for {row['Category'].strip()}")
+                            else:
+                                if allocate_to_category(category_id, current_month, int(new_allocated)):
+                                    st.success(f"✅ Allocated {format_sats(int(new_allocated))} to {row['Category'].strip()}")
+                                    changes_made = True
+                                else:
+                                    st.error(f"❌ Failed to allocate to {row['Category'].strip()}")
+                        
+                        # Check for master category reassignment
+                        original_master = df.iloc[idx]['Master_Category_Assignment']
+                        new_master = row['Master_Category_Assignment']
+                        
+                        if original_master != new_master:
+                            category_id = row['ID']
+                            
+                            if new_master == 'Uncategorized':
+                                master_id = None
+                            else:
+                                master_id = next((mc['id'] for mc in master_categories if mc['name'] == new_master), None)
+                            
+                            if assign_category_to_master(category_id, master_id):
+                                st.success(f"✅ Moved {row['Category'].strip()} to {new_master}")
+                                changes_made = True
+                            else:
+                                st.error(f"❌ Failed to move {row['Category'].strip()}")
+                        
+                # Rerun if any changes were made
+                if changes_made:
+                    st.rerun()
+            
+            # Delete functionality section
+            st.markdown("---")
+            st.markdown("#### 🗑️ Delete Categories")
+            
             col1, col2 = st.columns(2)
             
             with col1:
-                transaction_date = st.date_input(
-                    "Date",
-                    value=datetime.now().date(),
-                    help="Date of transaction"
-                )
-                
-                transaction_type = st.selectbox(
-                    "Transaction Type",
-                    options=["Income", "Expense"],
-                    help="Select whether this is income or an expense"
-                )
-                
-                transaction_amount = st.text_input(
-                    "Amount",
-                    placeholder="1000000 or 0.01 BTC",
-                    help="Enter amount in sats or BTC"
-                )
+                st.markdown("**Delete Master Category**")
+                if master_categories:
+                    selected_master_to_delete = st.selectbox(
+                        "Select Master Category to Delete",
+                        [mc['name'] for mc in master_categories],
+                        key="delete_master_select"
+                    )
+                    
+                    if st.button("🗑️ Delete Master Category", key="delete_master_btn", type="secondary"):
+                        master_id = next((mc['id'] for mc in master_categories if mc['name'] == selected_master_to_delete), None)
+                        if master_id:
+                            # Check if master category has categories assigned
+                            categories_in_master = [cat for cat in all_categories if cat['master_category_id'] == master_id]
+                            
+                            if categories_in_master:
+                                # Move categories to Uncategorized before deleting master category
+                                for cat in categories_in_master:
+                                    assign_category_to_master(cat['id'], None)
+                                
+                                st.warning(f"⚠️ Moved {len(categories_in_master)} categories to Uncategorized before deleting master category")
+                            
+                            # Delete master category
+                            conn = get_db_connection()
+                            cursor = conn.cursor()
+                            try:
+                                cursor.execute("DELETE FROM master_categories WHERE id = ?", (master_id,))
+                                conn.commit()
+                                st.success(f"✅ Deleted master category: {selected_master_to_delete}")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Failed to delete master category: {e}")
+                            finally:
+                                conn.close()
+                else:
+                    st.info("No master categories to delete")
             
             with col2:
-                transaction_description = st.text_input(
-                    "Description",
-                    placeholder="Salary, groceries, coffee, etc.",
-                    help="Brief description of transaction"
-                )
-                
-                # Category selection (only for expenses)
-                if transaction_type == "Expense":
-                    categories = get_categories()
-                    if categories:
-                        transaction_category = st.selectbox(
-                            "Category",
-                            options=[cat['name'] for cat in categories],
-                            help="Select spending category"
-                        )
-                    else:
-                        st.warning("⚠️ Add categories first before recording expenses.")
-                        transaction_category = None
+                st.markdown("**Delete Category**")
+                if all_categories:
+                    selected_category_to_delete = st.selectbox(
+                        "Select Category to Delete",
+                        [cat['name'] for cat in all_categories],
+                        key="delete_category_select"
+                    )
+                    
+                    if st.button("🗑️ Delete Category", key="delete_category_btn", type="secondary"):
+                        category_id = next((cat['id'] for cat in all_categories if cat['name'] == selected_category_to_delete), None)
+                        if category_id:
+                            success, transaction_count, allocation_count = delete_category(category_id)
+                            if success:
+                                st.success(f"✅ Deleted category: {selected_category_to_delete}")
+                                if transaction_count > 0 or allocation_count > 0:
+                                    st.info(f"📊 Also deleted {transaction_count} transactions and {allocation_count} allocations")
+                                st.rerun()
+                            else:
+                                st.error(f"❌ Failed to delete category: {selected_category_to_delete}")
                 else:
-                    transaction_category = None
-            
-            # Submit button
-            button_text = "💰 Add Income" if transaction_type == "Income" else "💸 Add Expense"
-            submitted = st.form_submit_button(button_text, use_container_width=True, type="primary")
-            
-            if submitted:
-                if transaction_amount and transaction_description:
-                    try:
-                        amount_sats = parse_amount_input(transaction_amount)
-                        
-                        if transaction_type == "Income":
+                    st.info("No categories to delete")
+                    
+        else:
+            st.info("No categories yet. Add your first master category and categories above!")
+
+    # === TAB 2: TRANSACTIONS (Combined transaction entry + recent transactions) ===
+    with tab2:
+        st.markdown("### 💳 Enter Transaction")
+        
+        # Transaction type selection outside the form so it updates dynamically
+        transaction_type = st.selectbox(
+            "Transaction Type",
+            options=["Income", "Expense"],
+            help="Select whether this is income or an expense"
+        )
+        
+        # Dynamic form based on transaction type
+        if transaction_type == "Income":
+            with st.form("add_income_form"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    transaction_date = st.date_input(
+                        "Date",
+                        value=datetime.now().date(),
+                        help="Date of transaction"
+                    )
+                    
+                    transaction_amount = st.text_input(
+                        "Amount",
+                        placeholder="1000000 or 0.01 BTC",
+                        help="Enter amount in sats or BTC"
+                    )
+                
+                with col2:
+                    transaction_description = st.text_input(
+                        "Description",
+                        placeholder="Salary, freelance, etc.",
+                        help="Brief description of income source"
+                    )
+                
+                # Income submit button
+                submitted = st.form_submit_button("💰 Add Income", use_container_width=True, type="primary")
+                
+                if submitted:
+                    if transaction_amount and transaction_description:
+                        try:
+                            amount_sats = parse_amount_input(transaction_amount)
                             if add_income(amount_sats, transaction_description, str(transaction_date)):
                                 st.success(f"✅ Added income: {format_sats(amount_sats)} - {transaction_description}")
                                 st.rerun()
                             else:
                                 st.error("❌ Failed to add income")
-                        else:  # Expense
-                            if transaction_category:
+                        except ValueError:
+                            st.error("❌ Invalid amount format")
+                    else:
+                        st.error("❌ Please fill in all required fields")
+        
+        else:  # Expense
+            categories = get_categories()
+            if categories:
+                with st.form("add_expense_form"):
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        transaction_date = st.date_input(
+                            "Date",
+                            value=datetime.now().date(),
+                            help="Date of transaction"
+                        )
+                        
+                        transaction_category = st.selectbox(
+                            "Category",
+                            options=[cat['name'] for cat in categories],
+                            help="Select spending category"
+                        )
+                    
+                    with col2:
+                        transaction_amount = st.text_input(
+                            "Amount",
+                            placeholder="50000 or 0.0005 BTC",
+                            help="Enter amount in sats or BTC"
+                        )
+                        
+                        transaction_description = st.text_input(
+                            "Description",
+                            placeholder="Coffee, groceries, etc.",
+                            help="Brief description of expense"
+                        )
+                    
+                    # Expense submit button
+                    submitted = st.form_submit_button("💸 Add Expense", use_container_width=True, type="primary")
+                    
+                    if submitted:
+                        if transaction_amount and transaction_description:
+                            try:
+                                amount_sats = parse_amount_input(transaction_amount)
+                                
                                 # Find category ID
                                 category_id = None
-                                categories = get_categories()
                                 for cat in categories:
                                     if cat['name'] == transaction_category:
                                         category_id = cat['id']
@@ -516,105 +1010,18 @@ def main_page():
                                         st.rerun()
                                     else:
                                         st.error("❌ Failed to add expense")
-                            else:
-                                st.error("❌ Please select a category for expenses")
-                    except ValueError:
-                        st.error("❌ Invalid amount format")
-                else:
-                    st.error("❌ Please fill in all required fields")
-
-    # === TAB 2: CATEGORIES ===
-    with tab2:
-        st.markdown("### 📁 Category Management")
-        
-        # Add new category
-        with st.expander("➕ Add New Category", expanded=False):
-            with st.form("add_category_form"):
-                new_category = st.text_input("Category Name", placeholder="e.g., Transportation")
-                if st.form_submit_button("Add Category"):
-                    if new_category:
-                        if add_category(new_category):
-                            st.success(f"✅ Added category: {new_category}")
-                            st.rerun()
+                            except ValueError:
+                                st.error("❌ Invalid amount format")
                         else:
-                            st.error("❌ Category name already exists")
-                    else:
-                        st.error("❌ Please enter a category name")
+                            st.error("❌ Please fill in all required fields")
+            else:
+                st.warning("⚠️ Add categories first before recording expenses.")
+                st.info("👆 Go to the Categories tab to add your first spending category.")
 
-        # Display categories
-        categories = get_categories()
+        # Add separator between transaction entry and recent transactions
+        st.markdown("---")
         
-        if categories:
-            # Create category dataframe
-            category_data = []
-            for cat in categories:
-                allocated = get_category_allocated(cat['id'], current_month)
-                spent = get_category_spent(cat['id'], current_month)
-                balance = get_category_balance(cat['id'], current_month)
-                
-                category_data.append({
-                    'Category': cat['name'],
-                    'Allocated': format_sats(allocated),
-                    'Spent': format_sats(spent),
-                    'Balance': format_sats(balance),
-                    'Status': '✅ Good' if balance >= 0 else '⚠️ Overspent'
-                })
-            
-            df = pd.DataFrame(category_data)
-            st.dataframe(df, use_container_width=True, hide_index=True)
-            
-            # Allocation form
-            st.markdown("#### 💼 Allocate to Categories")
-            with st.form("allocate_form"):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    selected_category = st.selectbox(
-                        "Select Category",
-                        options=[cat['name'] for cat in categories],
-                        help="Choose category to allocate funds to"
-                    )
-                
-                with col2:
-                    allocation_amount = st.text_input(
-                        "Allocation Amount",
-                        placeholder="Amount in sats",
-                        help=f"Available: {format_sats(available)}"
-                    )
-                
-                if st.form_submit_button("💼 Allocate Funds", type="primary"):
-                    if allocation_amount:
-                        try:
-                            amount_sats = parse_amount_input(allocation_amount)
-                            
-                            # Find category ID
-                            category_id = None
-                            for cat in categories:
-                                if cat['name'] == selected_category:
-                                    category_id = cat['id']
-                                    break
-                            
-                            if category_id:
-                                current_allocation = get_category_allocated(category_id, current_month)
-                                additional_needed = amount_sats - current_allocation
-                                
-                                if additional_needed <= available:
-                                    if allocate_to_category(category_id, current_month, amount_sats):
-                                        st.success(f"✅ Allocated {format_sats(amount_sats)} to {selected_category}")
-                                        st.rerun()
-                                    else:
-                                        st.error("❌ Failed to allocate")
-                                else:
-                                    st.error(f"❌ Not enough available funds. Available: {format_sats(available)}")
-                        except ValueError:
-                            st.error("❌ Invalid amount format")
-                    else:
-                        st.error("❌ Please enter an allocation amount")
-        else:
-            st.info("No categories yet. Add your first category above!")
-
-    # === TAB 3: TRANSACTIONS ===
-    with tab3:
+        # Recent transactions section (moved below transaction entry)
         st.markdown("### 📋 Recent Transactions")
         
         transactions = get_recent_transactions(20)
@@ -738,7 +1145,7 @@ def main():
         main_page()
     elif st.session_state.page == 'reports':
         # Import and show reports page
-        from pages import reports
+        from modules import reports
         reports.show()
 
 if __name__ == "__main__":

@@ -408,7 +408,7 @@ def net_worth_report():
         fig = make_subplots(
             rows=2, cols=1,
             subplot_titles=('Monthly Income vs Expenses', 'Cumulative Net Worth'),
-            vertical_spacing=0.15,  # Increased spacing between charts
+            vertical_spacing=0.25,  # Increased spacing significantly for more room
             specs=[[{"secondary_y": False}], [{"secondary_y": False}]]
         )
         
@@ -431,19 +431,37 @@ def net_worth_report():
             row=2, col=1
         )
         
-        # Update layout with increased height
+        # Update layout with increased height and better spacing
         fig.update_layout(
-            height=800,  # Increased from 700
+            height=900,  # Increased from 800 to accommodate more spacing
             title_text="Net Worth Analysis",
             showlegend=True,
             title_font_size=16,
-            margin=dict(t=80, b=80, l=80, r=80)  # Added margins
+            margin=dict(t=100, b=100, l=80, r=80)  # Increased top/bottom margins
         )
         
-        # Format y-axes with better formatting
-        fig.update_yaxes(title_text="Amount (sats)", row=1, col=1, title_font_size=14)
-        fig.update_yaxes(title_text="Cumulative Net Worth (sats)", row=2, col=1, title_font_size=14)
-        fig.update_xaxes(title_text="Month", row=2, col=1, title_font_size=14)
+        # Format y-axes with better formatting and spacing
+        fig.update_yaxes(
+            title_text="Amount (sats)", 
+            row=1, col=1, 
+            title_font_size=14,
+            title_standoff=20  # Add space between axis and title
+        )
+        fig.update_yaxes(
+            title_text="Cumulative Net Worth (sats)", 
+            row=2, col=1, 
+            title_font_size=14,
+            title_standoff=20  # Add space between axis and title
+        )
+        fig.update_xaxes(
+            title_text="Month", 
+            row=2, col=1, 
+            title_font_size=14,
+            title_standoff=20  # Add space between axis and title
+        )
+        
+        # Update subplot title formatting for better spacing
+        fig.update_annotations(font_size=16, font_color="white")
         
         st.plotly_chart(fig, use_container_width=True)
         
@@ -491,7 +509,7 @@ def future_purchasing_power_report():
         budget_period = st.selectbox(
             "Base Budget Period:",
             ["current_month", "last_3_months", "last_6_months", "last_12_months"],
-            index=2,
+            index=0,
             format_func=lambda x: {
                 "current_month": "Current Month",
                 "last_3_months": "Last 3 Months",
