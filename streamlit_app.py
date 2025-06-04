@@ -556,19 +556,8 @@ def initialize_session_state():
     if 'first_visit' not in st.session_state:
         st.session_state.first_visit = True
     
-    # Initialize user's private data structures
+    # Initialize user's private data structures (only once)
     if 'user_data' not in st.session_state:
-        st.session_state.user_data = {
-            'transactions': [],  # List of transaction dicts
-            'categories': [],    # List of category dicts
-            'master_categories': [],  # List of master category dicts
-            'allocations': [],   # List of allocation dicts
-            'next_transaction_id': 1,
-            'next_category_id': 1,
-            'next_master_category_id': 1,
-            'next_allocation_id': 1
-        }
-        
         # Add some default master categories and categories for demo
         default_master_cats = [
             {'id': 1, 'name': 'Fixed Expenses'},
@@ -582,10 +571,52 @@ def initialize_session_state():
             {'id': 3, 'name': 'Bitcoin Stack', 'master_category_id': 3}
         ]
         
-        st.session_state.user_data['master_categories'] = default_master_cats
-        st.session_state.user_data['categories'] = default_categories
-        st.session_state.user_data['next_master_category_id'] = 4
-        st.session_state.user_data['next_category_id'] = 4
+        # Add some demo transactions for better UX
+        demo_transactions = [
+            {
+                'id': 1,
+                'date': get_current_month() + '-01',
+                'description': 'Monthly Salary',
+                'amount': 100000,  # 100k sats
+                'type': 'income',
+                'category_id': None
+            }
+        ]
+        
+        # Add some demo allocations
+        current_month = get_current_month()
+        demo_allocations = [
+            {
+                'id': 1,
+                'category_id': 1,  # Rent
+                'month': current_month,
+                'amount': 50000  # 50k sats
+            },
+            {
+                'id': 2,
+                'category_id': 2,  # Food
+                'month': current_month,
+                'amount': 30000  # 30k sats
+            },
+            {
+                'id': 3,
+                'category_id': 3,  # Bitcoin Stack
+                'month': current_month,
+                'amount': 20000  # 20k sats
+            }
+        ]
+        
+        # Initialize all data at once to avoid multiple session state updates
+        st.session_state.user_data = {
+            'transactions': demo_transactions,  # List of transaction dicts
+            'categories': default_categories,    # List of category dicts
+            'master_categories': default_master_cats,  # List of master category dicts
+            'allocations': demo_allocations,   # List of allocation dicts
+            'next_transaction_id': 2,  # Next ID after demo transaction
+            'next_category_id': 4,  # Start at 4 since we have 3 default categories
+            'next_master_category_id': 4,  # Start at 4 since we have 3 default master categories
+            'next_allocation_id': 4  # Next ID after demo allocations
+        }
 
 def landing_page():
     """Beautiful landing page explaining how to use the Bitcoin Budget app"""
