@@ -2159,8 +2159,9 @@ class LifecycleCostReportWindow:
         self.update_text_analysis()
     
     def update_text_analysis(self):
-        """Update the detailed text analysis"""
+        """Generate detailed text analysis of opportunity cost"""
         if not self.selected_transaction:
+            self.show_empty_state()
             return
         
         years_ahead = int(self.horizon_var.get())
@@ -2176,13 +2177,9 @@ class LifecycleCostReportWindow:
         current_btc_price = calculate_btc_fair_value(current_days)
         future_btc_price = calculate_btc_fair_value(future_days)
         
-        # Calculate what the sats would be worth in the future
-        btc_multiplier = future_btc_price / current_btc_price
-        future_value_sats = amount_sats * btc_multiplier
-        
-        # Calculate current and future USD values
+        # Calculate current and future USD values of the SAME amount of sats
         current_usd_value = (amount_sats / 100_000_000) * current_btc_price
-        future_usd_value = (future_value_sats / 100_000_000) * future_btc_price
+        future_usd_value = (amount_sats / 100_000_000) * future_btc_price
         
         # Calculate inflation-adjusted value for comparison
         inflation_multiplier = (1 + self.inflation_rate) ** years_ahead
@@ -2190,7 +2187,6 @@ class LifecycleCostReportWindow:
         
         # Calculate opportunity cost metrics
         bitcoin_gain_percentage = ((future_btc_price / current_btc_price) - 1) * 100
-        opportunity_cost_sats = future_value_sats - amount_sats
         opportunity_cost_usd = future_usd_value - current_usd_value
         real_purchasing_power_gain = future_usd_value / inflation_adjusted_value
         
@@ -2216,24 +2212,24 @@ Bitcoin Price Appreciation: +{bitcoin_gain_percentage:.1f}%
 • Bitcoin Amount: {format_sats(amount_sats)}
 • USD Value (then): ${current_usd_value:,.2f}
 
-🚀 What That Bitcoin Would Be Worth:
-• Future Bitcoin Amount: {format_sats(int(future_value_sats))}
+🚀 What Those Same {format_sats(amount_sats)} Would Be Worth:
+• Bitcoin Amount: {format_sats(amount_sats)} (same amount!)
 • Future USD Value: ${future_usd_value:,.2f}
 
 💔 Opportunity Cost:
-• Lost Bitcoin Gain: {format_sats(int(opportunity_cost_sats))}
-• Lost USD Value: ${opportunity_cost_usd:,.2f}
+• Foregone USD Appreciation: ${opportunity_cost_usd:,.2f}
+• Your {format_sats(amount_sats)} would have grown {bitcoin_gain_percentage:.1f}% in USD terms
 
 📊 Inflation Comparison:
 • Your Purchase + Inflation: ${inflation_adjusted_value:,.2f}
-• Bitcoin Holdings Value: ${future_usd_value:,.2f}
+• Same Bitcoin USD Value: ${future_usd_value:,.2f}
 • Real Purchasing Power Gain: {real_purchasing_power_gain:.1f}x
 
 🎯 Bottom Line:
 Instead of buying "{self.selected_transaction['description']}" for {format_sats(amount_sats)}, 
-if you had held that Bitcoin for {years_ahead} year{'s' if years_ahead > 1 else ''}, you would have 
-{format_sats(int(opportunity_cost_sats))} MORE bitcoin, worth ${opportunity_cost_usd:,.2f} 
-more than your purchase (even after accounting for {self.inflation_rate*100:.0f}% annual inflation).
+if you had held that Bitcoin for {years_ahead} year{'s' if years_ahead > 1 else ''}, those same 
+{format_sats(amount_sats)} would be worth ${opportunity_cost_usd:,.2f} MORE in USD terms 
+(even after accounting for {self.inflation_rate*100:.0f}% annual inflation).
 
 This represents a {real_purchasing_power_gain:.1f}x improvement in purchasing power!"""
 
@@ -2258,34 +2254,31 @@ This represents a {real_purchasing_power_gain:.1f}x improvement in purchasing po
         current_btc_price = calculate_btc_fair_value(current_days)
         future_btc_price = calculate_btc_fair_value(future_days)
         
-        btc_multiplier = future_btc_price / current_btc_price
-        future_value_sats = amount_sats * btc_multiplier
-        
+        # Calculate USD values of the SAME amount of sats
         current_usd_value = (amount_sats / 100_000_000) * current_btc_price
-        future_usd_value = (future_value_sats / 100_000_000) * future_btc_price
+        future_usd_value = (amount_sats / 100_000_000) * future_btc_price
         
         inflation_multiplier = (1 + self.inflation_rate) ** years_ahead
         inflation_adjusted_value = current_usd_value * inflation_multiplier
         
-        opportunity_cost_sats = future_value_sats - amount_sats
         opportunity_cost_usd = future_usd_value - current_usd_value
         
         # Clear the figure
         self.fig.clear()
         
         # Create 2x2 subplot layout
-        ax1 = self.fig.add_subplot(221)  # Bitcoin amount comparison
+        ax1 = self.fig.add_subplot(221)  # Bitcoin amount stays the same
         ax2 = self.fig.add_subplot(222)  # USD value comparison  
         ax3 = self.fig.add_subplot(223)  # Price progression
         ax4 = self.fig.add_subplot(224)  # Opportunity cost summary
         
-        # Chart 1: Bitcoin Amount Comparison (Bar Chart)
-        categories = ['What You Spent', f'Value in {years_ahead} Years']
-        values = [amount_sats / 1000, future_value_sats / 1000]  # Convert to thousands for readability
+        # Chart 1: Bitcoin Amount (Bar Chart) - Shows amount stays the same
+        categories = ['Amount Spent', f'Same Amount in {years_ahead} Years']
+        values = [amount_sats / 1000, amount_sats / 1000]  # Same amount!
         colors = ['#DC143C', '#2E8B57']
         
         bars1 = ax1.bar(categories, values, color=colors, alpha=0.7)
-        ax1.set_title(f'Bitcoin Amount Comparison', fontweight='bold')
+        ax1.set_title(f'Bitcoin Amount (Unchanged)', fontweight='bold')
         ax1.set_ylabel('Thousands of Sats')
         ax1.grid(True, alpha=0.3)
         
@@ -2347,8 +2340,8 @@ This represents a {real_purchasing_power_gain:.1f}x improvement in purchasing po
         
         # Overall title
         self.fig.suptitle(f'Opportunity Cost Analysis: {self.selected_transaction["description"]}\n' +
-                         f'{format_sats(amount_sats)} → {format_sats(int(future_value_sats))} ' +
-                         f'(+{format_sats(int(opportunity_cost_sats))} opportunity cost)',
+                         f'{format_sats(amount_sats)} → Same Bitcoin Amount, Higher USD Value ' +
+                         f'(${opportunity_cost_usd:,.0f} opportunity cost)',
                          fontsize=14, fontweight='bold')
         
         # Adjust layout and draw
