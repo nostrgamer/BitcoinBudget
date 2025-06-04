@@ -523,7 +523,401 @@ def initialize_session_state():
     if 'current_month' not in st.session_state:
         st.session_state.current_month = get_current_month()
     if 'page' not in st.session_state:
-        st.session_state.page = 'main'
+        st.session_state.page = 'landing'
+    if 'first_visit' not in st.session_state:
+        st.session_state.first_visit = True
+
+def landing_page():
+    """Beautiful landing page explaining how to use the Bitcoin Budget app"""
+    # Hide sidebar for landing page
+    st.markdown("""
+        <style>
+        .css-1d391kg {display: none}
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # Hero section
+    st.markdown("""
+        <div style="text-align: center; padding: 2rem 0;">
+            <h1 style="font-size: 3.5rem; margin-bottom: 0.5rem;">₿ Bitcoin Budget</h1>
+            <p style="font-size: 1.3rem; color: #666; margin-bottom: 1rem;">
+                Modern envelope budgeting for Bitcoin users
+            </p>
+            <h2 style="font-size: 1.8rem; color: #f7931a; margin-bottom: 2rem;">
+                What if you could see the long term implications<br/>of your stacking and spending?
+            </h2>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Show example lifecycle cost analysis with custom styling
+    st.markdown("""
+        <div style="background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); 
+             padding: 1rem 2rem; border-radius: 10px; margin: 1rem 0 1.5rem 0;">
+            <h3 style="color: white; text-align: center; margin: 0; font-size: 1.3rem;">
+                🍽️ Example: 10-Year Cost of Fancy Dinner out with Friends
+            </h3>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Create the example metrics that match the image
+    example_col1, example_col2, example_col3, example_col4 = st.columns(4)
+    
+    with example_col1:
+        st.markdown("""
+            <div style="background: #1f2937; padding: 1rem; border-radius: 8px; text-align: center; margin-bottom: 1rem;">
+                <div style="color: #10b981; font-size: 0.8rem; margin-bottom: 0.3rem;">💸 Amount Spent</div>
+                <div style="color: white; font-size: 1.5rem; font-weight: bold; margin-bottom: 0.3rem;">250,000 sats</div>
+                <div style="color: #10b981; font-size: 0.8rem;">↗ $245.55</div>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with example_col2:
+        st.markdown("""
+            <div style="background: #1f2937; padding: 1rem; border-radius: 8px; text-align: center; margin-bottom: 1rem;">
+                <div style="color: #f59e0b; font-size: 0.8rem; margin-bottom: 0.3rem;">🚀 Future Value</div>
+                <div style="color: white; font-size: 1.5rem; font-weight: bold; margin-bottom: 0.3rem;">$3,914.52</div>
+                <div style="color: #10b981; font-size: 0.8rem;">↗ +1494.2%</div>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with example_col3:
+        st.markdown("""
+            <div style="background: #1f2937; padding: 1rem; border-radius: 8px; text-align: center; margin-bottom: 1rem;">
+                <div style="color: #ef4444; font-size: 0.8rem; margin-bottom: 0.3rem;">💔 Opportunity Cost</div>
+                <div style="color: white; font-size: 1.5rem; font-weight: bold; margin-bottom: 0.3rem;">$3,668.97</div>
+                <div style="color: #ef4444; font-size: 0.8rem;">↘ -1494.2%</div>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with example_col4:
+        st.markdown("""
+            <div style="background: #1f2937; padding: 1rem; border-radius: 8px; text-align: center; margin-bottom: 1rem;">
+                <div style="color: #8b5cf6; font-size: 0.8rem; margin-bottom: 0.3rem;">📊 Purchasing Power</div>
+                <div style="color: white; font-size: 1.5rem; font-weight: bold; margin-bottom: 0.3rem;">7.4x</div>
+                <div style="color: #10b981; font-size: 0.8rem;">↗ vs inflation</div>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    # Create side-by-side charts: pie chart and value comparison
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    
+    chart_col1, chart_col2 = st.columns(2)
+    
+    # Left column: Opportunity Cost Pie Chart
+    with chart_col1:
+        st.markdown("#### 💔 Opportunity Cost Analysis")
+        
+        fig_pie = go.Figure(data=[go.Pie(
+            labels=['Opportunity Cost', 'Purchase Value'],
+            values=[3668.97, 245.55],
+            hole=.3,
+            marker_colors=['#ef4444', '#10b981']
+        )])
+        
+        fig_pie.update_traces(
+            textposition='inside', 
+            textinfo='percent+label',
+            textfont_size=10,
+            marker=dict(line=dict(color='#000000', width=2))
+        )
+        
+        fig_pie.update_layout(
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="center",
+                x=0.5
+            ),
+            margin=dict(t=10, b=10, l=10, r=10),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white', size=10),
+            height=280
+        )
+        
+        st.plotly_chart(fig_pie, use_container_width=True)
+    
+    # Right column: Value Comparison Bar Chart
+    with chart_col2:
+        st.markdown("#### 📊 USD Value Comparison")
+        
+        # Calculate inflation-adjusted value (assuming ~3% annual inflation over 10 years)
+        inflation_value = 245.55 * (1.03 ** 10)  # ~$329.73
+        
+        fig_bar = go.Figure(data=[
+            go.Bar(
+                x=['Purchase Value', 'Future BTC Value', 'Purchase + Inflation'],
+                y=[245.55, 3914.52, inflation_value],
+                marker_color=['#ef4444', '#10b981', '#f59e0b'],
+                text=[f'${245.55:.0f}', f'${3914.52:.0f}', f'${inflation_value:.0f}'],
+                textposition='auto',
+                textfont=dict(color='white', size=11)
+            )
+        ])
+        
+        fig_bar.update_layout(
+            title='',
+            xaxis=dict(
+                tickfont=dict(color='white', size=9),
+                gridcolor='rgba(255,255,255,0.1)',
+                title=''
+            ),
+            yaxis=dict(
+                tickfont=dict(color='white', size=9),
+                gridcolor='rgba(255,255,255,0.1)',
+                title=dict(text='USD Value', font=dict(color='white', size=10))
+            ),
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white'),
+            margin=dict(t=10, b=10, l=10, r=10),
+            height=280,
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig_bar, use_container_width=True)
+    # Center the get started button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🚀 Get Started", type="primary", use_container_width=True, key="get_started"):
+            st.session_state.page = 'main'
+            st.session_state.first_visit = False
+            st.rerun()
+    
+    st.markdown("---")
+    
+    # Feature overview with beautiful icons and descriptions
+    st.markdown("## ✨ Visualize Living on a Bitcoin Standard")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+            ### 🎯 **Envelope Budgeting that is Bitcoin Native**
+            You live on a Bitcoin standard by earning and spending. 
+            Now track your precious sats with precision and purpose.
+        """)
+    
+    with col2:
+        st.markdown("""
+            ### ⚡ **Secure and Open Source**
+            Manually enter your data to minimize 
+            security risk. The original air gapped security with nothing to connect to. 
+            Open source project, after all you don't trust, you verify.
+        """)
+    
+    with col3:
+        st.markdown("""
+            ### 📊 **Smart Analytics**
+            Track spending trends, opportunity costs, 
+            and make data-driven decisions about your Bitcoin stack.
+        """)
+    
+    st.markdown("---")
+    
+    # How it works section
+    st.markdown("## 🔄 How Bitcoin Budget Works")
+    
+    # Visual flow - centered and full width
+    flow_col1, flow_col2, flow_col3 = st.columns([1, 2, 1])
+    
+    with flow_col2:
+        # Create a clean visual flow using Streamlit components
+        
+        # Step 1: Bitcoin Income
+        st.markdown("""
+            <div style="text-align: center; margin: 1.5rem 0;">
+                <div style="background: #f59e0b; color: black; padding: 1rem 2rem; border-radius: 8px; 
+                     display: inline-block; font-weight: bold; font-size: 1.1rem;">
+                    Bitcoin Income
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<div style='text-align: center; font-size: 2rem; color: #6b7280; margin: 1rem 0;'>↓</div>", unsafe_allow_html=True)
+        
+        # Step 2: Assign to Categories
+        st.markdown("""
+            <div style="text-align: center; margin: 1.5rem 0;">
+                <div style="background: #ef4444; color: white; padding: 1rem 2rem; border-radius: 8px; 
+                     display: inline-block; font-weight: bold; font-size: 1.1rem;">
+                    Assign to Categories
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<div style='text-align: center; font-size: 2rem; color: #6b7280; margin: 1rem 0;'>↓</div>", unsafe_allow_html=True)
+        
+        # Step 3: Category Cards
+        cat_col1, cat_col2, cat_col3 = st.columns(3)
+        
+        with cat_col1:
+            st.markdown("""
+                <div style="background: #1e40af; color: white; padding: 1.2rem; border-radius: 8px; text-align: center; margin: 0.2rem;">
+                    <div style="font-weight: bold; margin-bottom: 0.5rem; font-size: 1rem;">Rent</div>
+                    <div style="font-size: 0.9rem; opacity: 0.9;">50,000 sats</div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with cat_col2:
+            st.markdown("""
+                <div style="background: #dc2626; color: white; padding: 1.2rem; border-radius: 8px; text-align: center; margin: 0.2rem;">
+                    <div style="font-weight: bold; margin-bottom: 0.5rem; font-size: 1rem;">Food</div>
+                    <div style="font-size: 0.9rem; opacity: 0.9;">25,000 sats</div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with cat_col3:
+            st.markdown("""
+                <div style="background: #f59e0b; color: black; padding: 1.2rem; border-radius: 8px; text-align: center; margin: 0.2rem;">
+                    <div style="font-weight: bold; margin-bottom: 0.5rem; font-size: 1rem;">Savings Stack</div>
+                    <div style="font-size: 0.9rem; opacity: 0.8;">25,000 sats</div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("<div style='text-align: center; font-size: 2rem; color: #6b7280; margin: 1.5rem 0;'>↓</div>", unsafe_allow_html=True)
+        
+        # Step 4: Track Spending
+        st.markdown("""
+            <div style="text-align: center; margin: 1.5rem 0;">
+                <div style="background: #10b981; color: white; padding: 1rem 2rem; border-radius: 8px; 
+                     display: inline-block; font-weight: bold; font-size: 1.1rem;">
+                    Track Spending & Stay on Budget
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")    
+   
+    # Getting started guide
+    st.markdown("## 🚀 Quick Start Guide")
+    
+    with st.expander("📖 Step-by-Step Tutorial", expanded=False):
+        st.markdown("""
+            ### Step 1: Add Your First Income 💰
+            1. Click "Get Started" to enter the app
+            2. Go to the "Transactions" tab
+            3. Click "Add Income" in the Income section
+            4. Enter amount in satoshis (e.g., 1000000 for 0.01 BTC)
+            5. Add a description like "Freelance payment"
+            
+            ### Step 2: Create Spending Categories 📁
+            1. Go to the "Categories" tab
+            2. Click "Add Master Category" (e.g., "Fixed Expenses")
+            3. Click "Add Category" and assign to master category
+            4. Create categories like: Rent, Food, Transportation, Bitcoin Savings
+            
+            ### Step 3: Allocate Your Income 🎯
+            1. In the Categories section, you'll see "Available to Assign"
+            2. Click the allocate button for each category
+            3. Assign portions of your income to different envelopes
+            4. Make sure "Available to Assign" reaches zero
+            
+            ### Step 4: Track Your Spending 💸
+            1. When you spend Bitcoin, add an expense
+            2. Choose the correct category
+            3. Watch your category balances update
+            4. Get warnings when you overspend a category
+            
+            ### Step 5: Analyze Your Budget 📊
+            1. Click "Reports" in the sidebar
+            2. View spending breakdowns and trends
+            3. See opportunity cost analysis
+            4. Make better Bitcoin decisions
+        """)
+    
+    # Sample data section
+    with st.expander("📋 Example Budget Layout", expanded=False):
+        st.markdown("""
+            Here's what a typical Bitcoin budget might look like:
+            
+            **Monthly Income:** 5,000,000 sats (0.05 BTC)
+            
+            **Master Categories:**
+            
+            📊 **Fixed Expenses** - 3,000,000 sats
+            - 🏠 Rent: 2,000,000 sats
+            - 📱 Phone: 500,000 sats  
+            - 🌐 Internet: 300,000 sats
+            - 💡 Utilities: 200,000 sats
+            
+            📊 **Variable Expenses** - 1,500,000 sats
+            - 🍕 Food: 800,000 sats
+            - 🚗 Transportation: 400,000 sats
+            - 🎮 Entertainment: 300,000 sats
+            
+            📊 **Savings & Investments** - 500,000 sats
+            - ⚡ Bitcoin Stack: 300,000 sats
+            - 🏦 Emergency Fund: 200,000 sats
+        """)
+    
+    st.markdown("---")
+    
+    # FAQ section
+    st.markdown("## ❓ Frequently Asked Questions")
+    
+    faq_col1, faq_col2 = st.columns(2)
+    
+    with faq_col1:
+        with st.expander("Why use envelope budgeting?"):
+            st.markdown("""
+                **Envelope budgeting ensures every satoshi has a purpose.**
+                
+                Instead of wondering "can I afford this?", you'll know exactly 
+                how much you have allocated for each spending category. This 
+                prevents overspending and helps you stick to your Bitcoin 
+                savings goals.
+            """)
+        
+        with st.expander("How do I handle Bitcoin volatility?"):
+            st.markdown("""
+                **Budget in satoshis, not fiat value.**
+                
+                This app works in satoshis, so your budget remains consistent 
+                regardless of Bitcoin's USD price. You're budgeting your actual 
+                Bitcoin, not its fiat equivalent.
+            """)
+    
+    with faq_col2:
+        with st.expander("What if I overspend a category?"):
+            st.markdown("""
+                **The app will warn you, but won't stop you.**
+                
+                If you overspend, the category balance goes negative. You can 
+                either move money from another category or reduce spending 
+                to get back on track.
+            """)
+        
+        with st.expander("Can I use this for fiat expenses?"):
+            st.markdown("""
+                **Absolutely! Convert fiat to sats when entering.**
+                
+                If you spend $50 on groceries, convert that to satoshis at 
+                the current rate and enter it as an expense. This gives you 
+                a Bitcoin-native view of all your spending.
+            """)
+    
+    st.markdown("---")
+    
+    # Call to action
+    st.markdown("""
+        <div style="text-align: center; padding: 2rem 0; background: linear-gradient(90deg, #f7931a 0%, #ffb84d 100%); 
+             border-radius: 10px; margin: 2rem 0;">
+            <h3 style="color: white; margin-bottom: 1rem;">Ready to take control of your Bitcoin budget?</h3>
+            <p style="color: white; margin-bottom: 1.5rem;">Start your journey to better Bitcoin financial management today!</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Final CTA button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🚀 Start Budgeting Now", type="primary", use_container_width=True, key="start_budgeting"):
+            st.session_state.page = 'main'
+            st.session_state.first_visit = False
+            st.rerun()
 
 def main_page():
     """Main budget application page"""
@@ -1248,6 +1642,10 @@ def sidebar_navigation():
         # Navigation
         st.markdown("### 🚀 Navigation")
         
+        if st.button("📖 How to Use", use_container_width=True):
+            st.session_state.page = 'landing'
+            st.rerun()
+        
         if st.button("🏠 Main Budget", use_container_width=True):
             st.session_state.page = 'main'
             st.rerun()
@@ -1262,11 +1660,14 @@ def main():
     init_database()
     initialize_session_state()
     
-    # Sidebar navigation
-    sidebar_navigation()
+    # Show sidebar only when not on landing page
+    if st.session_state.page != 'landing':
+        sidebar_navigation()
     
     # Page routing
-    if st.session_state.page == 'main':
+    if st.session_state.page == 'landing':
+        landing_page()
+    elif st.session_state.page == 'main':
         main_page()
     elif st.session_state.page == 'reports':
         # Import and show reports page
