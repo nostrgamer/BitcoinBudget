@@ -540,6 +540,23 @@ def get_recent_transactions(limit=10):
     return transactions
 
 
+def get_expense_transactions(limit=50):
+    """Get recent expense transactions for lifecycle cost analysis"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT t.id, t.date, t.description, t.amount, c.name as category_name
+        FROM transactions t
+        JOIN categories c ON t.category_id = c.id
+        WHERE t.type = 'expense'
+        ORDER BY t.date DESC, t.created_at DESC
+        LIMIT ?
+    """, (limit,))
+    transactions = cursor.fetchall()
+    conn.close()
+    return transactions
+
+
 # === UTILITY FUNCTIONS ===
 
 def format_sats(satoshis):
@@ -579,6 +596,7 @@ class BitcoinBudgetApp:
         self.root = tk.Tk()
         self.root.title("Bitcoin Budget Desktop")
         self.root.geometry("1300x700")  # Increased from 1200x700
+        self.root.state('zoomed')  # Start maximized on Windows
         
         self.current_month = get_current_month()
         
@@ -668,17 +686,16 @@ class BitcoinBudgetApp:
         
         # Transaction treeview - add hidden ID column
         columns = ("ID", "Date", "Description", "Amount", "Category")
-        self.transactions_tree = ttk.Treeview(transactions_frame, columns=columns, show="headings", height=6)
+        self.transactions_tree = ttk.Treeview(transactions_frame, columns=columns, show="headings", height=12)
         
-        # Hide the ID column
-        self.transactions_tree.column("ID", width=0, stretch=False)
-        self.transactions_tree.heading("ID", text="")
-        
-        # Configure visible columns
-        visible_columns = ["Date", "Description", "Amount", "Category"]
-        for col in visible_columns:
+        for col in columns:
             self.transactions_tree.heading(col, text=col)
-            self.transactions_tree.column(col, width=150)
+            if col == "Description":
+                self.transactions_tree.column(col, width=250)
+            elif col == "Date":
+                self.transactions_tree.column(col, width=100)
+            else:
+                self.transactions_tree.column(col, width=120)
         
         self.transactions_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
@@ -695,7 +712,8 @@ class BitcoinBudgetApp:
         
         # Configure grid weights
         main_frame.rowconfigure(3, weight=1)
-        main_frame.columnconfigure(1, weight=1)
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.columnconfigure(1, weight=2)  # Give categories section more weight
         categories_frame.rowconfigure(0, weight=1)
         list_frame.rowconfigure(0, weight=1)
         list_frame.columnconfigure(0, weight=1)
@@ -979,7 +997,7 @@ class BitcoinBudgetApp:
         # Create a simple menu to choose report type
         menu_window = tk.Toplevel(self.root)
         menu_window.title("Choose Report Type")
-        menu_window.geometry("500x400")
+        menu_window.geometry("500x450")
         menu_window.transient(self.root)
         menu_window.grab_set()
         
@@ -1009,6 +1027,10 @@ class BitcoinBudgetApp:
             menu_window.destroy()
             PurchasingPowerReportWindow(self.root, self.current_month)
         
+        def open_lifecycle_cost_report():
+            menu_window.destroy()
+            LifecycleCostReportWindow(self.root, self.current_month)
+        
         # Create larger, more readable buttons
         spending_btn = ttk.Button(frame, text="📊 Spending Breakdown", 
                   command=open_spending_report)
@@ -1022,13 +1044,17 @@ class BitcoinBudgetApp:
                   command=open_purchasing_power_report)
         purchasing_btn.grid(row=3, column=0, pady=10, sticky=(tk.W, tk.E), ipadx=10, ipady=8)
         
+        lifecycle_btn = ttk.Button(frame, text="⏳ Lifecycle Cost", 
+                  command=open_lifecycle_cost_report)
+        lifecycle_btn.grid(row=4, column=0, pady=10, sticky=(tk.W, tk.E), ipadx=10, ipady=8)
+        
         # Add separator
         separator = ttk.Separator(frame, orient='horizontal')
-        separator.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=15)
+        separator.grid(row=5, column=0, sticky=(tk.W, tk.E), pady=15)
         
         cancel_btn = ttk.Button(frame, text="Cancel", 
                   command=menu_window.destroy)
-        cancel_btn.grid(row=5, column=0, pady=(10, 0), ipadx=10, ipady=8, sticky=(tk.W, tk.E))
+        cancel_btn.grid(row=6, column=0, pady=(10, 0), ipadx=10, ipady=8, sticky=(tk.W, tk.E))
     
     def run(self):
         """Start the application"""
@@ -1068,7 +1094,8 @@ class SpendingReportWindow:
         self.window = tk.Toplevel(parent)
         self.window.title(f"Spending Breakdown")
         self.window.geometry("1200x700")  # Made wider for controls
-        self.window.transient(parent)
+        # Allow standard window controls
+        self.window.state('zoomed')  # Start maximized
         self.window.grab_set()
         
         self.create_widgets()
@@ -1315,7 +1342,8 @@ class NetWorthReportWindow:
         self.window = tk.Toplevel(parent)
         self.window.title(f"Net Worth Analysis")
         self.window.geometry("1200x700")
-        self.window.transient(parent)
+        # Allow standard window controls
+        self.window.state('zoomed')  # Start maximized
         self.window.grab_set()
         
         self.create_widgets()
@@ -1541,7 +1569,8 @@ class PurchasingPowerReportWindow:
         self.window = tk.Toplevel(parent)
         self.window.title("Future Purchasing Power Analysis")
         self.window.geometry("1400x900")
-        self.window.transient(parent)
+        # Allow standard window controls
+        self.window.state('zoomed')  # Start maximized
         self.window.grab_set()
         
         self.create_widgets()
@@ -1883,6 +1912,448 @@ def calculate_future_purchasing_power(current_budget_sats, years_ahead, inflatio
     reduction_percentage = (1 - future_budget / current_budget_sats) * 100
     
     return future_budget, reduction_percentage
+
+
+class LifecycleCostReportWindow:
+    def __init__(self, parent, month):
+        """Initialize the lifecycle cost report window"""
+        self.parent = parent
+        self.month = month
+        self.selected_transaction = None
+        self.inflation_rate = 0.08  # Default 8% inflation
+        
+        # Create new window
+        self.window = tk.Toplevel(parent)
+        self.window.title("Lifecycle Cost Analysis")
+        self.window.geometry("1900x1200")
+        # Remove transient to allow standard window controls (min/max/restore)
+        # self.window.transient(parent)  # Commented out to enable window controls
+        self.window.state('zoomed')  # Start maximized
+        self.window.grab_set()
+        
+        self.create_widgets()
+        self.load_transactions()
+    
+    def create_widgets(self):
+        """Create the report interface"""
+        # Main frame
+        main_frame = ttk.Frame(self.window, padding="10")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Configure grid weights
+        self.window.grid_rowconfigure(0, weight=1)
+        self.window.grid_columnconfigure(0, weight=1)
+        main_frame.grid_rowconfigure(2, weight=1)
+        main_frame.grid_columnconfigure(0, weight=1)
+        
+        # Title
+        title_label = ttk.Label(main_frame, text="Lifecycle Cost Analysis", 
+                               font=("Arial", 16, "bold"))
+        title_label.grid(row=0, column=0, columnspan=2, pady=(0, 15))
+        
+        # Transaction selection frame
+        selection_frame = ttk.LabelFrame(main_frame, text="Select Expense Transaction", padding="10")
+        selection_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10), pady=(0, 10))
+        
+        # Transaction listbox
+        list_frame = ttk.Frame(selection_frame)
+        list_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        columns = ("Date", "Description", "Amount", "Category")
+        self.transactions_tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=12)
+        
+        for col in columns:
+            self.transactions_tree.heading(col, text=col)
+            if col == "Description":
+                self.transactions_tree.column(col, width=250)
+            elif col == "Date":
+                self.transactions_tree.column(col, width=100)
+            else:
+                self.transactions_tree.column(col, width=120)
+        
+        self.transactions_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Scrollbar for transaction list
+        trans_scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.transactions_tree.yview)
+        trans_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        self.transactions_tree.configure(yscrollcommand=trans_scrollbar.set)
+        
+        # Bind selection event
+        self.transactions_tree.bind('<<TreeviewSelect>>', self.on_transaction_select)
+        
+        selection_frame.grid_rowconfigure(0, weight=1)
+        selection_frame.grid_columnconfigure(0, weight=1)
+        list_frame.grid_rowconfigure(0, weight=1)
+        list_frame.grid_columnconfigure(0, weight=1)
+        
+        # Analysis settings frame
+        settings_frame = ttk.LabelFrame(main_frame, text="Analysis Settings", padding="10")
+        settings_frame.grid(row=1, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(10, 0), pady=(0, 10))
+        
+        # Time horizon selection
+        ttk.Label(settings_frame, text="Time Horizon:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W, pady=(0, 10))
+        
+        self.horizon_var = tk.StringVar(value="5")
+        horizon_buttons = [
+            ("1 Year", "1"), ("2 Years", "2"), ("5 Years", "5"), ("10 Years", "10")
+        ]
+        for i, (text, value) in enumerate(horizon_buttons):
+            ttk.Radiobutton(settings_frame, text=text, variable=self.horizon_var, 
+                           value=value, command=self.update_analysis).grid(row=i+1, column=0, sticky=tk.W, pady=2)
+        
+        # Inflation rate setting
+        ttk.Label(settings_frame, text="Annual Inflation Rate:", font=("Arial", 10, "bold")).grid(row=6, column=0, sticky=tk.W, pady=(20, 5))
+        
+        inflation_frame = ttk.Frame(settings_frame)
+        inflation_frame.grid(row=7, column=0, sticky=tk.W)
+        
+        self.inflation_var = tk.StringVar(value="8.0")
+        inflation_entry = ttk.Entry(inflation_frame, textvariable=self.inflation_var, width=8)
+        inflation_entry.grid(row=0, column=0)
+        ttk.Label(inflation_frame, text="%").grid(row=0, column=1, padx=(2, 5))
+        ttk.Button(inflation_frame, text="Update", command=self.update_inflation).grid(row=0, column=2)
+        
+        # Results display frame - now with charts and text
+        results_frame = ttk.LabelFrame(main_frame, text="Opportunity Cost Analysis", padding="15")
+        results_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        
+        # Create notebook for tabs
+        notebook = ttk.Notebook(results_frame)
+        notebook.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Chart tab
+        chart_frame = ttk.Frame(notebook)
+        notebook.add(chart_frame, text="📊 Visual Analysis")
+        
+        # Create matplotlib figure for charts
+        self.fig = Figure(figsize=(16, 8), dpi=100)
+        self.canvas = FigureCanvasTkAgg(self.fig, chart_frame)
+        self.canvas.get_tk_widget().grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        chart_frame.grid_rowconfigure(0, weight=1)
+        chart_frame.grid_columnconfigure(0, weight=1)
+        
+        # Text analysis tab
+        text_frame = ttk.Frame(notebook)
+        notebook.add(text_frame, text="📝 Detailed Analysis")
+        
+        # Results text area
+        self.results_text = tk.Text(text_frame, height=12, width=120, wrap=tk.WORD, font=("Arial", 11))
+        self.results_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Scrollbar for results
+        results_scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.results_text.yview)
+        results_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        self.results_text.configure(yscrollcommand=results_scrollbar.set)
+        
+        text_frame.grid_rowconfigure(0, weight=1)
+        text_frame.grid_columnconfigure(0, weight=1)
+        
+        results_frame.grid_rowconfigure(0, weight=1)
+        results_frame.grid_columnconfigure(0, weight=1)
+        
+        # Close button
+        ttk.Button(main_frame, text="Close", command=self.window.destroy).grid(row=3, column=0, columnspan=2, pady=(10, 0))
+        
+        # Initial empty state
+        self.show_empty_state()
+    
+    def load_transactions(self):
+        """Load expense transactions into the treeview"""
+        # Clear existing items
+        for item in self.transactions_tree.get_children():
+            self.transactions_tree.delete(item)
+        
+        # Load expense transactions
+        transactions = get_expense_transactions(100)  # Get more transactions for selection
+        
+        # Store transaction data separately for lookup
+        self.transaction_data = {}
+        
+        for trans in transactions:
+            trans_id, date_str, desc, amount, category = trans
+            
+            # Store transaction data in the item
+            item_id = self.transactions_tree.insert("", "end", values=(
+                date_str, desc, format_sats(amount), category
+            ))
+            
+            # Store the full transaction data for later lookup
+            self.transaction_data[item_id] = {
+                'id': trans_id,
+                'date': date_str,
+                'description': desc,
+                'amount': amount,
+                'category': category
+            }
+    
+    def on_transaction_select(self, event):
+        """Handle transaction selection"""
+        selection = self.transactions_tree.selection()
+        if selection:
+            item = selection[0]
+            
+            # Get transaction data from our stored data
+            if item in self.transaction_data:
+                trans_data = self.transaction_data[item]
+                
+                # Store selected transaction info
+                self.selected_transaction = {
+                    'id': trans_data['id'],
+                    'date': trans_data['date'],
+                    'description': trans_data['description'],
+                    'amount_display': format_sats(trans_data['amount']),
+                    'category': trans_data['category'],
+                    'amount_sats': trans_data['amount']
+                }
+                
+                self.update_analysis()
+    
+    def update_inflation(self):
+        """Update inflation rate from user input"""
+        try:
+            self.inflation_rate = float(self.inflation_var.get()) / 100.0
+            self.update_analysis()
+        except ValueError:
+            messagebox.showerror("Error", "Please enter a valid inflation rate", parent=self.window)
+            self.inflation_var.set("8.0")
+    
+    def show_empty_state(self):
+        """Show instructions when no transaction is selected"""
+        # Clear chart
+        self.fig.clear()
+        ax = self.fig.add_subplot(111)
+        ax.text(0.5, 0.5, '📝 Select a transaction to see opportunity cost visualization\n\n' +
+                'Choose an expense from the list above to analyze its lifecycle cost.\n' +
+                'The chart will show visual comparisons of your purchase vs Bitcoin holding.',
+                horizontalalignment='center', verticalalignment='center', 
+                transform=ax.transAxes, fontsize=14, bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue"))
+        ax.set_title("Opportunity Cost Visualization", fontsize=16, fontweight='bold')
+        ax.axis('off')
+        self.canvas.draw()
+        
+        # Update text tab
+        self.results_text.config(state=tk.NORMAL)
+        self.results_text.delete(1.0, tk.END)
+        self.results_text.insert(tk.END, 
+            "📝 Instructions:\n\n"
+            "1. Select an expense transaction from the list above\n"
+            "2. Choose your time horizon (1, 2, 5, or 10 years)\n"
+            "3. Adjust inflation rate if needed\n"
+            "4. View the opportunity cost analysis\n\n"
+            "📊 Visual Analysis Tab: Shows charts comparing your purchase cost vs Bitcoin opportunity\n"
+            "📝 Detailed Analysis Tab: Provides comprehensive numerical breakdown\n\n"
+            "This analysis shows what holding that Bitcoin would be worth instead of spending it today, "
+            "helping you understand the true lifecycle cost of your purchases."
+        )
+        self.results_text.config(state=tk.DISABLED)
+    
+    def update_analysis(self):
+        """Update the lifecycle cost analysis"""
+        if not self.selected_transaction:
+            self.show_empty_state()
+            return
+        
+        # Update both visual and text analysis
+        self.update_visual_analysis()
+        self.update_text_analysis()
+    
+    def update_text_analysis(self):
+        """Update the detailed text analysis"""
+        if not self.selected_transaction:
+            return
+        
+        years_ahead = int(self.horizon_var.get())
+        amount_sats = self.selected_transaction['amount_sats']
+        
+        # Calculate opportunity cost
+        today = datetime.now()
+        future_date = today + timedelta(days=years_ahead * 365.25)
+        
+        current_days = get_days_since_genesis(today)
+        future_days = get_days_since_genesis(future_date)
+        
+        current_btc_price = calculate_btc_fair_value(current_days)
+        future_btc_price = calculate_btc_fair_value(future_days)
+        
+        # Calculate what the sats would be worth in the future
+        btc_multiplier = future_btc_price / current_btc_price
+        future_value_sats = amount_sats * btc_multiplier
+        
+        # Calculate current and future USD values
+        current_usd_value = (amount_sats / 100_000_000) * current_btc_price
+        future_usd_value = (future_value_sats / 100_000_000) * future_btc_price
+        
+        # Calculate inflation-adjusted value for comparison
+        inflation_multiplier = (1 + self.inflation_rate) ** years_ahead
+        inflation_adjusted_value = current_usd_value * inflation_multiplier
+        
+        # Calculate opportunity cost metrics
+        bitcoin_gain_percentage = ((future_btc_price / current_btc_price) - 1) * 100
+        opportunity_cost_sats = future_value_sats - amount_sats
+        opportunity_cost_usd = future_usd_value - current_usd_value
+        real_purchasing_power_gain = future_usd_value / inflation_adjusted_value
+        
+        # Display results
+        self.results_text.config(state=tk.NORMAL)
+        self.results_text.delete(1.0, tk.END)
+        
+        results = f"""💰 LIFECYCLE COST ANALYSIS
+        
+🛍️ Purchase Details:
+• Item: {self.selected_transaction['description']}
+• Category: {self.selected_transaction['category']}
+• Date: {self.selected_transaction['date']}
+• Amount Spent: {format_sats(amount_sats)}
+
+📈 Opportunity Cost Analysis ({years_ahead} year{'s' if years_ahead > 1 else ''}):
+
+Current Bitcoin Price: ${current_btc_price:,.0f}
+Future Bitcoin Price: ${future_btc_price:,.0f} (Power Law Projection)
+Bitcoin Price Appreciation: +{bitcoin_gain_percentage:.1f}%
+
+💸 What You Spent:
+• Bitcoin Amount: {format_sats(amount_sats)}
+• USD Value (then): ${current_usd_value:,.2f}
+
+🚀 What That Bitcoin Would Be Worth:
+• Future Bitcoin Amount: {format_sats(int(future_value_sats))}
+• Future USD Value: ${future_usd_value:,.2f}
+
+💔 Opportunity Cost:
+• Lost Bitcoin Gain: {format_sats(int(opportunity_cost_sats))}
+• Lost USD Value: ${opportunity_cost_usd:,.2f}
+
+📊 Inflation Comparison:
+• Your Purchase + Inflation: ${inflation_adjusted_value:,.2f}
+• Bitcoin Holdings Value: ${future_usd_value:,.2f}
+• Real Purchasing Power Gain: {real_purchasing_power_gain:.1f}x
+
+🎯 Bottom Line:
+Instead of buying "{self.selected_transaction['description']}" for {format_sats(amount_sats)}, 
+if you had held that Bitcoin for {years_ahead} year{'s' if years_ahead > 1 else ''}, you would have 
+{format_sats(int(opportunity_cost_sats))} MORE bitcoin, worth ${opportunity_cost_usd:,.2f} 
+more than your purchase (even after accounting for {self.inflation_rate*100:.0f}% annual inflation).
+
+This represents a {real_purchasing_power_gain:.1f}x improvement in purchasing power!"""
+
+        self.results_text.insert(tk.END, results)
+        self.results_text.config(state=tk.DISABLED)
+    
+    def update_visual_analysis(self):
+        """Create visual charts for opportunity cost analysis"""
+        if not self.selected_transaction:
+            return
+        
+        years_ahead = int(self.horizon_var.get())
+        amount_sats = self.selected_transaction['amount_sats']
+        
+        # Calculate all the values
+        today = datetime.now()
+        future_date = today + timedelta(days=years_ahead * 365.25)
+        
+        current_days = get_days_since_genesis(today)
+        future_days = get_days_since_genesis(future_date)
+        
+        current_btc_price = calculate_btc_fair_value(current_days)
+        future_btc_price = calculate_btc_fair_value(future_days)
+        
+        btc_multiplier = future_btc_price / current_btc_price
+        future_value_sats = amount_sats * btc_multiplier
+        
+        current_usd_value = (amount_sats / 100_000_000) * current_btc_price
+        future_usd_value = (future_value_sats / 100_000_000) * future_btc_price
+        
+        inflation_multiplier = (1 + self.inflation_rate) ** years_ahead
+        inflation_adjusted_value = current_usd_value * inflation_multiplier
+        
+        opportunity_cost_sats = future_value_sats - amount_sats
+        opportunity_cost_usd = future_usd_value - current_usd_value
+        
+        # Clear the figure
+        self.fig.clear()
+        
+        # Create 2x2 subplot layout
+        ax1 = self.fig.add_subplot(221)  # Bitcoin amount comparison
+        ax2 = self.fig.add_subplot(222)  # USD value comparison  
+        ax3 = self.fig.add_subplot(223)  # Price progression
+        ax4 = self.fig.add_subplot(224)  # Opportunity cost summary
+        
+        # Chart 1: Bitcoin Amount Comparison (Bar Chart)
+        categories = ['What You Spent', f'Value in {years_ahead} Years']
+        values = [amount_sats / 1000, future_value_sats / 1000]  # Convert to thousands for readability
+        colors = ['#DC143C', '#2E8B57']
+        
+        bars1 = ax1.bar(categories, values, color=colors, alpha=0.7)
+        ax1.set_title(f'Bitcoin Amount Comparison', fontweight='bold')
+        ax1.set_ylabel('Thousands of Sats')
+        ax1.grid(True, alpha=0.3)
+        
+        # Add value labels on bars
+        for bar, val in zip(bars1, values):
+            height = bar.get_height()
+            ax1.text(bar.get_x() + bar.get_width()/2., height + max(values)*0.01,
+                    f'{val:,.0f}K sats', ha='center', va='bottom', fontweight='bold')
+        
+        # Chart 2: USD Value Comparison (Bar Chart)
+        usd_categories = ['Purchase Value', f'Future BTC Value', 'Purchase + Inflation']
+        usd_values = [current_usd_value, future_usd_value, inflation_adjusted_value]
+        usd_colors = ['#DC143C', '#2E8B57', '#FFD700']
+        
+        bars2 = ax2.bar(usd_categories, usd_values, color=usd_colors, alpha=0.7)
+        ax2.set_title('USD Value Comparison', fontweight='bold')
+        ax2.set_ylabel('USD Value')
+        ax2.grid(True, alpha=0.3)
+        
+        # Add value labels
+        for bar, val in zip(bars2, usd_values):
+            height = bar.get_height()
+            ax2.text(bar.get_x() + bar.get_width()/2., height + max(usd_values)*0.01,
+                    f'${val:,.0f}', ha='center', va='bottom', fontweight='bold')
+        
+        # Chart 3: Bitcoin Price Progression (Line Chart)
+        years_range = list(range(years_ahead + 1))
+        price_progression = []
+        for year in years_range:
+            future_days_year = get_days_since_genesis(today + timedelta(days=year * 365.25))
+            price = calculate_btc_fair_value(future_days_year)
+            price_progression.append(price)
+        
+        ax3.plot(years_range, price_progression, marker='o', linewidth=3, markersize=6, color='#FF8C00')
+        ax3.set_title(f'Bitcoin Price Projection ({years_ahead} Years)', fontweight='bold')
+        ax3.set_xlabel('Years Ahead')
+        ax3.set_ylabel('Bitcoin Price (USD)')
+        ax3.grid(True, alpha=0.3)
+        ax3.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x/1000:.0f}K' if x >= 1000 else f'${x:.0f}'))
+        
+        # Chart 4: Opportunity Cost Summary (Pie Chart)
+        if opportunity_cost_usd > 0:
+            pie_labels = ['Purchase Value', 'Opportunity Cost']
+            pie_values = [current_usd_value, opportunity_cost_usd]
+            pie_colors = ['#DC143C', '#32CD32']
+            
+            wedges, texts, autotexts = ax4.pie(pie_values, labels=pie_labels, autopct='%1.1f%%', 
+                                             colors=pie_colors, startangle=90)
+            ax4.set_title(f'Total Opportunity Cost\n${opportunity_cost_usd:,.0f} Lost', fontweight='bold')
+            
+            for autotext in autotexts:
+                autotext.set_color('white')
+                autotext.set_fontweight('bold')
+        else:
+            ax4.text(0.5, 0.5, 'No Opportunity Cost\n(Rare scenario)', 
+                    horizontalalignment='center', verticalalignment='center', 
+                    transform=ax4.transAxes, fontsize=12)
+            ax4.set_title('Opportunity Cost Analysis', fontweight='bold')
+        
+        # Overall title
+        self.fig.suptitle(f'Opportunity Cost Analysis: {self.selected_transaction["description"]}\n' +
+                         f'{format_sats(amount_sats)} → {format_sats(int(future_value_sats))} ' +
+                         f'(+{format_sats(int(opportunity_cost_sats))} opportunity cost)',
+                         fontsize=14, fontweight='bold')
+        
+        # Adjust layout and draw
+        self.fig.tight_layout()
+        self.canvas.draw()
 
 
 # === MAIN EXECUTION ===
