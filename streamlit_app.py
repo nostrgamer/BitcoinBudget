@@ -268,6 +268,34 @@ def delete_transaction(transaction_id):
     finally:
         conn.close()
 
+def update_transaction(transaction_id, date, description, amount, category_id=None):
+    """Update a transaction"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        if category_id is not None:
+            # Expense transaction
+            cursor.execute("""
+                UPDATE transactions 
+                SET date = ?, description = ?, amount = ?, category_id = ?
+                WHERE id = ?
+            """, (date, description, amount, category_id, transaction_id))
+        else:
+            # Income transaction (no category)
+            cursor.execute("""
+                UPDATE transactions 
+                SET date = ?, description = ?, amount = ?
+                WHERE id = ?
+            """, (date, description, amount, transaction_id))
+        
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        st.error(f"Error updating transaction: {e}")
+        return False
+    finally:
+        conn.close()
+
 def delete_category(category_id):
     """Delete a category and all its associated allocations and transactions"""
     conn = get_db_connection()
@@ -1024,62 +1052,159 @@ def main_page():
         # Recent transactions section (moved below transaction entry)
         st.markdown("### 📋 Recent Transactions")
         
-        transactions = get_recent_transactions(20)
+        transactions = get_recent_transactions(50)  # Get more transactions for editing
         
         if transactions:
-            # Convert to dataframe
+            # Get all categories for dropdown options
+            all_categories = get_categories()
+            category_options = ['Income'] + [cat['name'] for cat in all_categories]
+            
+            # Convert to dataframe with proper data types for editing
             trans_data = []
             for trans in transactions:
                 trans_id, date_str, desc, amount, trans_type, category = trans
                 
+                # Determine category for display
                 if trans_type == 'income':
-                    amount_str = f"+{format_sats(amount)}"
-                    emoji = "💰"
-                    category_str = "Income"
+                    category_display = "Income"
                 else:
-                    amount_str = f"-{format_sats(amount)}"
-                    emoji = "💸"
-                    category_str = category or "Unknown"
+                    category_display = category or "Unknown"
                 
                 trans_data.append({
                     'ID': trans_id,
-                    'Type': emoji,
-                    'Date': date_str,
+                    'Date': datetime.strptime(date_str, '%Y-%m-%d').date(),
                     'Description': desc,
-                    'Amount': amount_str,
-                    'Category': category_str
+                    'Amount': amount,  # Store as raw number for editing
+                    'Category': category_display,
+                    'Type': trans_type,  # Keep track of original type
+                    'Original_Category_ID': trans[0] if trans_type == 'expense' else None  # For reference
                 })
             
             df = pd.DataFrame(trans_data)
             
-            # Display transactions with selection
-            selected_rows = st.dataframe(
+            # Display editable transactions table
+            edited_df = st.data_editor(
                 df,
                 use_container_width=True,
                 hide_index=True,
                 column_config={
                     "ID": None,  # Hide ID column
-                    "Type": st.column_config.TextColumn("", width="small"),
-                    "Amount": st.column_config.TextColumn("Amount", width="medium")
+                    "Type": None,  # Hide type column
+                    "Original_Category_ID": None,  # Hide original category ID
+                    "Date": st.column_config.DateColumn(
+                        "Date",
+                        help="Click to edit transaction date",
+                        format="YYYY-MM-DD"
+                    ),
+                    "Description": st.column_config.TextColumn(
+                        "Description",
+                        help="Click to edit transaction description",
+                        width="large"
+                    ),
+                    "Amount": st.column_config.NumberColumn(
+                        "Amount (sats)",
+                        help="Click to edit amount in satoshis",
+                        min_value=1,
+                        step=1,
+                        format="%d"
+                    ),
+                    "Category": st.column_config.SelectboxColumn(
+                        "Category",
+                        help="Click to change transaction category",
+                        options=category_options
+                    )
                 },
-                on_select="rerun",
-                selection_mode="single-row"
+                key="transactions_editor"
             )
             
-            # Delete transaction button
-            if selected_rows.selection.rows:
-                selected_idx = selected_rows.selection.rows[0]
-                selected_transaction = trans_data[selected_idx]
+            # Process transaction edits
+            if not edited_df.equals(df):
+                changes_made = False
+                for idx, row in edited_df.iterrows():
+                    transaction_id = row['ID']
+                    original_row = df.iloc[idx]
+                    
+                    # Check if any fields changed
+                    date_changed = row['Date'] != original_row['Date']
+                    desc_changed = row['Description'] != original_row['Description']
+                    amount_changed = row['Amount'] != original_row['Amount']
+                    category_changed = row['Category'] != original_row['Category']
+                    
+                    if date_changed or desc_changed or amount_changed or category_changed:
+                        # Determine if this is income or expense based on category
+                        new_category = row['Category']
+                        new_date = str(row['Date'])
+                        new_description = row['Description']
+                        new_amount = int(row['Amount'])
+                        
+                        if new_category == 'Income':
+                            # Income transaction
+                            if update_transaction(transaction_id, new_date, new_description, new_amount):
+                                st.success(f"✅ Updated income: {new_description}")
+                                changes_made = True
+                            else:
+                                st.error(f"❌ Failed to update income: {new_description}")
+                        else:
+                            # Expense transaction - find category ID
+                            category_id = None
+                            for cat in all_categories:
+                                if cat['name'] == new_category:
+                                    category_id = cat['id']
+                                    break
+                            
+                            if category_id:
+                                if update_transaction(transaction_id, new_date, new_description, new_amount, category_id):
+                                    st.success(f"✅ Updated expense: {new_description}")
+                                    changes_made = True
+                                else:
+                                    st.error(f"❌ Failed to update expense: {new_description}")
+                            else:
+                                st.error(f"❌ Invalid category: {new_category}")
                 
-                st.markdown("#### 🗑️ Delete Transaction")
-                st.write(f"Selected: **{selected_transaction['Description']}** - {selected_transaction['Amount']}")
+                if changes_made:
+                    st.rerun()
+            
+            # Enhanced delete functionality
+            st.markdown("---")
+            st.markdown("#### 🗑️ Delete Transactions")
+            
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                # Create options for deletion dropdown
+                delete_options = []
+                delete_mapping = {}
                 
-                if st.button("🗑️ Delete Selected Transaction", type="secondary"):
-                    if delete_transaction(selected_transaction['ID']):
-                        st.success("✅ Transaction deleted")
-                        st.rerun()
+                for trans in transactions:
+                    trans_id, date_str, desc, amount, trans_type, category = trans
+                    
+                    if trans_type == 'income':
+                        display_text = f"{date_str} | Income | {desc} | +{format_sats(amount)}"
+                        emoji = "💰"
                     else:
-                        st.error("❌ Failed to delete transaction")
+                        category_name = category or "Unknown"
+                        display_text = f"{date_str} | {category_name} | {desc} | -{format_sats(amount)}"
+                        emoji = "💸"
+                    
+                    option = f"{emoji} {display_text}"
+                    delete_options.append(option)
+                    delete_mapping[option] = trans_id
+                
+                selected_for_deletion = st.selectbox(
+                    "Select Transaction to Delete",
+                    delete_options,
+                    key="delete_transaction_select"
+                )
+            
+            with col2:
+                if st.button("🗑️ Delete Transaction", key="delete_transaction_btn", type="secondary"):
+                    if selected_for_deletion:
+                        transaction_id = delete_mapping[selected_for_deletion]
+                        if delete_transaction(transaction_id):
+                            st.success("✅ Transaction deleted")
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed to delete transaction")
         else:
             st.info("No transactions yet. Add some income or expenses to get started!")
 
