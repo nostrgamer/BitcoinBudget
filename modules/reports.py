@@ -80,7 +80,7 @@ def get_spending_breakdown(start_date, end_date):
     return breakdown, total_spent
 
 def get_net_worth_data(start_date, end_date):
-    """Get monthly income vs expenses data for net worth analysis"""
+    """Get monthly income vs expenses data with account-based net worth analysis"""
     user_data = get_user_data()
     
     monthly_data = {}
@@ -108,20 +108,55 @@ def get_net_worth_data(start_date, end_date):
     # Convert to sorted list and calculate net worth progression
     months = sorted(all_months)
     net_worth_data = []
-    cumulative_net_worth = 0
     
-    for month in months:
-        data = monthly_data.get(month, {'income': 0, 'expenses': 0})
-        monthly_net = data['income'] - data['expenses']
-        cumulative_net_worth += monthly_net
-        
-        net_worth_data.append({
-            'month': month,
-            'income': data['income'],
-            'expenses': data['expenses'],
-            'monthly_net': monthly_net,
-            'cumulative_net_worth': cumulative_net_worth
-        })
+    # Calculate current actual net worth from account balances
+    current_net_worth = 0
+    for account in user_data['accounts']:
+        current_net_worth += account['balance']
+    
+    # If we have multiple months, show progression
+    if len(months) > 1:
+        cumulative_net_worth = 0
+        for i, month in enumerate(months):
+            data = monthly_data.get(month, {'income': 0, 'expenses': 0})
+            monthly_net = data['income'] - data['expenses']
+            cumulative_net_worth += monthly_net
+            
+            # For the most recent month, use actual account balance
+            if i == len(months) - 1:
+                actual_net_worth = current_net_worth
+            else:
+                actual_net_worth = cumulative_net_worth
+            
+            net_worth_data.append({
+                'month': month,
+                'income': data['income'],
+                'expenses': data['expenses'],
+                'monthly_net': monthly_net,
+                'cumulative_net_worth': actual_net_worth
+            })
+    else:
+        # Single month or no historical data - show current account balance
+        if months:
+            month = months[0]
+            data = monthly_data.get(month, {'income': 0, 'expenses': 0})
+            net_worth_data.append({
+                'month': month,
+                'income': data['income'],
+                'expenses': data['expenses'],
+                'monthly_net': data['income'] - data['expenses'],
+                'cumulative_net_worth': current_net_worth
+            })
+        else:
+            # No transaction data in range - show current state
+            current_month = get_current_month()
+            net_worth_data.append({
+                'month': current_month,
+                'income': 0,
+                'expenses': 0,
+                'monthly_net': 0,
+                'cumulative_net_worth': current_net_worth
+            })
     
     return net_worth_data
 
@@ -494,7 +529,7 @@ def net_worth_report():
         total_income = sum(income)
         total_expenses = sum(expenses)
         final_net_worth = cumulative[-1] if cumulative else 0
-        avg_monthly_net = final_net_worth / len(months) if months else 0
+        avg_monthly_net = (total_income - total_expenses) / len(months) if months else 0
         
         with col1:
             st.metric("Total Income", format_sats(total_income))
@@ -503,10 +538,45 @@ def net_worth_report():
             st.metric("Total Expenses", format_sats(total_expenses))
         
         with col3:
-            st.metric("Net Worth", format_sats(final_net_worth))
+            st.metric("Current Net Worth", format_sats(final_net_worth))
         
         with col4:
             st.metric("Avg Monthly Net", format_sats(int(avg_monthly_net)))
+        
+        # Account breakdown
+        st.markdown("### 🏦 Account Breakdown")
+        user_data = get_user_data()
+        
+        account_data = []
+        tracked_total = 0
+        untracked_total = 0
+        
+        for account in user_data['accounts']:
+            account_data.append({
+                'Account': account['name'],
+                'Type': 'Tracked' if account['is_tracked'] else 'Untracked',
+                'Balance': format_sats(account['balance'])
+            })
+            
+            if account['is_tracked']:
+                tracked_total += account['balance']
+            else:
+                untracked_total += account['balance']
+        
+        if account_data:
+            df_accounts = pd.DataFrame(account_data)
+            st.dataframe(df_accounts, use_container_width=True, hide_index=True)
+            
+            # Account summary
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Tracked Accounts", format_sats(tracked_total))
+            with col2:
+                st.metric("Untracked Accounts", format_sats(untracked_total))
+            with col3:
+                st.metric("Total Balance", format_sats(tracked_total + untracked_total))
+        else:
+            st.info("No accounts configured. Add accounts to see detailed breakdown.")
             
     else:
         st.info("No financial data found for the selected period.")
@@ -588,6 +658,15 @@ def future_purchasing_power_report():
         
         st.info(f"📅 {period_desc[budget_period]}")
         st.metric("Base Monthly Budget", format_sats(int(monthly_total_spending)))
+        
+        # Show current tracked account balance for context
+        user_data = get_user_data()
+        tracked_balance = sum(account['balance'] for account in user_data['accounts'] if account['is_tracked'])
+        months_of_runway = int(tracked_balance / monthly_total_spending) if monthly_total_spending > 0 else 0
+        
+        st.metric("Tracked Account Balance", format_sats(tracked_balance))
+        if months_of_runway > 0:
+            st.metric("Months of Runway", f"{months_of_runway} months")
     
     if monthly_total_spending > 0 and selected_years:
         # Calculate projections using monthly averages
