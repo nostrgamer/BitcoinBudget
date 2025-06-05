@@ -802,18 +802,7 @@ def landing_page():
         </div>
     """, unsafe_allow_html=True)
     
-    # Quick preview summary for faster loading
-    st.markdown("""
-        <div style="background: linear-gradient(135deg, #f7931a 0%, #ff6b35 100%); 
-             padding: 1.5rem 2rem; border-radius: 10px; margin: 1rem 0 2rem 0; text-align: center;">
-            <h3 style="color: white; margin: 0 0 1rem 0; font-size: 1.4rem;">
-                🚀 Track your sats • Manage spending • Visualize future value
-            </h3>
-            <p style="color: white; margin: 0; font-size: 1rem; opacity: 0.9;">
-                See how 1M sats + 250k sats/month DCA becomes 61M sats with real purchasing power projections
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
+    # Removed unnecessary orange block as requested
     
     # Import plotly only when needed for charts
     import plotly.graph_objects as go
