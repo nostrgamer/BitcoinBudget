@@ -11,16 +11,15 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import calendar
-import sqlite3
 
 # Import functions from main app
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def get_db_connection():
-    """Get database connection"""
-    return sqlite3.connect('budget.db')
+def get_user_data():
+    """Get user data from session state"""
+    return st.session_state.user_data
 
 def format_sats(satoshis):
     """Format satoshis for display"""
@@ -41,66 +40,65 @@ def parse_amount_input(text):
 
 def get_spending_breakdown(start_date, end_date):
     """Get spending breakdown by category for a given date range"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    user_data = get_user_data()
     
-    cursor.execute("""
-        SELECT c.name, SUM(t.amount) as total_spent
-        FROM transactions t
-        JOIN categories c ON t.category_id = c.id
-        WHERE t.type = 'expense' AND t.date BETWEEN ? AND ?
-        GROUP BY c.id, c.name
-        HAVING total_spent > 0
-        ORDER BY total_spent DESC
-    """, (start_date, end_date))
+    # Group expenses by category
+    category_spending = {}
     
-    results = cursor.fetchall()
-    conn.close()
+    for transaction in user_data['transactions']:
+        if (transaction['type'] == 'expense' and 
+            start_date <= transaction['date'] <= end_date):
+            
+            # Find category name
+            category_name = "Unknown"
+            if transaction['category_id']:
+                for category in user_data['categories']:
+                    if category['id'] == transaction['category_id']:
+                        category_name = category['name']
+                        break
+            
+            if category_name not in category_spending:
+                category_spending[category_name] = 0
+            category_spending[category_name] += transaction['amount']
     
+    # Convert to breakdown format
     breakdown = []
-    total_spent = sum(row[1] for row in results)
+    total_spent = sum(category_spending.values())
     
-    for category_name, amount in results:
-        percentage = (amount / total_spent * 100) if total_spent > 0 else 0
-        breakdown.append({
-            'category': category_name,
-            'amount': amount,
-            'percentage': percentage
-        })
+    for category_name, amount in category_spending.items():
+        if amount > 0:
+            percentage = (amount / total_spent * 100) if total_spent > 0 else 0
+            breakdown.append({
+                'category': category_name,
+                'amount': amount,
+                'percentage': percentage
+            })
+    
+    # Sort by amount (highest first)
+    breakdown.sort(key=lambda x: x['amount'], reverse=True)
     
     return breakdown, total_spent
 
 def get_net_worth_data(start_date, end_date):
     """Get monthly income vs expenses data for net worth analysis"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT 
-            strftime('%Y-%m', date) as month,
-            type,
-            SUM(amount) as total
-        FROM transactions 
-        WHERE date BETWEEN ? AND ?
-        GROUP BY strftime('%Y-%m', date), type
-        ORDER BY month
-    """, (start_date, end_date))
-    
-    results = cursor.fetchall()
-    conn.close()
+    user_data = get_user_data()
     
     monthly_data = {}
     all_months = set()
     
-    for month, transaction_type, total in results:
-        all_months.add(month)
-        if month not in monthly_data:
-            monthly_data[month] = {'income': 0, 'expenses': 0}
-        
-        if transaction_type == 'income':
-            monthly_data[month]['income'] = total
-        elif transaction_type == 'expense':
-            monthly_data[month]['expenses'] = total
+    for transaction in user_data['transactions']:
+        if start_date <= transaction['date'] <= end_date:
+            # Extract year-month from date
+            month = transaction['date'][:7]  # 'YYYY-MM'
+            all_months.add(month)
+            
+            if month not in monthly_data:
+                monthly_data[month] = {'income': 0, 'expenses': 0}
+            
+            if transaction['type'] == 'income':
+                monthly_data[month]['income'] += transaction['amount']
+            elif transaction['type'] == 'expense':
+                monthly_data[month]['expenses'] += transaction['amount']
     
     # Fill in missing months with zero values
     for month in all_months:
@@ -209,18 +207,39 @@ def calculate_future_purchasing_power(current_budget_sats, years_ahead, inflatio
 
 def get_expense_transactions(limit=50):
     """Get recent expense transactions for lifecycle cost analysis"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT t.id, t.date, t.description, t.amount, c.name as category_name
-        FROM transactions t
-        JOIN categories c ON t.category_id = c.id
-        WHERE t.type = 'expense'
-        ORDER BY t.date DESC, t.created_at DESC
-        LIMIT ?
-    """, (limit,))
-    transactions = cursor.fetchall()
-    conn.close()
+    user_data = get_user_data()
+    
+    # Filter expense transactions
+    expense_transactions = [
+        t for t in user_data['transactions'] 
+        if t['type'] == 'expense'
+    ]
+    
+    # Sort by date (most recent first)
+    sorted_transactions = sorted(
+        expense_transactions, 
+        key=lambda x: x['date'], 
+        reverse=True
+    )[:limit]
+    
+    # Format for compatibility with existing code
+    transactions = []
+    for transaction in sorted_transactions:
+        category_name = "Unknown"
+        if transaction['category_id']:
+            for category in user_data['categories']:
+                if category['id'] == transaction['category_id']:
+                    category_name = category['name']
+                    break
+        
+        transactions.append((
+            transaction['id'],
+            transaction['date'],
+            transaction['description'],
+            transaction['amount'],
+            category_name
+        ))
+    
     return transactions
 
 def show():
