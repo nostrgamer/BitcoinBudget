@@ -1,31 +1,31 @@
 # Bitcoin Budget - Streamlit Web Application Rules
 
 ## Project Overview
-A **modern, web-based Bitcoin budgeting application** using Python + Streamlit + Plotly + SQLite. Maximum simplicity with professional web UI.
+A **modern, web-based Bitcoin budgeting application** using Python + Streamlit + Plotly + Session State. Account-based envelope budgeting with advanced analytics.
 
-**Core Principle: If you can do it in Excel with a few macros, it should be simple in code - now with a modern web interface.**
+**Core Principle: If you can do it in Excel with a few macros, it should be simple in code - now with a modern web interface and account-based budgeting.**
 
 ## Technology Stack
 - **Language**: Python 3.8+
 - **Web Framework**: Streamlit (modern web UI)
 - **Charts**: Plotly (interactive visualizations)
-- **Data**: Pandas (data handling)
-- **Database**: SQLite (single file)
-- **Deployment**: Streamlit Cloud, Heroku, or self-hosted
-- **Target**: ~1600 lines total across 2-3 files
+- **Data**: Pandas + Session State (privacy-focused, no database)
+- **Storage**: Session-based isolation (each user has private data)
+- **Deployment**: Streamlit Cloud with auto-deploy from GitHub
+- **Target**: ~2400 lines total across 2 files (main app + reports)
 
 ## Development Rules
 
 ### File Structure (Clean Web Architecture)
 ```
 bitcoin_budget/
-├── streamlit_app.py           # Main application (~750 lines)
-├── pages/
+├── streamlit_app.py           # Main application (~2400 lines)
+├── modules/
 │   ├── __init__.py           # Package initialization
-│   └── reports.py            # All reports functionality (~870 lines)
-├── budget.db                 # SQLite database (auto-created)
-├── requirements_streamlit.txt # Streamlit + dependencies
-└── README.md                 # Usage instructions
+│   └── reports.py            # All reports functionality (~1000 lines)
+├── requirements.txt          # Streamlit + dependencies
+├── README.md                 # Complete documentation
+└── .cursorrules             # Development guidelines
 ```
 
 ### Code Organization (Streamlit Structure)
@@ -42,25 +42,28 @@ import plotly.graph_objects as go
 # === STREAMLIT PAGE CONFIG ===
 st.set_page_config(page_title="Bitcoin Budget", layout="wide")
 
-# === DATABASE FUNCTIONS ===
-def init_database():
-    """Create tables if they don't exist"""
+# === SESSION STATE FUNCTIONS ===
+def initialize_session_state():
+    """Initialize user data in session state"""
 
-def add_income(amount_sats, description, date):
-    """Add income transaction"""
+def add_account(name, initial_balance, is_tracked=True):
+    """Add Bitcoin account (tracked/untracked)"""
 
-def add_expense(amount_sats, description, category_id, date):
-    """Add expense transaction"""
+def add_income(amount_sats, description, date, account_id):
+    """Add income transaction with account tracking"""
 
-# === BUDGET LOGIC ===
-def get_total_income(month=None):
-    """Get total income for month or all time"""
+def add_expense(amount_sats, description, category_id, date, account_id):
+    """Add expense transaction with account tracking"""
 
-def get_available_to_assign(month):
-    """Calculate unallocated income"""
+# === ACCOUNT-BASED BUDGET LOGIC ===
+def get_tracked_account_balance():
+    """Get total balance of tracked accounts"""
 
-def get_category_balance(category_id, month):
-    """Get envelope balance with rollover"""
+def get_available_to_assign():
+    """Calculate: Tracked Balance - Money in Categories"""
+
+def get_category_balance(category_id):
+    """Get category balance (all-time allocated - spent)"""
 
 # === STREAMLIT UI FUNCTIONS ===
 def initialize_session_state():
@@ -85,12 +88,13 @@ if __name__ == "__main__":
 - **Comments**: Only when the code isn't self-explanatory
 - **Line length**: Keep under 100 characters
 
-### Database Guidelines
-- **Simple SQLite**: No ORM, just direct SQL
-- **Three tables**: transactions, categories, allocations
+### Session State Guidelines
+- **Privacy-First**: Each user gets isolated data in st.session_state.user_data
+- **Account-Based**: Tracked (on-budget) and untracked (off-budget) accounts
+- **Four data structures**: accounts, transactions, categories, allocations
 - **Integer amounts**: Store satoshis as integers (no decimals)
 - **Text dates**: Store as 'YYYY-MM-DD' strings
-- **Foreign keys**: Use them for data integrity
+- **Account tracking**: All transactions linked to specific accounts
 
 ### Streamlit UI Guidelines
 - **Built-in components**: Use st.form, st.columns, st.tabs, st.sidebar
@@ -111,46 +115,51 @@ if __name__ == "__main__":
 ❌ **NO** custom CSS or complex styling
 ❌ **NO** external APIs or integrations
 ❌ **NO** authentication systems
-❌ **NO** multiple database connections
+❌ **NO** databases or persistent storage
 ❌ **NO** async/await unless truly needed
 ❌ **NO** complex JavaScript or custom components
 
 ✅ **YES** to simple Streamlit functions
-✅ **YES** to direct database calls
+✅ **YES** to session state for data storage
 ✅ **YES** to built-in Streamlit components
 ✅ **YES** to Plotly for charts (built-in integration)
 ✅ **YES** to session state for navigation
 ✅ **YES** to pandas DataFrames for data display
 ✅ **YES** to responsive layouts with st.columns
+✅ **YES** to account-based budgeting patterns
 
 ### Development Workflow
-1. **Start with database**: Get SQLite working first
-2. **Add core functions**: Income, expenses, categories
-3. **Build Streamlit pages**: Main app with sidebar navigation
-4. **Add reports module**: Separate file for analytics
-5. **Test in browser**: Run `streamlit run streamlit_app.py`
-6. **Deploy to web**: Streamlit Cloud or production hosting
+1. **Start with session state**: Initialize user data structure
+2. **Add account functions**: Tracked/untracked account management
+3. **Add core functions**: Income, expenses, categories with account tracking
+4. **Build Streamlit pages**: Main app with accounts tab and sidebar navigation
+5. **Add reports module**: Separate file for 5 types of analytics
+6. **Test in browser**: Run `streamlit run streamlit_app.py` locally
+7. **Deploy to web**: Auto-deploy to Streamlit Cloud via GitHub
 
 ### Error Handling
 - **User errors**: Show st.error with helpful message
-- **Database errors**: Catch and show user-friendly message
-- **Input validation**: Check before database operations
+- **Session state errors**: Catch and initialize missing data
+- **Input validation**: Check before session state operations
 - **Form validation**: Use Streamlit form submission patterns
 - **Graceful degradation**: App shouldn't crash on bad input
+- **Account validation**: Ensure account exists before transactions
 
 ### Testing Strategy
 - **Manual testing**: Click through the web interface
 - **Function testing**: Run individual functions in REPL
-- **Database testing**: Check SQLite file with DB Browser
+- **Session state testing**: Check data structure integrity
 - **Browser testing**: Test responsiveness and mobile compatibility
+- **Multi-user testing**: Verify session isolation works properly
 - **No unit tests**: Keep it simple for this scope
 
 ### Performance Guidelines
 - **Personal budget app**: Performance is not critical
-- **SQLite is fast enough**: No need for optimization
+- **Session state is fast**: In-memory operations are instant
 - **Streamlit handles caching**: Use @st.cache_data when needed
-- **Keep queries simple**: Basic SELECT/INSERT/UPDATE
+- **Keep operations simple**: Basic list/dict operations
 - **Pandas for display**: DataFrame operations are efficient enough
+- **Account balance caching**: Store computed balances to avoid recalculation
 
 ### Bitcoin Display Formats
 ```python
@@ -170,34 +179,43 @@ def parse_amount_input(text):
 
 ### Streamlit-Specific Patterns
 ```python
-# Session state management
-if 'current_month' not in st.session_state:
-    st.session_state.current_month = get_current_month()
+# Session state initialization with user data
+def initialize_session_state():
+    if 'user_data' not in st.session_state:
+        st.session_state.user_data = {
+            'accounts': [demo_accounts],
+            'transactions': [demo_transactions],
+            'categories': [demo_categories],
+            'allocations': [demo_allocations]
+        }
 
-# Form handling with validation
+# Account-based form handling
 with st.form("add_income_form"):
     amount = st.text_input("Amount", placeholder="1000000 or 0.01 BTC")
     description = st.text_input("Description")
+    account = st.selectbox("Account", [acc['name'] for acc in get_accounts()])
     submitted = st.form_submit_button("Add Income")
     
-    if submitted and amount and description:
+    if submitted and amount and description and account:
         try:
             amount_sats = parse_amount_input(amount)
-            if add_income(amount_sats, description, date.today()):
+            account_id = get_account_id_by_name(account)
+            if add_income(amount_sats, description, date.today(), account_id):
                 st.success("Income added successfully!")
                 st.rerun()
         except ValueError:
             st.error("Invalid amount format")
 
-# Interactive charts
-fig = px.pie(breakdown_data, values='amount', names='category',
-             title='Spending Breakdown')
+# Advanced analytics charts
+fig = make_subplots(rows=2, cols=2, subplot_titles=(...))
+# Bitcoin price growth, stack value, purchasing power, multipliers
 st.plotly_chart(fig, use_container_width=True)
 
-# Navigation with sidebar
+# Navigation with multiple report types
 with st.sidebar:
-    if st.button("📊 Reports"):
+    if st.button("🚀 Net Worth Future Value"):
         st.session_state.page = 'reports'
+        st.session_state.report_type = 'net_worth_future_value'
         st.rerun()
 ```
 
@@ -214,31 +232,41 @@ with st.sidebar:
 - ✅ **Mobile friendly**: Responsive design works on phones/tablets
 - ✅ **Interactive charts**: Plotly visualizations with hover details
 - ✅ **Fast development**: Build and test quickly with hot reload
-- ✅ **Easy deployment**: One-click deploy to Streamlit Cloud
-- ✅ **All YNAB features**: Income, expenses, categories, allocation
-- ✅ **Advanced analytics**: Visual reports with opportunity cost analysis
+- ✅ **Easy deployment**: Auto-deploy to Streamlit Cloud from GitHub
+- ✅ **Account-based budgeting**: Tracked and untracked accounts with transfers
+- ✅ **All YNAB features**: Income, expenses, categories, allocation with accounts
+- ✅ **Advanced analytics**: 5 report types with Bitcoin Power Law projections
+- ✅ **Privacy-first**: Session-based isolation for each user
+- ✅ **Motivational**: Net Worth Future Value to encourage stacking
 - ✅ **No crashes**: Handle user errors gracefully
 
 ### Example Streamlit Function
 ```python
 def main_page():
-    """Main budget application page"""
+    """Main budget application page with account-based budgeting"""
     current_month = st.session_state.current_month
     
     st.title(f"₿ Bitcoin Budget - {current_month}")
     
-    # Budget summary metrics
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total Income", format_sats(get_total_income(current_month)))
+    # Account-based budget summary metrics
+    tracked_balance = get_total_account_balance(tracked_only=True)
+    in_categories = get_total_category_balances_current()
+    available = tracked_balance - in_categories
     
-    # Tabbed interface
-    tab1, tab2, tab3, tab4 = st.tabs(["💰 Income", "📁 Categories", "💸 Expenses", "📋 Transactions"])
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Tracked Account Balance", format_sats(tracked_balance))
+    with col2:
+        st.metric("Money in Categories", format_sats(in_categories))
+    with col3:
+        st.metric("Available to Assign", format_sats(available))
+    
+    # Tabbed interface with accounts
+    tab1, tab2, tab3, tab4 = st.tabs(["🏦 Accounts", "📁 Categories", "💳 Transactions", "📊 Reports"])
     
     with tab1:
-        with st.form("add_income"):
-            # Income form with validation
-            pass
+        # Account management with tracked/untracked designation
+        accounts_page()
 ```
 
-Remember: **Simple is better than complex. Web-native is better than desktop porting. Interactive is better than static.** 
+Remember: **Simple is better than complex. Account-based is better than transaction-only. Privacy-first is better than shared data. Motivational is better than purely functional.** 

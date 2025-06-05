@@ -6,7 +6,6 @@ Modern web-based envelope budgeting for Bitcoin users
 # Force preview refresh
 
 import streamlit as st
-import sqlite3
 import pandas as pd
 from datetime import datetime, timedelta
 import calendar
@@ -24,73 +23,9 @@ st.set_page_config(
 
 # === DATABASE FUNCTIONS (UNCHANGED FROM ORIGINAL) ===
 
-def init_database():
-    """Create database tables if they don't exist"""
-    conn = sqlite3.connect('budget.db')
-    cursor = conn.cursor()
-    
-    # Master Categories table - groups for organizing categories
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS master_categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            sort_order INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Transactions table - all income and expenses
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS transactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date TEXT NOT NULL,
-            description TEXT NOT NULL,
-            amount INTEGER NOT NULL,
-            category_id INTEGER,
-            type TEXT NOT NULL,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(category_id) REFERENCES categories(id)
-        )
-    ''')
-    
-    # Categories table - spending envelopes (now with master category grouping)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            master_category_id INTEGER,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(master_category_id) REFERENCES master_categories(id)
-        )
-    ''')
-    
-    # Allocations table - monthly budget assignments
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS allocations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category_id INTEGER NOT NULL,
-            month TEXT NOT NULL,
-            amount INTEGER NOT NULL,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(category_id, month),
-            FOREIGN KEY(category_id) REFERENCES categories(id)
-        )
-    ''')
-    
-    # Add master_category_id column to existing categories table if it doesn't exist
-    cursor.execute("PRAGMA table_info(categories)")
-    columns = [column[1] for column in cursor.fetchall()]
-    if 'master_category_id' not in columns:
-        cursor.execute("ALTER TABLE categories ADD COLUMN master_category_id INTEGER REFERENCES master_categories(id)")
-    
-    conn.commit()
-    conn.close()
 
-def get_db_connection():
-    """Get database connection"""
-    return sqlite3.connect('budget.db')
 
-def add_income(amount_sats, description, transaction_date):
+def add_income(amount_sats, description, transaction_date, account_id=None):
     """Add income transaction"""
     try:
         transaction = {
@@ -99,16 +34,25 @@ def add_income(amount_sats, description, transaction_date):
             'description': description,
             'amount': amount_sats,
             'type': 'income',
-            'category_id': None
+            'category_id': None,
+            'account_id': account_id
         }
         st.session_state.user_data['transactions'].append(transaction)
         st.session_state.user_data['next_transaction_id'] += 1
+        
+        # Update account balance if account is specified
+        if account_id:
+            for account in st.session_state.user_data['accounts']:
+                if account['id'] == account_id:
+                    account['balance'] += amount_sats
+                    break
+        
         return True
     except Exception as e:
         st.error(f"Error adding income: {e}")
         return False
 
-def add_expense(amount_sats, description, category_id, transaction_date):
+def add_expense(amount_sats, description, category_id, transaction_date, account_id=None):
     """Add expense transaction"""
     try:
         transaction = {
@@ -117,10 +61,19 @@ def add_expense(amount_sats, description, category_id, transaction_date):
             'description': description,
             'amount': amount_sats,
             'type': 'expense',
-            'category_id': category_id
+            'category_id': category_id,
+            'account_id': account_id
         }
         st.session_state.user_data['transactions'].append(transaction)
         st.session_state.user_data['next_transaction_id'] += 1
+        
+        # Update account balance if account is specified
+        if account_id:
+            for account in st.session_state.user_data['accounts']:
+                if account['id'] == account_id:
+                    account['balance'] -= amount_sats
+                    break
+        
         return True
     except Exception as e:
         st.error(f"Error adding expense: {e}")
@@ -253,21 +206,26 @@ def rename_category(category_id, new_name):
 def allocate_to_category(category_id, month, amount_sats):
     """Allocate amount to category for specific month"""
     try:
+        # Ensure category_id is always an integer (fix for data type issues)
+        category_id = int(category_id)
+        
         # Find existing allocation for this category and month
         existing_allocation = None
         for i, alloc in enumerate(st.session_state.user_data['allocations']):
-            if alloc['category_id'] == category_id and alloc['month'] == month:
+            # Compare with both int and string versions to handle existing bad data
+            if (int(alloc['category_id']) == category_id and alloc['month'] == month):
                 existing_allocation = i
                 break
         
         if existing_allocation is not None:
-            # Update existing allocation
+            # Update existing allocation and ensure category_id is integer
             st.session_state.user_data['allocations'][existing_allocation]['amount'] = amount_sats
+            st.session_state.user_data['allocations'][existing_allocation]['category_id'] = category_id
         else:
-            # Create new allocation
+            # Create new allocation with integer category_id
             allocation = {
                 'id': st.session_state.user_data['next_allocation_id'],
-                'category_id': category_id,
+                'category_id': category_id,  # Ensure this is an integer
                 'month': month,
                 'amount': amount_sats
             }
@@ -422,25 +380,6 @@ def get_category_allocated(category_id, month):
     """Get amount allocated to category for month"""
     return get_category_allocated_direct(category_id, month)
 
-def get_category_rollover_balance(category_id, month):
-    """Get the rollover balance for a category from the previous month only"""
-    year, month_num = map(int, month.split('-'))
-    
-    if month_num == 1:
-        prev_month = f"{year-1}-12"
-    else:
-        prev_month = f"{year}-{month_num-1:02d}"
-    
-    prev_income = get_total_income(prev_month)
-    if prev_income == 0:
-        return 0
-    
-    prev_allocated = get_category_allocated_direct(category_id, prev_month)
-    prev_spent = get_category_spent(category_id, prev_month)
-    prev_balance = prev_allocated - prev_spent
-    
-    return max(0, prev_balance)
-
 def get_category_allocated_direct(category_id, month):
     """Get amount allocated to category for month without rollover logic"""
     for allocation in st.session_state.user_data['allocations']:
@@ -450,12 +389,24 @@ def get_category_allocated_direct(category_id, month):
     return 0
 
 def get_category_balance(category_id, month):
-    """Get current balance for category envelope including rollover from previous months"""
-    allocated = get_category_allocated_direct(category_id, month)
-    spent = get_category_spent(category_id, month)
-    rollover = get_category_rollover_balance(category_id, month)
+    """Get current balance for category envelope (account-based approach)"""
+    # Get all allocations ever made to this category
+    total_allocated = 0
+    for allocation in st.session_state.user_data['allocations']:
+        if allocation['category_id'] == category_id:
+            # Only count allocations up to and including the current month
+            if allocation['month'] <= month:
+                total_allocated += allocation['amount']
     
-    return allocated + rollover - spent
+    # Get all spending ever from this category
+    total_spent = 0
+    for transaction in st.session_state.user_data['transactions']:
+        if (transaction['type'] == 'expense' and 
+            transaction['category_id'] == category_id and
+            transaction['date'][:7] <= month):  # transaction date <= month
+            total_spent += transaction['amount']
+    
+    return total_allocated - total_spent
 
 def get_recent_transactions(limit=20):
     """Get recent transactions with IDs"""
@@ -520,6 +471,151 @@ def get_expense_transactions(limit=50):
     
     return transactions
 
+# === ACCOUNT FUNCTIONS ===
+
+def add_account(name, initial_balance, is_tracked=True, account_type='checking'):
+    """Add a new account"""
+    try:
+        # Check for duplicate name
+        for acc in st.session_state.user_data['accounts']:
+            if acc['name'] == name:
+                return False  # Duplicate name
+        
+        account = {
+            'id': st.session_state.user_data['next_account_id'],
+            'name': name,
+            'balance': initial_balance,
+            'is_tracked': is_tracked,
+            'account_type': account_type
+        }
+        st.session_state.user_data['accounts'].append(account)
+        st.session_state.user_data['next_account_id'] += 1
+        return True
+    except Exception:
+        return False
+
+def get_accounts():
+    """Get all accounts"""
+    return st.session_state.user_data['accounts'].copy()
+
+def get_tracked_accounts():
+    """Get only tracked (on-budget) accounts"""
+    return [acc for acc in st.session_state.user_data['accounts'] if acc['is_tracked']]
+
+def get_untracked_accounts():
+    """Get only untracked (off-budget) accounts"""
+    return [acc for acc in st.session_state.user_data['accounts'] if not acc['is_tracked']]
+
+def get_account_balance(account_id):
+    """Get current balance for an account"""
+    for account in st.session_state.user_data['accounts']:
+        if account['id'] == account_id:
+            return account['balance']
+    return 0
+
+def update_account_balance(account_id, new_balance):
+    """Update account balance"""
+    try:
+        for account in st.session_state.user_data['accounts']:
+            if account['id'] == account_id:
+                account['balance'] = new_balance
+                return True
+        return False
+    except Exception:
+        return False
+
+def transfer_between_accounts(from_account_id, to_account_id, amount):
+    """Transfer money between accounts"""
+    try:
+        from_account = None
+        to_account = None
+        
+        for account in st.session_state.user_data['accounts']:
+            if account['id'] == from_account_id:
+                from_account = account
+            elif account['id'] == to_account_id:
+                to_account = account
+        
+        if from_account and to_account and from_account['balance'] >= amount:
+            from_account['balance'] -= amount
+            to_account['balance'] += amount
+            return True
+        return False
+    except Exception:
+        return False
+
+def get_total_account_balance(tracked_only=True):
+    """Get total balance across accounts"""
+    total = 0
+    for account in st.session_state.user_data['accounts']:
+        if not tracked_only or account['is_tracked']:
+            total += account['balance']
+    return total
+
+def get_total_category_balances_current():
+    """Get current total money in all categories (all allocations minus all spending)"""
+    total = 0
+    categories = get_categories()
+    for category in categories:
+        # Get ALL allocations ever made to this category (no month filter)
+        total_allocated = 0
+        for allocation in st.session_state.user_data['allocations']:
+            if int(allocation['category_id']) == int(category['id']):
+                total_allocated += allocation['amount']
+        
+        # Get ALL spending ever from this category (no month filter)
+        total_spent = 0
+        for transaction in st.session_state.user_data['transactions']:
+            if (transaction['type'] == 'expense' and 
+                transaction['category_id'] == category['id']):
+                total_spent += transaction['amount']
+        
+        category_balance = total_allocated - total_spent
+        if category_balance > 0:  # Only count positive balances
+            total += category_balance
+    
+    return total
+
+def get_total_category_balances(month):
+    """Get total money currently in all categories"""
+    total = 0
+    categories = get_categories()
+    for category in categories:
+        balance = get_category_balance(category['id'], month)
+        if balance > 0:  # Only count positive balances
+            total += balance
+    return total
+
+def get_unaccounted_income(month=None):
+    """Get income that's not tied to any account"""
+    total_income = get_total_income(month)
+    
+    # Get income that IS tied to accounts
+    accounted_income = 0
+    for trans in st.session_state.user_data['transactions']:
+        if trans['type'] == 'income' and 'account_id' in trans and trans['account_id']:
+            if month is None or trans['date'].startswith(month):
+                accounted_income += trans['amount']
+    
+    return total_income - accounted_income
+
+def delete_account(account_id):
+    """Delete an account (only if no transactions reference it)"""
+    try:
+        # Check if any transactions reference this account
+        for trans in st.session_state.user_data['transactions']:
+            if 'account_id' in trans and trans['account_id'] == account_id:
+                return False  # Cannot delete account with transactions
+        
+        # Remove the account
+        st.session_state.user_data['accounts'] = [
+            acc for acc in st.session_state.user_data['accounts'] 
+            if acc['id'] != account_id
+        ]
+        return True
+    except Exception:
+        return False
+
 # === UTILITY FUNCTIONS (UNCHANGED FROM ORIGINAL) ===
 
 def format_sats(satoshis):
@@ -544,6 +640,38 @@ def parse_amount_input(text):
 def get_current_month():
     """Return current month as 'YYYY-MM'"""
     return datetime.now().strftime('%Y-%m')
+
+def clean_duplicate_allocations():
+    """Remove duplicate allocations for same category/month, keeping the latest one"""
+    try:
+        # Group allocations by category_id and month (normalize category_id to int)
+        seen_combinations = set()
+        cleaned_allocations = []
+        
+        # Process in reverse order to keep the latest allocation
+        for allocation in reversed(st.session_state.user_data['allocations']):
+            try:
+                # Normalize category_id to integer
+                normalized_category_id = int(allocation['category_id'])
+                key = (normalized_category_id, allocation['month'])
+                
+                if key not in seen_combinations:
+                    seen_combinations.add(key)
+                    # Ensure the allocation we keep has integer category_id
+                    allocation['category_id'] = normalized_category_id
+                    cleaned_allocations.insert(0, allocation)  # Insert at beginning to maintain order
+            except (ValueError, TypeError):
+                # Skip allocations with invalid category_id
+                continue
+        
+        original_count = len(st.session_state.user_data['allocations'])
+        st.session_state.user_data['allocations'] = cleaned_allocations
+        removed_count = original_count - len(cleaned_allocations)
+        
+        return removed_count
+    except Exception as e:
+        st.error(f"Error cleaning duplicates: {e}")
+        return 0
 
 # === STREAMLIT APPLICATION ===
 
@@ -579,7 +707,8 @@ def initialize_session_state():
                 'description': 'Monthly Salary',
                 'amount': 100000,  # 100k sats
                 'type': 'income',
-                'category_id': None
+                'category_id': None,
+                'account_id': 1  # Tie to Checking Account
             }
         ]
         
@@ -606,20 +735,44 @@ def initialize_session_state():
             }
         ]
         
+        # Add some demo accounts for better UX
+        demo_accounts = [
+            {
+                'id': 1,
+                'name': 'Checking Account',
+                'balance': 100000,  # 100k sats (reflects the historical income transaction)
+                'is_tracked': True,
+                'account_type': 'checking'
+            },
+            {
+                'id': 2,
+                'name': 'Bitcoin Savings',
+                'balance': 500000,  # 500k sats
+                'is_tracked': False,  # Off-budget for long-term holding
+                'account_type': 'savings'
+            }
+        ]
+
         # Initialize all data at once to avoid multiple session state updates
         st.session_state.user_data = {
             'transactions': demo_transactions,  # List of transaction dicts
             'categories': default_categories,    # List of category dicts
             'master_categories': default_master_cats,  # List of master category dicts
             'allocations': demo_allocations,   # List of allocation dicts
+            'accounts': demo_accounts,         # List of account dicts
             'next_transaction_id': 2,  # Next ID after demo transaction
             'next_category_id': 4,  # Start at 4 since we have 3 default categories
             'next_master_category_id': 4,  # Start at 4 since we have 3 default master categories
-            'next_allocation_id': 4  # Next ID after demo allocations
+            'next_allocation_id': 4,  # Next ID after demo allocations
+            'next_account_id': 3      # Next ID after demo accounts
         }
 
 def landing_page():
     """Beautiful landing page explaining how to use the Bitcoin Budget app"""
+    # Import plotly at the top for all charts
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    
     # Hide sidebar for landing page
     st.markdown("""
         <style>
@@ -639,6 +792,191 @@ def landing_page():
             </h2>
         </div>
     """, unsafe_allow_html=True)
+    
+    # Net Worth Future Value Example - Bitcoin Power Law calculation
+    from datetime import datetime, timedelta
+    
+    # Calculate example: 1M sats + 250k/month for 20 years
+    initial_sats = 1_000_000
+    monthly_dca_sats = 250_000
+    years = 20
+    inflation_rate = 0.08
+    
+    # Bitcoin Power Law calculations
+    genesis_date = datetime(2009, 1, 3)
+    today = datetime.now()
+    future_date = today + timedelta(days=years * 365.25)
+    
+    current_days = (today - genesis_date).days
+    future_days = (future_date - genesis_date).days
+    
+    current_btc_price = 1.0117e-17 * (current_days ** 5.82)
+    future_btc_price = 1.0117e-17 * (future_days ** 5.82)
+    
+    # Calculate total sats and values
+    total_dca_sats = monthly_dca_sats * 12 * years
+    total_sats = initial_sats + total_dca_sats
+    
+    current_usd_value = (initial_sats / 100_000_000) * current_btc_price
+    future_usd_value = (total_sats / 100_000_000) * future_btc_price
+    inflation_adjusted_purchasing_power = future_usd_value / ((1 + inflation_rate) ** years)
+    
+    bitcoin_gain = ((future_btc_price / current_btc_price) - 1) * 100
+    purchasing_power_multiplier = inflation_adjusted_purchasing_power / current_usd_value
+    total_invested_usd = (total_dca_sats / 100_000_000) * current_btc_price
+    
+    # Show Net Worth Future Value example with custom styling
+    st.markdown("""
+        <div style="background: linear-gradient(135deg, #f7931a 0%, #ff6b35 100%); 
+             padding: 1rem 2rem; border-radius: 10px; margin: 1rem 0 1.5rem 0;">
+            <h3 style="color: white; text-align: center; margin: 0; font-size: 1.3rem;">
+                🚀 Example: Net Worth Future Value - DCA'ing 250k sats/month for 20 Years
+            </h3>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Create the net worth example metrics
+    nw_col1, nw_col2, nw_col3, nw_col4 = st.columns(4)
+    
+    with nw_col1:
+        st.markdown(f"""
+            <div style="background: #1f2937; padding: 1rem; border-radius: 8px; text-align: center; margin-bottom: 1rem;">
+                <div style="color: #f7931a; font-size: 0.8rem; margin-bottom: 0.3rem;">💎 Starting Stack</div>
+                <div style="color: white; font-size: 1.5rem; font-weight: bold; margin-bottom: 0.3rem;">{format_sats(initial_sats)}</div>
+                <div style="color: #10b981; font-size: 0.8rem;">↗ ${current_usd_value:,.0f}</div>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with nw_col2:
+        st.markdown(f"""
+            <div style="background: #1f2937; padding: 1rem; border-radius: 8px; text-align: center; margin-bottom: 1rem;">
+                <div style="color: #10b981; font-size: 0.8rem; margin-bottom: 0.3rem;">📈 Total Investment</div>
+                <div style="color: white; font-size: 1.5rem; font-weight: bold; margin-bottom: 0.3rem;">${total_invested_usd:,.0f}</div>
+                <div style="color: #10b981; font-size: 0.8rem;">↗ {format_sats(total_dca_sats)} DCA</div>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with nw_col3:
+        st.markdown(f"""
+            <div style="background: #1f2937; padding: 1rem; border-radius: 8px; text-align: center; margin-bottom: 1rem;">
+                <div style="color: #8b5cf6; font-size: 0.8rem; margin-bottom: 0.3rem;">🎯 Future Value (Real)</div>
+                <div style="color: white; font-size: 1.5rem; font-weight: bold; margin-bottom: 0.3rem;">${inflation_adjusted_purchasing_power:,.0f}</div>
+                <div style="color: #10b981; font-size: 0.8rem;">↗ After 8% inflation</div>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with nw_col4:
+        st.markdown(f"""
+            <div style="background: #1f2937; padding: 1rem; border-radius: 8px; text-align: center; margin-bottom: 1rem;">
+                <div style="color: #ef4444; font-size: 0.8rem; margin-bottom: 0.3rem;">💎 Final Stack</div>
+                <div style="color: white; font-size: 1.5rem; font-weight: bold; margin-bottom: 0.3rem;">{format_sats(total_sats)}</div>
+                <div style="color: #10b981; font-size: 0.8rem;">↗ {purchasing_power_multiplier:.1f}x purchasing power</div>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    # Create side-by-side charts for Net Worth example
+    nw_chart_col1, nw_chart_col2 = st.columns(2)
+    
+    # Left column: Stack Growth Over Time
+    with nw_chart_col1:
+        st.markdown("#### 📊 Stack Growth Over 20 Years")
+        
+        # Calculate milestone data points
+        milestones = [0, 5, 10, 15, 20]
+        stack_values = []
+        for year in milestones:
+            milestone_sats = initial_sats + (monthly_dca_sats * 12 * year)
+            milestone_days = current_days + (year * 365.25)
+            milestone_btc_price = 1.0117e-17 * (milestone_days ** 5.82)
+            milestone_value = (milestone_sats / 100_000_000) * milestone_btc_price
+            stack_values.append(milestone_value)
+        
+        fig_growth = go.Figure(data=[
+            go.Scatter(
+                x=milestones,
+                y=stack_values,
+                mode='lines+markers',
+                line=dict(color='#f7931a', width=4),
+                marker=dict(size=10, color='#ff6b35'),
+                fill='tonexty' if len(milestones) > 1 else None,
+                fillcolor='rgba(247, 147, 26, 0.1)'
+            )
+        ])
+        
+        fig_growth.update_layout(
+            title='',
+            xaxis=dict(
+                title='Years',
+                tickfont=dict(color='white', size=9),
+                gridcolor='rgba(255,255,255,0.1)',
+                title_font=dict(color='white', size=10)
+            ),
+            yaxis=dict(
+                title='Stack Value (USD)',
+                tickfont=dict(color='white', size=9),
+                gridcolor='rgba(255,255,255,0.1)',
+                title_font=dict(color='white', size=10)
+            ),
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white'),
+            margin=dict(t=10, b=10, l=10, r=10),
+            height=280,
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig_growth, use_container_width=True)
+    
+    # Right column: Stack Size Visualization
+    with nw_chart_col2:
+        st.markdown("#### 💎 Final Stack Composition")
+        
+        fig_composition = go.Figure(data=[go.Pie(
+            labels=['Initial Stack', 'DCA Accumulation'],
+            values=[initial_sats, total_dca_sats],
+            hole=.3,
+            marker_colors=['#f7931a', '#ff6b35']
+        )])
+        
+        fig_composition.update_traces(
+            textposition='inside', 
+            textinfo='percent+label',
+            textfont_size=10,
+            marker=dict(line=dict(color='#000000', width=2))
+        )
+        
+        fig_composition.update_layout(
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="center",
+                x=0.5,
+                font=dict(color='white', size=9)
+            ),
+            margin=dict(t=10, b=10, l=10, r=10),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white', size=10),
+            height=280
+        )
+        
+        st.plotly_chart(fig_composition, use_container_width=True)
+    
+    # Add inspirational message for Net Worth example
+    st.markdown(f"""
+        <div style="background: #0f172a; padding: 1.5rem; border-radius: 10px; margin: 1rem 0; border-left: 4px solid #f7931a;">
+            <h4 style="color: #f7931a; margin: 0 0 0.5rem 0;">🎯 The Power of Consistent Stacking</h4>
+            <p style="color: #e2e8f0; margin: 0; font-size: 1rem;">
+                Starting with just <strong>{format_sats(initial_sats)}</strong> and consistently adding <strong>{format_sats(monthly_dca_sats)}</strong> per month, 
+                your Bitcoin stack could grow to <strong>{format_sats(total_sats)}</strong> with <strong>{purchasing_power_multiplier:.1f}x</strong> the purchasing power in 20 years. 
+                That's the magic of time, scarcity, and disciplined accumulation! 🚀
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("---")
     
     # Show example lifecycle cost analysis with custom styling
     st.markdown("""
@@ -690,9 +1028,6 @@ def landing_page():
         """, unsafe_allow_html=True)
     
     # Create side-by-side charts: pie chart and value comparison
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-    
     chart_col1, chart_col2 = st.columns(2)
     
     # Left column: Opportunity Cost Pie Chart
@@ -1023,55 +1358,60 @@ def main_page():
     # === BUDGET SUMMARY METRICS ===
     st.markdown("### 💰 Budget Summary")
     
-    total_income = get_total_income(current_month)
-    rollover = get_rollover_amount(current_month)
-    total_allocated = get_total_allocated(current_month)
-    available = get_available_to_assign(current_month)
+    # Account-based calculations (simplified)
+    tracked_balance = get_total_account_balance(tracked_only=True)
+    total_balance = get_total_account_balance(tracked_only=False)
     
-    col1, col2, col3, col4 = st.columns(4)
+    # Calculate total outstanding category balances (money already assigned)
+    # Use function that counts ALL allocations regardless of month
+    total_category_balances = get_total_category_balances_current()
+    
+    # Available to Assign = Tracked Account Balance - Outstanding Category Balances
+    available_to_assign = tracked_balance - total_category_balances
+    
+    # Show current month allocations for reference (use viewing month for this)
+    current_month_allocated = get_total_allocated(current_month)
+    
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         st.metric(
-            label="💵 Total Income",
-            value=format_sats(total_income),
-            delta=None
+            label="🎯 Available to Assign",
+            value=format_sats(available_to_assign),
+            delta=None,
+            help="Current unallocated balance (consistent across all months)"
         )
     
     with col2:
-        st.metric(
-            label="🔄 Rollover",
-            value=format_sats(rollover),
-            delta=None
-        )
-    
-    with col3:
-        # Check if over budget (allocated > income + rollover)
-        total_available = total_income + rollover
-        if total_allocated > total_available:
+        # Check if over budget (category balances > tracked balance)
+        if total_category_balances > tracked_balance:
             st.metric(
-                label="📋 Allocated",
-                value=format_sats(total_allocated),
+                label="📋 In Categories",
+                value=format_sats(total_category_balances),
                 delta="⚠️ Over Budget",
-                delta_color="inverse"
+                delta_color="inverse",
+                help="Current total money in category envelopes (exceeds account balance)"
             )
         else:
             st.metric(
-                label="📋 Allocated",
-                value=format_sats(total_allocated),
-                delta=None
+                label="📋 In Categories",
+                value=format_sats(total_category_balances),
+                delta=f"Viewing {current_month}: {format_sats(current_month_allocated)}",
+                help="Current total money in category envelopes (consistent across all months)"
             )
     
-    with col4:
+    with col3:
         st.metric(
-            label="🎯 Available to Assign",
-            value=format_sats(available),
-            delta=None
+            label="🏦 Account Balance",
+            value=format_sats(tracked_balance),
+            delta=f"Total: {format_sats(total_balance)}",
+            help="Balance in tracked accounts (affects budget)"
         )
 
     st.markdown("---")
 
     # === MAIN FUNCTIONALITY TABS ===
-    tab1, tab2 = st.tabs(["📁 Categories", "💳 Transactions"])
+    tab1, tab2, tab3 = st.tabs(["📁 Categories", "🏦 Accounts", "💳 Transactions"])
     
     # === TAB 1: CATEGORIES (Now the primary/default tab) ===
     with tab1:
@@ -1172,21 +1512,22 @@ def main_page():
                     'Type': 'master',
                     'Category': f"📂 {master_name}",
                     'Master_Category_Assignment': master_name,
-                    'Allocated': 0,  # Will be calculated
+                    'Current_Balance': 0,  # Will be calculated
+                    'This_Month_Allocation': 0,  # Will be calculated
                     'Spent': 0,      # Will be calculated
-                    'Balance': 0,    # Will be calculated
                     'Status': '📊 Total'
                 })
                 
                 # Add individual categories under this master category
                 for cat in categories_in_group:
-                    allocated = get_category_allocated(cat['id'], current_month)
+                    # In account-based budgeting, we care about current balance, not monthly allocations
+                    current_balance = get_category_balance(cat['id'], current_month)
+                    current_month_allocation = get_category_allocated(cat['id'], current_month)
                     spent = get_category_spent(cat['id'], current_month)
-                    balance = get_category_balance(cat['id'], current_month)
                     
-                    master_allocated += allocated
+                    master_allocated += current_balance
                     master_spent += spent
-                    master_balance += balance
+                    master_balance += current_balance
                     
                     # Get master category options for reassignment
                     master_options_for_cat = ['Uncategorized'] + [mc['name'] for mc in master_categories]
@@ -1197,18 +1538,19 @@ def main_page():
                         'Type': 'category',
                         'Category': f"    {cat['name']}", # Indent to show hierarchy
                         'Master_Category_Assignment': current_master,
-                        'Allocated': allocated,
+                        'Current_Balance': current_balance,
+                        'This_Month_Allocation': current_month_allocation,  # Show current month's allocation
                         'Spent': spent,
-                        'Balance': balance,
-                        'Status': '✅ Good' if balance >= 0 else '⚠️ Overspent'
+                        'Status': '✅ Good' if current_balance >= 0 else '⚠️ Overspent'
                     })
                 
                 # Update master category totals in the header row
+                master_month_allocation = sum(get_category_allocated(cat['id'], current_month) for cat in categories_in_group)
                 for row in table_data:
                     if row['ID'] == f"master_{master_name}":
-                        row['Allocated'] = master_allocated
+                        row['Current_Balance'] = master_allocated
+                        row['This_Month_Allocation'] = master_month_allocation
                         row['Spent'] = master_spent
-                        row['Balance'] = master_balance
                         row['Status'] = '📊 Total' if master_balance >= 0 else '⚠️ Over'
                         break
                 
@@ -1218,21 +1560,28 @@ def main_page():
                 grand_balance += master_balance
             
             # Add grand total row
+            grand_month_allocation = get_total_allocated(current_month)
             table_data.append({
                 'ID': 'grand_total',
                 'Type': 'grand_total',
                 'Category': '📊 GRAND TOTAL',
                 'Master_Category_Assignment': 'Grand Total',
-                'Allocated': grand_allocated,
+                'Current_Balance': grand_allocated,
+                'This_Month_Allocation': grand_month_allocation,
                 'Spent': grand_spent,
-                'Balance': grand_balance,
                 'Status': '🎯 Total' if grand_balance >= 0 else '⚠️ Over'
             })
             
-            # Create DataFrame
+            # Create DataFrame with consistent data types
             df = pd.DataFrame(table_data)
             
+            # Ensure all numeric columns are properly typed as integers
+            numeric_columns = ['Current_Balance', 'This_Month_Allocation', 'Spent']
+            for col in numeric_columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype('int64')
+            
             # Display editable table
+            refresh_count = st.session_state.get('data_editor_refresh_count', 0)
             edited_df = st.data_editor(
                 df,
                 use_container_width=True,
@@ -1243,113 +1592,67 @@ def main_page():
                     "Category": st.column_config.TextColumn(
                         "Category", 
                         help="Click to rename categories or master categories",
-                        width="large"
+                        width="large",
+                        disabled=True  # Disable category name editing for now to focus on allocations
                     ),
                     "Master_Category_Assignment": st.column_config.SelectboxColumn(
                         "Master Category",
                         help="Click dropdown to reassign category to different master category",
-                        options=['Uncategorized'] + [mc['name'] for mc in master_categories]
+                        options=['Uncategorized'] + [mc['name'] for mc in master_categories],
+                        disabled=True  # Disable for now to focus on allocations
                     ),
-                    "Allocated": st.column_config.NumberColumn(
-                        "Allocated (sats)",
-                        help="Enter allocation amount in satoshis (only works for individual categories)",
+                    "Current_Balance": st.column_config.NumberColumn(
+                        "Current Balance (sats)",
+                        help="Current money in this category envelope",
+                        disabled=True,
+                        format="%d"
+                    ),
+                    "This_Month_Allocation": st.column_config.NumberColumn(
+                        "This Month Allocation (sats)",
+                        help="Set allocation amount for this month (editable for individual categories only)",
                         min_value=0,
                         step=1,
                         format="%d"
                     ),
                     "Spent": st.column_config.NumberColumn(
-                        "Spent (sats)", 
-                        disabled=True,
-                        format="%d"
-                    ),
-                    "Balance": st.column_config.NumberColumn(
-                        "Balance (sats)", 
+                        "Spent This Month (sats)", 
                         disabled=True,
                         format="%d"
                     ),
                     "Status": st.column_config.TextColumn("Status", disabled=True)
                 },
-                key="unified_categories"
+                key=f"unified_categories_{refresh_count}",
+                disabled=["Type", "Category", "Master_Category_Assignment", "Current_Balance", "Spent", "Status"]
             )
             
-            # Process changes
+            # Process changes with simplified logic focusing only on allocations
             if not edited_df.equals(df):
                 changes_made = False
+                
+                # Only check allocation changes for individual categories
                 for idx, row in edited_df.iterrows():
-                    row_type = row['Type']
-                    
-                    # Check for category/master category name changes
-                    original_category_name = df.iloc[idx]['Category']
-                    new_category_name = row['Category']
-                    
-                    if original_category_name != new_category_name:
-                        if row_type == 'master':
-                            # Rename master category
-                            master_name = original_category_name.replace('📂 ', '')
-                            new_master_name = new_category_name.replace('📂 ', '')
-                            
-                            master_id = next((mc['id'] for mc in master_categories if mc['name'] == master_name), None)
-                            if master_id and new_master_name.strip():
-                                if rename_master_category(master_id, new_master_name.strip()):
-                                    st.success(f"✅ Renamed master category from '{master_name}' to '{new_master_name}'")
-                                    changes_made = True
-                                else:
-                                    st.error(f"❌ Failed to rename master category (name may already exist)")
+                    if row['Type'] == 'category':  # Only process individual categories
+                        category_id = row['ID']
+                        original_allocation = df.iloc[idx]['This_Month_Allocation']
+                        new_allocation = row['This_Month_Allocation']
                         
-                        elif row_type == 'category':
-                            # Rename individual category
-                            old_name = original_category_name.strip()
-                            new_name = new_category_name.strip()
-                            
-                            category_id = row['ID']
-                            if new_name:
-                                if rename_category(category_id, new_name):
-                                    st.success(f"✅ Renamed category from '{old_name}' to '{new_name}'")
-                                    changes_made = True
-                                else:
-                                    st.error(f"❌ Failed to rename category (name may already exist)")
-                    
-                    if row_type == 'category':  # Only process other changes for individual categories
-                        # Check for allocation changes
-                        original_allocated = df.iloc[idx]['Allocated']
-                        new_allocated = row['Allocated']
-                        
-                        if original_allocated != new_allocated:
-                            category_id = row['ID']
-                            
-                            if new_allocated == 0 or pd.isna(new_allocated):
-                                if delete_allocation(category_id, current_month):
-                                    st.success(f"✅ Removed allocation for {row['Category'].strip()}")
-                                    changes_made = True
-                                else:
-                                    st.error(f"❌ Failed to remove allocation for {row['Category'].strip()}")
-                            else:
-                                if allocate_to_category(category_id, current_month, int(new_allocated)):
-                                    st.success(f"✅ Allocated {format_sats(int(new_allocated))} to {row['Category'].strip()}")
+                        if original_allocation != new_allocation:
+                            try:
+                                new_amount = int(new_allocation)
+                                
+                                if allocate_to_category(category_id, current_month, new_amount):
+                                    st.success(f"✅ Set {row['Category'].strip()} allocation to {format_sats(new_amount)}")
                                     changes_made = True
                                 else:
                                     st.error(f"❌ Failed to allocate to {row['Category'].strip()}")
-                        
-                        # Check for master category reassignment
-                        original_master = df.iloc[idx]['Master_Category_Assignment']
-                        new_master = row['Master_Category_Assignment']
-                        
-                        if original_master != new_master:
-                            category_id = row['ID']
-                            
-                            if new_master == 'Uncategorized':
-                                master_id = None
-                            else:
-                                master_id = next((mc['id'] for mc in master_categories if mc['name'] == new_master), None)
-                            
-                            if assign_category_to_master(category_id, master_id):
-                                st.success(f"✅ Moved {row['Category'].strip()} to {new_master}")
-                                changes_made = True
-                            else:
-                                st.error(f"❌ Failed to move {row['Category'].strip()}")
-                        
-                # Rerun if any changes were made
+                            except (ValueError, TypeError) as e:
+                                st.error(f"❌ Invalid allocation amount: {e}")
+                
                 if changes_made:
+                    # Force refresh of the data editor by updating its key
+                    if 'data_editor_refresh_count' not in st.session_state:
+                        st.session_state.data_editor_refresh_count = 0
+                    st.session_state.data_editor_refresh_count += 1
                     st.rerun()
             
             # Delete functionality section
@@ -1420,8 +1723,205 @@ def main_page():
         else:
             st.info("No categories yet. Add your first master category and categories above!")
 
-    # === TAB 2: TRANSACTIONS (Combined transaction entry + recent transactions) ===
+
+
+    # === TAB 2: ACCOUNTS ===
     with tab2:
+        st.markdown("### 🏦 Account Management")
+        
+        # Account Summary Metrics
+        tracked_accounts = get_tracked_accounts()
+        untracked_accounts = get_untracked_accounts()
+        
+        tracked_total = get_total_account_balance(tracked_only=True)
+        untracked_total = get_total_account_balance(tracked_only=False) - tracked_total
+        total_all_accounts = tracked_total + untracked_total
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric(
+                label="🟢 Tracked Accounts",
+                value=format_sats(tracked_total),
+                help="On-budget accounts that affect your spending plan"
+            )
+        
+        with col2:
+            st.metric(
+                label="🔵 Untracked Accounts",
+                value=format_sats(untracked_total),
+                help="Off-budget accounts (long-term savings, investments)"
+            )
+        
+        with col3:
+            st.metric(
+                label="💰 Total Net Worth",
+                value=format_sats(total_all_accounts),
+                help="Combined balance across all accounts"
+            )
+        
+        st.markdown("---")
+        
+        # Show unaccounted income warning
+        unaccounted = get_unaccounted_income(current_month)
+        if unaccounted > 0:
+            st.warning(f"⚠️ **{format_sats(unaccounted)} income not tied to accounts**")
+            st.info("💡 Some income transactions aren't linked to accounts. Go to Transactions tab to edit them and select an account.")
+            
+            # Show which transactions are unaccounted
+            with st.expander("🔍 View Unaccounted Transactions", expanded=False):
+                unaccounted_transactions = []
+                for trans in st.session_state.user_data['transactions']:
+                    if (trans['type'] == 'income' and 
+                        ('account_id' not in trans or not trans['account_id']) and
+                        trans['date'].startswith(current_month)):
+                        unaccounted_transactions.append(trans)
+                
+                if unaccounted_transactions:
+                    for trans in unaccounted_transactions:
+                        st.write(f"• {trans['date']}: **{format_sats(trans['amount'])}** - {trans['description']}")
+                else:
+                    st.write("No unaccounted transactions this month.")
+        
+        # Add New Account
+        with st.expander("➕ Add New Account", expanded=False):
+            with st.form("add_account_form"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    account_name = st.text_input("Account Name", placeholder="e.g., Checking, Bitcoin Savings")
+                    account_type = st.selectbox(
+                        "Account Type", 
+                        ["checking", "savings", "investment", "credit", "other"]
+                    )
+                
+                with col2:
+                    initial_balance = st.text_input(
+                        "Initial Balance", 
+                        placeholder="50000 or 0.0005 BTC",
+                        help="Enter current account balance"
+                    )
+                    is_tracked = st.checkbox(
+                        "Tracked Account", 
+                        value=True,
+                        help="Tracked = affects budget planning | Untracked = long-term savings"
+                    )
+                
+                if st.form_submit_button("Add Account"):
+                    if account_name and initial_balance:
+                        try:
+                            balance_sats = parse_amount_input(initial_balance)
+                            if add_account(account_name, balance_sats, is_tracked, account_type):
+                                st.success(f"✅ Added account: {account_name}")
+                                st.rerun()
+                            else:
+                                st.error("❌ Account name already exists")
+                        except ValueError:
+                            st.error("❌ Invalid balance format")
+                    else:
+                        st.error("❌ Please fill in all required fields")
+        
+        # Account Lists
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 🟢 Tracked Accounts (On-Budget)")
+            if tracked_accounts:
+                for account in tracked_accounts:
+                    with st.container():
+                        account_col1, account_col2, account_col3 = st.columns([3, 2, 1])
+                        
+                        with account_col1:
+                            st.write(f"**{account['name']}** ({account['account_type']})")
+                        
+                        with account_col2:
+                            st.write(format_sats(account['balance']))
+                        
+                        with account_col3:
+                            if st.button("🗑️", key=f"delete_tracked_{account['id']}", help="Delete account"):
+                                if delete_account(account['id']):
+                                    st.success(f"Deleted {account['name']}")
+                                    st.rerun()
+                                else:
+                                    st.error("Cannot delete account with transactions")
+                        
+                        st.markdown("---")
+            else:
+                st.info("No tracked accounts yet. Add one above!")
+        
+        with col2:
+            st.markdown("#### 🔵 Untracked Accounts (Off-Budget)")
+            if untracked_accounts:
+                for account in untracked_accounts:
+                    with st.container():
+                        account_col1, account_col2, account_col3 = st.columns([3, 2, 1])
+                        
+                        with account_col1:
+                            st.write(f"**{account['name']}** ({account['account_type']})")
+                        
+                        with account_col2:
+                            st.write(format_sats(account['balance']))
+                        
+                        with account_col3:
+                            if st.button("🗑️", key=f"delete_untracked_{account['id']}", help="Delete account"):
+                                if delete_account(account['id']):
+                                    st.success(f"Deleted {account['name']}")
+                                    st.rerun()
+                                else:
+                                    st.error("Cannot delete account with transactions")
+                        
+                        st.markdown("---")
+            else:
+                st.info("No untracked accounts yet. Add one above!")
+        
+        # Account Transfers
+        st.markdown("#### 💸 Transfer Between Accounts")
+        all_accounts = get_accounts()
+        if len(all_accounts) >= 2:
+            with st.form("transfer_form"):
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    from_account = st.selectbox(
+                        "From Account",
+                        [acc['name'] for acc in all_accounts]
+                    )
+                
+                with col2:
+                    to_account = st.selectbox(
+                        "To Account",
+                        [acc['name'] for acc in all_accounts]
+                    )
+                
+                with col3:
+                    transfer_amount = st.text_input(
+                        "Amount",
+                        placeholder="25000 or 0.00025 BTC"
+                    )
+                
+                if st.form_submit_button("Transfer"):
+                    if from_account != to_account and transfer_amount:
+                        try:
+                            amount_sats = parse_amount_input(transfer_amount)
+                            
+                            # Get account IDs
+                            from_id = next(acc['id'] for acc in all_accounts if acc['name'] == from_account)
+                            to_id = next(acc['id'] for acc in all_accounts if acc['name'] == to_account)
+                            
+                            if transfer_between_accounts(from_id, to_id, amount_sats):
+                                st.success(f"✅ Transferred {format_sats(amount_sats)} from {from_account} to {to_account}")
+                                st.rerun()
+                            else:
+                                st.error("❌ Transfer failed - insufficient funds")
+                        except ValueError:
+                            st.error("❌ Invalid amount format")
+                    else:
+                        st.error("❌ Please select different accounts and enter amount")
+        else:
+            st.info("Add at least 2 accounts to enable transfers")
+
+    # === TAB 3: TRANSACTIONS (Combined transaction entry + recent transactions) ===
+    with tab3:
         st.markdown("### 💳 Enter Transaction")
         
         # Transaction type selection outside the form so it updates dynamically
@@ -1455,6 +1955,15 @@ def main_page():
                         placeholder="Salary, freelance, etc.",
                         help="Brief description of income source"
                     )
+                    
+                    # Account selection for income
+                    accounts = get_accounts()
+                    account_options = ['None (no account)'] + [f"{acc['name']}" for acc in accounts]
+                    selected_account = st.selectbox(
+                        "Deposit to Account",
+                        options=account_options,
+                        help="Select which account receives this income"
+                    )
                 
                 # Income submit button
                 submitted = st.form_submit_button("💰 Add Income", use_container_width=True, type="primary")
@@ -1463,7 +1972,16 @@ def main_page():
                     if transaction_amount and transaction_description:
                         try:
                             amount_sats = parse_amount_input(transaction_amount)
-                            if add_income(amount_sats, transaction_description, str(transaction_date)):
+                            
+                            # Get account ID if selected
+                            account_id = None
+                            if selected_account != 'None (no account)':
+                                for acc in accounts:
+                                    if acc['name'] == selected_account:
+                                        account_id = acc['id']
+                                        break
+                            
+                            if add_income(amount_sats, transaction_description, str(transaction_date), account_id):
                                 st.success(f"✅ Added income: {format_sats(amount_sats)} - {transaction_description}")
                                 st.rerun()
                             else:
@@ -1505,6 +2023,15 @@ def main_page():
                             help="Brief description of expense"
                         )
                     
+                    # Account selection for expense (full width)
+                    accounts = get_accounts()
+                    account_options = ['None (no account)'] + [f"{acc['name']}" for acc in accounts]
+                    selected_account = st.selectbox(
+                        "Pay from Account",
+                        options=account_options,
+                        help="Select which account this expense is paid from"
+                    )
+                    
                     # Expense submit button
                     submitted = st.form_submit_button("💸 Add Expense", use_container_width=True, type="primary")
                     
@@ -1520,8 +2047,16 @@ def main_page():
                                         category_id = cat['id']
                                         break
                                 
+                                # Get account ID if selected
+                                account_id = None
+                                if selected_account != 'None (no account)':
+                                    for acc in accounts:
+                                        if acc['name'] == selected_account:
+                                            account_id = acc['id']
+                                            break
+                                
                                 if category_id:
-                                    if add_expense(amount_sats, transaction_description, category_id, str(transaction_date)):
+                                    if add_expense(amount_sats, transaction_description, category_id, str(transaction_date), account_id):
                                         st.success(f"✅ Added expense: {format_sats(amount_sats)} - {transaction_description}")
                                         st.rerun()
                                     else:
@@ -1650,6 +2185,10 @@ def main_page():
                                 st.error(f"❌ Invalid category: {new_category}")
                 
                 if changes_made:
+                    # Force refresh of the data editor by updating its key
+                    if 'data_editor_refresh_count' not in st.session_state:
+                        st.session_state.data_editor_refresh_count = 0
+                    st.session_state.data_editor_refresh_count += 1
                     st.rerun()
             
             # Enhanced delete functionality
@@ -1695,6 +2234,8 @@ def main_page():
                             st.error("❌ Failed to delete transaction")
         else:
             st.info("No transactions yet. Add some income or expenses to get started!")
+
+
 
 def sidebar_navigation():
     """Sidebar for navigation and month selection"""
@@ -1750,8 +2291,7 @@ def sidebar_navigation():
 
 def main():
     """Main application entry point"""
-    # Initialize database and session state
-    init_database()
+    # Initialize session state
     initialize_session_state()
     
     # Show sidebar only when not on landing page

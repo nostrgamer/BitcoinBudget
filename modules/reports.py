@@ -284,7 +284,7 @@ def show():
     # Report type selector
     report_type = st.selectbox(
         "Choose Report Type",
-        ["📊 Spending Breakdown", "📈 Net Worth Analysis", "🔮 Future Purchasing Power", "⏳ Lifecycle Cost Analysis"],
+        ["📊 Spending Breakdown", "📈 Net Worth Analysis", "🚀 Net Worth Future Value", "🔮 Future Purchasing Power", "⏳ Lifecycle Cost Analysis"],
         index=0
     )
     
@@ -292,6 +292,8 @@ def show():
         spending_breakdown_report()
     elif report_type == "📈 Net Worth Analysis":
         net_worth_report()
+    elif report_type == "🚀 Net Worth Future Value":
+        net_worth_future_value_report()
     elif report_type == "🔮 Future Purchasing Power":
         future_purchasing_power_report()
     elif report_type == "⏳ Lifecycle Cost Analysis":
@@ -580,6 +582,274 @@ def net_worth_report():
             
     else:
         st.info("No financial data found for the selected period.")
+
+def net_worth_future_value_report():
+    """Net worth future value analysis - show the power of HODLing Bitcoin"""
+    st.markdown("## 🚀 Net Worth Future Value Analysis")
+    st.markdown("*Discover the future purchasing power of your Bitcoin stack*")
+    
+    user_data = get_user_data()
+    
+    # Calculate current net worth
+    current_net_worth_sats = sum(account['balance'] for account in user_data['accounts'])
+    
+    if current_net_worth_sats <= 0:
+        st.warning("💡 **Add some Bitcoin to your accounts to see your future purchasing power!**")
+        st.info("Go to the Accounts tab to add your Bitcoin holdings and see how they could grow over time.")
+        return
+    
+    # Settings section
+    st.markdown("### ⚙️ Analysis Settings")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Inflation rate
+        inflation_rate = st.slider(
+            "Annual Inflation Rate:",
+            min_value=0.0,
+            max_value=15.0,
+            value=8.0,
+            step=0.5,
+            format="%.1f%%",
+            help="Expected annual debasement of fiat currency"
+        ) / 100.0
+        
+        # Monthly DCA option
+        monthly_dca_sats = st.number_input(
+            "Additional Monthly Stacking (sats):",
+            min_value=0,
+            value=0,
+            step=10000,
+            help="How many sats you plan to stack each month"
+        )
+    
+    with col2:
+        # Current net worth display
+        st.markdown("### 💎 Current Bitcoin Stack")
+        today = datetime.now()
+        current_days = get_days_since_genesis(today)
+        current_btc_price = calculate_btc_fair_value(current_days)
+        current_usd_value = (current_net_worth_sats / 100_000_000) * current_btc_price
+        
+        st.metric("Net Worth", format_sats(current_net_worth_sats))
+        st.metric("Current USD Value", f"${current_usd_value:,.2f}")
+        st.metric("Bitcoin Price (Power Law)", f"${current_btc_price:,.0f}")
+    
+    # Time horizons
+    time_horizons = [5, 10, 15, 20]
+    
+    # Calculate projections
+    projections = []
+    for years in time_horizons:
+        # Calculate future Bitcoin price
+        future_date = today + timedelta(days=years * 365.25)
+        future_days = get_days_since_genesis(future_date)
+        future_btc_price = calculate_btc_fair_value(future_days)
+        
+        # Calculate total sats (current + DCA)
+        total_dca_sats = monthly_dca_sats * 12 * years
+        total_sats = current_net_worth_sats + total_dca_sats
+        
+        # Calculate future values
+        future_usd_value = (total_sats / 100_000_000) * future_btc_price
+        inflation_adjusted_purchasing_power = future_usd_value / ((1 + inflation_rate) ** years)
+        
+        # Calculate gains
+        bitcoin_gain = ((future_btc_price / current_btc_price) - 1) * 100
+        real_purchasing_power_multiplier = inflation_adjusted_purchasing_power / current_usd_value
+        
+        projections.append({
+            'Years': years,
+            'Total Sats': total_sats,
+            'Bitcoin Price': future_btc_price,
+            'Future USD Value': future_usd_value,
+            'Real Purchasing Power': inflation_adjusted_purchasing_power,
+            'Bitcoin Gain %': bitcoin_gain,
+            'Purchasing Power Multiplier': real_purchasing_power_multiplier
+        })
+    
+    # === MAIN VISUALIZATION ===
+    st.markdown("---")
+    st.markdown("### 🎯 Future Value Projections")
+    
+    # Create dramatic visualization
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=(
+            "🚀 Bitcoin Price Growth (Power Law)",
+            "💰 Your Stack Value Growth", 
+            "📈 Real Purchasing Power Growth",
+            "🎯 Purchasing Power Multiplier"
+        ),
+        specs=[[{"type": "scatter"}, {"type": "bar"}],
+               [{"type": "bar"}, {"type": "bar"}]],
+        vertical_spacing=0.12,
+        horizontal_spacing=0.1
+    )
+    
+    years = [p['Years'] for p in projections]
+    
+    # 1. Bitcoin price growth
+    current_price_line = [current_btc_price] * len(years)
+    future_prices = [p['Bitcoin Price'] for p in projections]
+    
+    fig.add_trace(
+        go.Scatter(x=years, y=current_price_line, mode='lines', 
+                  name='Current Price', line=dict(color='gray', dash='dash')),
+        row=1, col=1
+    )
+    fig.add_trace(
+        go.Scatter(x=years, y=future_prices, mode='lines+markers',
+                  name='Future Price', line=dict(color='#FF6B35', width=4),
+                  marker=dict(size=10)),
+        row=1, col=1
+    )
+    
+    # 2. Stack value growth
+    current_value_bars = [current_usd_value] * len(years)
+    future_values = [p['Future USD Value'] for p in projections]
+    
+    fig.add_trace(
+        go.Bar(x=years, y=current_value_bars, name='Current Value',
+               marker_color='lightgray', opacity=0.6),
+        row=1, col=2
+    )
+    fig.add_trace(
+        go.Bar(x=years, y=future_values, name='Future Value',
+               marker_color='#2E8B57'),
+        row=1, col=2
+    )
+    
+    # 3. Real purchasing power
+    real_power = [p['Real Purchasing Power'] for p in projections]
+    fig.add_trace(
+        go.Bar(x=years, y=real_power, name='Real Purchasing Power',
+               marker_color='#4169E1'),
+        row=2, col=1
+    )
+    
+    # 4. Purchasing power multiplier
+    multipliers = [p['Purchasing Power Multiplier'] for p in projections]
+    fig.add_trace(
+        go.Bar(x=years, y=multipliers, name='Power Multiplier',
+               marker_color='#9370DB', showlegend=False),
+        row=2, col=2
+    )
+    
+    # Update layout
+    fig.update_layout(
+        height=800,
+        title_text="🚀 The Power of HODLing Bitcoin",
+        title_font_size=20,
+        showlegend=True,
+        title_x=0.5
+    )
+    
+    # Format axes
+    fig.update_yaxes(title_text="Bitcoin Price (USD)", row=1, col=1)
+    fig.update_yaxes(title_text="USD Value", row=1, col=2)
+    fig.update_yaxes(title_text="Real Purchasing Power (USD)", row=2, col=1)
+    fig.update_yaxes(title_text="Multiplier", row=2, col=2)
+    fig.update_xaxes(title_text="Years", row=2, col=1)
+    fig.update_xaxes(title_text="Years", row=2, col=2)
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # === DETAILED PROJECTIONS TABLE ===
+    st.markdown("---")
+    st.markdown("### 📊 Detailed Projections")
+    
+    # Format data for display
+    display_data = []
+    for p in projections:
+        display_data.append({
+            'Time Horizon': f"{p['Years']} years",
+            'Total Stack': format_sats(p['Total Sats']),
+            'Bitcoin Price': f"${p['Bitcoin Price']:,.0f}",
+            'Stack Value': f"${p['Future USD Value']:,.0f}",
+            'Real Purchasing Power': f"${p['Real Purchasing Power']:,.0f}",
+            'BTC Gain': f"+{p['Bitcoin Gain %']:.0f}%",
+            'Power Multiplier': f"{p['Purchasing Power Multiplier']:.1f}x"
+        })
+    
+    df_projections = pd.DataFrame(display_data)
+    st.dataframe(df_projections, use_container_width=True, hide_index=True)
+    
+    # === MOTIVATIONAL INSIGHTS ===
+    st.markdown("---")
+    st.markdown("### 💡 Key Insights")
+    
+    # Pick the 10-year projection for highlights
+    ten_year = next((p for p in projections if p['Years'] == 10), projections[1] if len(projections) > 1 else projections[0])
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            "Bitcoin Price (10Y)",
+            f"${ten_year['Bitcoin Price']:,.0f}",
+            delta=f"+{ten_year['Bitcoin Gain %']:.0f}%"
+        )
+    
+    with col2:
+        st.metric(
+            "Your Stack Value (10Y)",
+            f"${ten_year['Future USD Value']:,.0f}",
+            delta=f"${ten_year['Future USD Value'] - current_usd_value:,.0f}"
+        )
+    
+    with col3:
+        st.metric(
+            "Real Purchasing Power (10Y)",
+            f"${ten_year['Real Purchasing Power']:,.0f}",
+            delta=f"{ten_year['Purchasing Power Multiplier']:.1f}x current"
+        )
+    
+    with col4:
+        if monthly_dca_sats > 0:
+            total_dca_usd = (monthly_dca_sats * 12 * 10 / 100_000_000) * current_btc_price
+            st.metric(
+                "DCA Investment (10Y)",
+                f"${total_dca_usd:,.0f}",
+                delta=f"{format_sats(monthly_dca_sats * 12 * 10)}"
+            )
+        else:
+            st.metric(
+                "Start DCA?",
+                "Add monthly stacking",
+                delta="Compound growth!"
+            )
+    
+    # === MOTIVATIONAL MESSAGE ===
+    st.markdown("---")
+    
+    # Create inspiring message based on the projections
+    twenty_year = projections[-1]  # Last projection (20 years)
+    
+    st.markdown(f"""
+    ### 🎯 The Power of Time and Patience
+    
+    **Your current {format_sats(current_net_worth_sats)} could become:**
+    
+    - 💎 **Real purchasing power of ${twenty_year['Real Purchasing Power']:,.0f}** in 20 years
+    - 🚀 **That's {twenty_year['Purchasing Power Multiplier']:.1f}x your current purchasing power!**
+    - 📈 **Bitcoin price could reach ${twenty_year['Bitcoin Price']:,.0f}** (Power Law projection)
+    
+    **Key Takeaways:**
+    - ⏰ **Time is your greatest ally** - Bitcoin's scarcity + time = wealth preservation
+    - 🔒 **HODLing beats timing** - Stay humble and stack sats
+    - 📈 **DCA amplifies growth** - Regular stacking compounds exponentially
+    - 💪 **Your future self will thank you** - Every sat counts in the long run
+    
+    *"The best time to plant a tree was 20 years ago. The second best time is now."*
+    """)
+    
+    # Add DCA encouragement if not already doing it
+    if monthly_dca_sats == 0:
+        st.info("""
+        💡 **Pro Tip:** Try adding even 10,000 sats/month to see how DCA accelerates your wealth building!
+        Small consistent investments can have massive long-term impact.
+        """)
 
 def future_purchasing_power_report():
     """Future purchasing power analysis"""

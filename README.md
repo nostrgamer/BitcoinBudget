@@ -70,12 +70,14 @@ The application will open at `http://localhost:8501`
 ## Features
 
 ### 🏦 **Core Envelope Budgeting**
-- ✅ **Smart Income Entry**: Add Bitcoin income with flexible sats/BTC input
+- ✅ **Account Management**: Tracked accounts (on-budget) and untracked accounts (savings/long-term)
+- ✅ **Smart Income Entry**: Add Bitcoin income with flexible sats/BTC input and account selection
 - ✅ **Category Management**: Create master categories (Fixed, Variable, Savings) and subcategories
 - ✅ **Intelligent Allocation**: Allocate income with availability checking and rollover
-- ✅ **Real-time Balances**: Live category balances with overspending alerts
+- ✅ **Real-time Balances**: Live category balances with overspending alerts and account tracking
 - ✅ **Month Navigation**: Navigate between months with preserved data
-- ✅ **Transaction Management**: Edit, delete, and categorize all transactions
+- ✅ **Transaction Management**: Edit, delete, and categorize all transactions with account tracking
+- ✅ **Account Transfers**: Move funds between different Bitcoin accounts
 
 ### ₿ **Bitcoin-Native Features**
 - ✅ **Satoshi Precision**: All calculations in satoshis (no floating point errors)
@@ -92,10 +94,20 @@ The application will open at `http://localhost:8501`
 - **Summary Metrics**: Total spending, category count, top spending category
 
 #### 📈 Net Worth Analysis
-- **Dual Chart Display**: Income vs expenses + cumulative net worth
+- **Account-Based Net Worth**: Real net worth using actual account balances
+- **Dual Chart Display**: Income vs expenses + cumulative net worth progression
+- **Account Breakdown**: Detailed view of tracked vs untracked accounts
 - **Interactive Plotly Charts**: Zoom, pan, hover for detailed information
-- **Financial Metrics**: Income, expenses, net worth, monthly averages
+- **Financial Metrics**: Current net worth, income, expenses, monthly averages
 - **Trend Analysis**: Track financial progress across multiple months
+
+#### 🚀 Net Worth Future Value
+- **Personal Stack Projections**: Show future value of your actual Bitcoin holdings
+- **DCA Modeling**: Optional Dollar Cost Averaging scenario analysis
+- **20-Year Horizons**: Project 5, 10, 15, 20-year growth scenarios
+- **4-Panel Dashboard**: Bitcoin price growth, stack value, purchasing power, multipliers
+- **Motivational Insights**: Encouraging analysis to incentivize HODLing and stacking
+- **Account Integration**: Uses your real account balances for projections
 
 #### 🔮 Future Purchasing Power
 - **Bitcoin Power Law Modeling**: Project future Bitcoin prices using historical data
@@ -103,6 +115,7 @@ The application will open at `http://localhost:8501`
 - **Budget Projections**: Show how spending power increases over time
 - **Visual Analysis**: Side-by-side current vs future budget comparisons
 - **Multiple Horizons**: 1, 2, 5, 10-year purchasing power projections
+- **Runway Analysis**: Shows months of financial runway with current spending
 
 #### ⏳ Lifecycle Cost Analysis
 - **Transaction Selection**: Analyze any historical expense transaction
@@ -121,7 +134,8 @@ The application will open at `http://localhost:8501`
 ```python
 # Each user gets isolated data in browser session
 st.session_state.user_data = {
-    'transactions': [],      # User's income/expenses
+    'accounts': [],          # User's Bitcoin accounts (tracked/untracked)
+    'transactions': [],      # User's income/expenses with account tracking
     'categories': [],        # User's spending categories
     'master_categories': [], # User's category groups
     'allocations': [],       # User's budget allocations
@@ -133,13 +147,13 @@ st.session_state.user_data = {
 ┌─────────────────────────────────────────────────────────────────┐
 │ ₿ Bitcoin Budget - 2025-06                                      │
 ├─────────────────────────────────────────────────────────────────┤
-│ 💰 Budget Summary (Real-time metrics)                          │
-│ [Total Income] [Rollover] [Allocated] [Available to Assign]     │
+│ 💰 Budget Summary (Account-based metrics)                      │
+│ [Tracked Balance] [In Categories] [Available to Assign]        │
 ├─────────────────────────────────────────────────────────────────┤
-│ [📁 Categories] [💳 Transactions] (Interactive tabs)           │
+│ [🏦 Accounts] [📁 Categories] [💳 Transactions] (Tabs)         │
 │ Modern forms with validation and editable data tables          │
 ├─────────────────────────────────────────────────────────────────┤
-│ Sidebar: Month Navigation + Reports + How to Use               │
+│ Sidebar: Month Navigation + Reports (5 types) + How to Use     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -176,23 +190,28 @@ def analyze_lifecycle_cost(amount_sats, years_ahead):
 
 ### 🚀 **First Time User**
 1. Visit [bitcoinbudget.streamlit.app](https://bitcoinbudget.streamlit.app/)
-2. Read the landing page explanation with real opportunity cost example
-3. Click "🚀 Start Budgeting Now" 
-4. App loads with demo data: 100k sats income, 3 categories, sample allocations
-5. Try adding your own transactions to see how it works
+2. See compelling examples on landing page:
+   - **Net Worth Future Value**: 1M sats + 250k/month DCA over 20 years
+   - **Opportunity Cost Analysis**: $250 dinner becomes $3,914 opportunity cost
+3. Click "🚀 Get Started" to see the app with demo data
+4. App loads with demo accounts (Checking + Bitcoin Savings) and sample allocations
+5. Try adding your own transactions and explore the different tabs
 
 ### 📊 **Daily Budget Management**
-1. **Add Income**: Use the Income tab with date picker and amount validation
-2. **Allocate Budget**: Assign income to categories with smart availability checking
-3. **Track Expenses**: Record spending with category selection and descriptions
-4. **Monitor Balances**: Real-time category balances with overspending warnings
-5. **View Reports**: Analyze spending patterns and opportunity costs
+1. **Manage Accounts**: Set up your tracked (on-budget) and untracked (savings) accounts
+2. **Add Income**: Use the Income tab with date picker, amount validation, and account selection
+3. **Allocate Budget**: Assign income to categories with smart availability checking
+4. **Track Expenses**: Record spending with category and account selection
+5. **Monitor Balances**: Real-time category and account balances with overspending warnings
+6. **Transfer Funds**: Move money between accounts as needed
+7. **View Reports**: Analyze spending patterns, net worth, and future projections
 
 ### 🔍 **Advanced Analysis**
 1. **Spending Breakdown**: See which categories consume the most Bitcoin
-2. **Net Worth Tracking**: Monitor income vs expenses over multiple months
-3. **Future Projections**: Understand how current spending affects future wealth
-4. **Lifecycle Analysis**: Analyze specific purchases' long-term opportunity cost
+2. **Net Worth Tracking**: Monitor account balances and income vs expenses over time
+3. **Net Worth Future Value**: Visualize your Bitcoin stack growth over 5-20 years with DCA modeling
+4. **Future Purchasing Power**: Understand how current spending affects future wealth
+5. **Lifecycle Analysis**: Analyze specific purchases' long-term opportunity cost
 
 ## Deployment & Architecture
 
