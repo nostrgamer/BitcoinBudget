@@ -269,4 +269,105 @@ def main_page():
         accounts_page()
 ```
 
-Remember: **Simple is better than complex. Account-based is better than transaction-only. Privacy-first is better than shared data. Motivational is better than purely functional.** 
+Remember: **Simple is better than complex. Account-based is better than transaction-only. Privacy-first is better than shared data. Motivational is better than purely functional.**
+
+## Database Integration Roadmap
+
+### 🎯 **Current Development**: Hybrid Storage Solution
+**Branch**: `1-database-integration-that-allows-local-and-csv-formats`
+
+The current session-only storage provides maximum privacy but lacks persistence. We're implementing a hybrid solution that maintains Bitcoin privacy ethos while adding practical data persistence and portability.
+
+### 🚀 **Phase 1: localStorage Persistence** (🚧 In Progress)
+**Goal**: Replace SQLite with browser localStorage for automatic session persistence
+
+**Implementation Tasks**:
+- ✅ Remove SQLite database dependencies
+- ✅ Create localStorage wrapper functions for data operations
+- ✅ Migrate all session_state operations to localStorage
+- ✅ Add automatic save/load on app initialization
+- ✅ Maintain same privacy benefits (data never leaves user's device)
+- ✅ Add localStorage error handling and fallback to session_state
+
+**Technical Changes**:
+```python
+# Replace SQLite operations with localStorage
+def save_to_local_storage(key, data):
+    """Save data to browser localStorage"""
+    
+def load_from_local_storage(key, default=None):
+    """Load data from browser localStorage with fallback"""
+    
+def initialize_session_state():
+    """Load existing data from localStorage or create demo data"""
+```
+
+### 📂 **Phase 2: JSON Export/Import** (⏳ Planned)
+**Goal**: Allow users to export/import their budget data as JSON files
+
+**Implementation Tasks**:
+- ✅ Create export function: budget data → JSON file download
+- ✅ Create import function: JSON file upload → restore budget data
+- ✅ Add data validation and error handling for imports
+- ✅ Support partial imports (accounts only, transactions only, etc.)
+- ✅ Add backup/restore functionality in UI (sidebar or settings)
+
+### 📊 **Phase 3: YNAB CSV Import** (⏳ Planned) 
+**Goal**: Enable easy migration from YNAB to Bitcoin Budget
+
+**Implementation Tasks**:
+- ✅ Parse YNAB CSV export format
+- ✅ Map YNAB accounts → Bitcoin accounts (tracked/untracked)
+- ✅ Map YNAB categories → Bitcoin Budget categories
+- ✅ Convert USD amounts → satoshis (user-specified or current rate)
+- ✅ Handle YNAB-specific data (payees, cleared status, etc.)
+- ✅ Add YNAB import UI with preview and mapping options
+
+**YNAB CSV Mapping**:
+```python
+# YNAB CSV columns → Bitcoin Budget fields
+def parse_ynab_csv(csv_data, btc_usd_rate):
+    """Convert YNAB export to Bitcoin Budget format"""
+    # Account → Account (create tracked/untracked)
+    # Category Group → Master Category
+    # Category → Category
+    # Outflow/Inflow → Amount in satoshis
+    # Date, Payee, Memo → Transaction details
+```
+
+### 📁 **Phase 4: Enhanced Export Formats** (⏳ Planned)
+**Goal**: Support multiple export formats for different use cases
+
+**Implementation Tasks**:
+- ✅ CSV export for analysis/spreadsheets
+- ✅ YNAB-compatible CSV export (for reverse migration)
+- ✅ PDF reports export
+- ✅ Multiple file format selection in export UI
+
+### 🔄 **Development Guidelines for Database Integration**
+
+**localStorage Implementation**:
+- **Use JSON serialization**: Store complex objects as JSON strings
+- **Error handling**: Graceful fallback to session_state if localStorage fails
+- **Data validation**: Ensure data integrity on load
+- **Privacy maintained**: localStorage is still client-side only
+
+**File Operations**:
+- **Streamlit file widgets**: Use st.file_uploader and st.download_button
+- **User feedback**: Clear success/error messages for import/export
+- **Data validation**: Validate imports before applying to prevent corruption
+- **Backup reminders**: Encourage users to export regularly
+
+**YNAB Compatibility**:
+- **Pandas for CSV**: Use pd.read_csv for robust parsing
+- **Currency conversion**: Flexible USD → satoshis conversion options
+- **Data mapping**: Clear mapping of YNAB concepts to Bitcoin Budget
+- **Preview mode**: Show import preview before final confirmation
+
+### 🎯 **Success Criteria**
+- ✅ **Seamless UX**: Works like native app with automatic persistence
+- ✅ **Data ownership**: Users control their budget files completely
+- ✅ **YNAB migration**: Easy path for existing YNAB users
+- ✅ **Privacy preserved**: No server-side storage, user controls all data
+- ✅ **No data loss**: Automatic saves prevent work loss
+- ✅ **Cross-device**: Import/export enables device portability 

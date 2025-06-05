@@ -297,6 +297,51 @@ def calculate_future_purchasing_power(sats, years, inflation=0.08):
     return future_value / current_value  # Purchasing power multiplier
 ```
 
+## Database Integration Roadmap
+
+### 🗄️ **Current Limitation**: Session-Only Storage
+The current app uses session-based storage which provides maximum privacy but doesn't persist data between browser sessions. We're implementing a hybrid solution that maintains privacy while adding data persistence and portability.
+
+### 🎯 **Hybrid Storage Solution**: localStorage + File Import/Export
+
+#### **Phase 1: localStorage Persistence** 
+- ✅ Replace SQLite with browser localStorage for automatic session persistence
+- ✅ Data automatically saves as user works (no data loss during sessions)
+- ✅ Browser restart recovery - budgets persist until user clears browser data
+- ✅ Same privacy benefits - data never leaves user's device
+
+#### **Phase 2: JSON Export/Import**
+- ✅ Export budget data as JSON file for backup/sharing
+- ✅ Import previously exported budgets on any device/browser
+- ✅ Move data between devices while maintaining complete user control
+- ✅ True self-custody of financial data (Bitcoin ethos)
+
+#### **Phase 3: YNAB CSV Import** 
+- ✅ Import YNAB budget exports (CSV format) for easy migration
+- ✅ Automatic mapping: YNAB accounts → Bitcoin accounts, categories → categories
+- ✅ Convert USD amounts to satoshis using user-specified or current BTC rate
+- ✅ Massive user acquisition opportunity (millions of existing YNAB users)
+
+#### **Phase 4: Enhanced Export Formats**
+- ✅ CSV export for analysis/spreadsheets
+- ✅ YNAB-compatible CSV export (for users who want to go back)
+- ✅ Multiple format support for different use cases
+
+### 💡 **Benefits of New Storage System**
+- **Seamless UX**: No data loss, works like native app
+- **Data Ownership**: Users control their own budget files
+- **Privacy-First**: No server-side storage, encryption options
+- **YNAB Migration**: Easy path from YNAB subscription to Bitcoin budgeting
+- **Backup Strategy**: Users choose their own data redundancy approach
+- **Device Portability**: Use budget on multiple devices with file sync
+
+### 🔄 **Implementation Status**
+- **Current Branch**: `1-database-integration-that-allows-local-and-csv-formats`
+- **Phase 1**: 🚧 In Progress - localStorage integration
+- **Phase 2**: ⏳ Planned - JSON import/export
+- **Phase 3**: ⏳ Planned - YNAB CSV import  
+- **Phase 4**: ⏳ Planned - Additional export formats
+
 ## Contributing
 
 1. **Fork** the repository on GitHub

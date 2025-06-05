@@ -34,7 +34,134 @@ st.markdown("""
 <meta name="twitter:description" content="Track your sats, manage spending categories, and visualize your Bitcoin stack's future value with inflation-adjusted projections.">
 """, unsafe_allow_html=True)
 
-# === DATABASE FUNCTIONS (UNCHANGED FROM ORIGINAL) ===
+# === PHASE 1: ENHANCED SESSION PERSISTENCE + EXPORT/IMPORT ===
+
+import json
+from datetime import datetime
+
+def export_budget_data():
+    """Export user budget data as JSON file"""
+    try:
+        if 'user_data' in st.session_state:
+            # Add metadata
+            export_data = {
+                'version': '1.0',
+                'export_date': datetime.now().isoformat(),
+                'app_name': 'Bitcoin Budget',
+                'data': st.session_state.user_data
+            }
+            
+            # Convert to JSON
+            json_data = json.dumps(export_data, indent=2, default=str)
+            return json_data
+    except Exception as e:
+        st.error(f"Error exporting data: {e}")
+        return None
+
+def import_budget_data(json_data):
+    """Import user budget data from JSON string"""
+    try:
+        # Parse JSON
+        imported_data = json.loads(json_data)
+        
+        # Validate structure
+        if 'data' not in imported_data:
+            return False, "Invalid file format - missing data section"
+        
+        data = imported_data['data']
+        required_keys = ['transactions', 'categories', 'master_categories', 'allocations', 'accounts']
+        
+        for key in required_keys:
+            if key not in data:
+                return False, f"Invalid file format - missing {key}"
+        
+        # Import the data
+        st.session_state.user_data = data
+        
+        # Ensure next_id fields exist
+        if 'next_transaction_id' not in st.session_state.user_data:
+            st.session_state.user_data['next_transaction_id'] = max([t.get('id', 0) for t in data['transactions']] + [0]) + 1
+        if 'next_category_id' not in st.session_state.user_data:
+            st.session_state.user_data['next_category_id'] = max([c.get('id', 0) for c in data['categories']] + [0]) + 1
+        if 'next_master_category_id' not in st.session_state.user_data:
+            st.session_state.user_data['next_master_category_id'] = max([mc.get('id', 0) for mc in data['master_categories']] + [0]) + 1
+        if 'next_allocation_id' not in st.session_state.user_data:
+            st.session_state.user_data['next_allocation_id'] = max([a.get('id', 0) for a in data['allocations']] + [0]) + 1
+        if 'next_account_id' not in st.session_state.user_data:
+            st.session_state.user_data['next_account_id'] = max([acc.get('id', 0) for acc in data['accounts']] + [0]) + 1
+        
+        return True, "Budget data imported successfully!"
+        
+    except json.JSONDecodeError as e:
+        return False, f"Invalid JSON format: {e}"
+    except Exception as e:
+        return False, f"Error importing data: {e}"
+
+def get_demo_data():
+    """Get default demo data structure"""
+    current_month = get_current_month()
+    
+    default_master_cats = [
+        {'id': 1, 'name': 'Fixed Expenses'},
+        {'id': 2, 'name': 'Variable Expenses'},
+        {'id': 3, 'name': 'Savings'}
+    ]
+    
+    default_categories = [
+        {'id': 1, 'name': 'Rent', 'master_category_id': 1},
+        {'id': 2, 'name': 'Food', 'master_category_id': 2},
+        {'id': 3, 'name': 'Bitcoin Stack', 'master_category_id': 3}
+    ]
+    
+    demo_transactions = [
+        {
+            'id': 1,
+            'date': current_month + '-01',
+            'description': 'Monthly Salary',
+            'amount': 100000,  # 100k sats
+            'type': 'income',
+            'category_id': None,
+            'account_id': 1
+        }
+    ]
+    
+    demo_allocations = [
+        {'id': 1, 'category_id': 1, 'month': current_month, 'amount': 50000},
+        {'id': 2, 'category_id': 2, 'month': current_month, 'amount': 30000},
+        {'id': 3, 'category_id': 3, 'month': current_month, 'amount': 20000}
+    ]
+    
+    demo_accounts = [
+        {
+            'id': 1,
+            'name': 'Checking Account',
+            'balance': 100000,
+            'is_tracked': True,
+            'account_type': 'checking'
+        },
+        {
+            'id': 2,
+            'name': 'Bitcoin Savings',
+            'balance': 500000,
+            'is_tracked': False,
+            'account_type': 'savings'
+        }
+    ]
+    
+    return {
+        'transactions': demo_transactions,
+        'categories': default_categories,
+        'master_categories': default_master_cats,
+        'allocations': demo_allocations,
+        'accounts': demo_accounts,
+        'next_transaction_id': 2,
+        'next_category_id': 4,
+        'next_master_category_id': 4,
+        'next_allocation_id': 4,
+        'next_account_id': 3
+    }
+
+# === DATA FUNCTIONS (NO CHANGES NEEDED - ALREADY SESSION-BASED) ===
 
 
 
@@ -699,86 +826,8 @@ def initialize_session_state():
     
     # Initialize user's private data structures (only once)
     if 'user_data' not in st.session_state:
-        # Add some default master categories and categories for demo
-        default_master_cats = [
-            {'id': 1, 'name': 'Fixed Expenses'},
-            {'id': 2, 'name': 'Variable Expenses'},
-            {'id': 3, 'name': 'Savings'}
-        ]
-        
-        default_categories = [
-            {'id': 1, 'name': 'Rent', 'master_category_id': 1},
-            {'id': 2, 'name': 'Food', 'master_category_id': 2},
-            {'id': 3, 'name': 'Bitcoin Stack', 'master_category_id': 3}
-        ]
-        
-        # Add some demo transactions for better UX
-        demo_transactions = [
-            {
-                'id': 1,
-                'date': get_current_month() + '-01',
-                'description': 'Monthly Salary',
-                'amount': 100000,  # 100k sats
-                'type': 'income',
-                'category_id': None,
-                'account_id': 1  # Tie to Checking Account
-            }
-        ]
-        
-        # Add some demo allocations
-        current_month = get_current_month()
-        demo_allocations = [
-            {
-                'id': 1,
-                'category_id': 1,  # Rent
-                'month': current_month,
-                'amount': 50000  # 50k sats
-            },
-            {
-                'id': 2,
-                'category_id': 2,  # Food
-                'month': current_month,
-                'amount': 30000  # 30k sats
-            },
-            {
-                'id': 3,
-                'category_id': 3,  # Bitcoin Stack
-                'month': current_month,
-                'amount': 20000  # 20k sats
-            }
-        ]
-        
-        # Add some demo accounts for better UX
-        demo_accounts = [
-            {
-                'id': 1,
-                'name': 'Checking Account',
-                'balance': 100000,  # 100k sats (reflects the historical income transaction)
-                'is_tracked': True,
-                'account_type': 'checking'
-            },
-            {
-                'id': 2,
-                'name': 'Bitcoin Savings',
-                'balance': 500000,  # 500k sats
-                'is_tracked': False,  # Off-budget for long-term holding
-                'account_type': 'savings'
-            }
-        ]
-
-        # Initialize all data at once to avoid multiple session state updates
-        st.session_state.user_data = {
-            'transactions': demo_transactions,  # List of transaction dicts
-            'categories': default_categories,    # List of category dicts
-            'master_categories': default_master_cats,  # List of master category dicts
-            'allocations': demo_allocations,   # List of allocation dicts
-            'accounts': demo_accounts,         # List of account dicts
-            'next_transaction_id': 2,  # Next ID after demo transaction
-            'next_category_id': 4,  # Start at 4 since we have 3 default categories
-            'next_master_category_id': 4,  # Start at 4 since we have 3 default master categories
-            'next_allocation_id': 4,  # Next ID after demo allocations
-            'next_account_id': 3      # Next ID after demo accounts
-        }
+        # Use centralized demo data function
+        st.session_state.user_data = get_demo_data()
 
 def landing_page():
     """Beautiful landing page explaining how to use the Bitcoin Budget app"""
@@ -2333,6 +2382,66 @@ def sidebar_navigation():
         if st.button("📊 Reports", use_container_width=True):
             st.session_state.page = 'reports'
             st.rerun()
+        
+        st.markdown("---")
+        
+        # Data Management Section
+        st.markdown("### 💾 Data Management")
+        
+        # Export functionality
+        st.markdown("#### 📤 Export Budget")
+        export_data = export_budget_data()
+        if export_data:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"bitcoin_budget_{timestamp}.json"
+            
+            st.download_button(
+                label="💾 Download Budget",
+                data=export_data,
+                file_name=filename,
+                mime="application/json",
+                use_container_width=True,
+                help="Save your budget data to a file"
+            )
+        
+        # Import functionality
+        st.markdown("#### 📥 Import Budget")
+        uploaded_file = st.file_uploader(
+            "Choose a budget file",
+            type=['json'],
+            help="Upload a previously exported budget file",
+            key="budget_import"
+        )
+        
+        if uploaded_file is not None:
+            try:
+                # Read the uploaded file
+                json_data = uploaded_file.read().decode('utf-8')
+                
+                # Show import button
+                if st.button("📥 Import Budget", use_container_width=True, type="primary"):
+                    success, message = import_budget_data(json_data)
+                    if success:
+                        st.success(message)
+                        st.rerun()
+                    else:
+                        st.error(message)
+                        
+            except Exception as e:
+                st.error(f"Error reading file: {e}")
+        
+        # Reset to demo data
+        st.markdown("#### 🔄 Reset Data")
+        if st.button("🗑️ Reset to Demo", use_container_width=True, type="secondary"):
+            if st.session_state.get('confirm_reset', False):
+                st.session_state.user_data = get_demo_data()
+                st.session_state.confirm_reset = False
+                st.success("✅ Reset to demo data")
+                st.rerun()
+            else:
+                st.session_state.confirm_reset = True
+                st.warning("⚠️ Click again to confirm reset")
+                st.rerun()
 
 def main():
     """Main application entry point"""
