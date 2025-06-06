@@ -1610,6 +1610,11 @@ def main_page():
         all_categories = get_categories()
         
         if master_categories or all_categories:
+            # Sort master categories alphabetically and get names first
+            master_categories_sorted = sorted(master_categories, key=lambda x: x['name'])
+            master_names = [mc['name'] for mc in master_categories_sorted]
+            master_names.append('Uncategorized')  # Add "Uncategorized" for categories without master category
+            
             # Clean control panel
             with st.expander("🛠️ Category Controls", expanded=False):
                 col1, col2, col3, col4 = st.columns(4)
@@ -1638,15 +1643,6 @@ def main_page():
             grand_allocated = 0
             grand_spent = 0
             grand_balance = 0
-            
-            # Sort master categories alphabetically
-            master_categories_sorted = sorted(master_categories, key=lambda x: x['name'])
-            
-            # Get all master category names (including empty ones)
-            master_names = [mc['name'] for mc in master_categories_sorted]
-            
-            # Add "Uncategorized" for categories without master category
-            master_names.append('Uncategorized')
             
             # Group categories by master category with collapsible functionality
             for master_name in master_names:
@@ -1783,7 +1779,7 @@ def main_page():
                     "Status": st.column_config.TextColumn("Status", disabled=True)
                 },
                 key=f"unified_categories_{refresh_count}",
-                disabled=["Type", "Category", "Master_Category_Assignment", "Current_Balance", "Spent", "Status"]
+                disabled=["Type", "Master_Category_Assignment", "Current_Balance", "Spent", "Status"]
             )
             
             # Process changes (master category toggles and allocations)
@@ -1833,8 +1829,14 @@ def main_page():
                     st.session_state.data_editor_refresh_count += 1
                     st.rerun()
             
-            # Clean help tip
-            st.info("💡 **Tip:** Click on folder icons (📂/📁) in the table below to expand/collapse master categories")
+            # Interactive help
+            collapsed_count = len(st.session_state.collapsed_master_categories)
+            expanded_count = len(master_names) - collapsed_count
+            
+            if collapsed_count > 0:
+                st.info(f"💡 **{collapsed_count} master categories collapsed, {expanded_count} expanded.** Click master category names in the table to expand/collapse them, or use controls above.")
+            else:
+                st.info("💡 **All master categories expanded.** Click master category names (with 📂 icons) in the table to collapse them, or use controls above.")
             
             # Delete functionality section
             st.markdown("---")
