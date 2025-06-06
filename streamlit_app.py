@@ -839,6 +839,33 @@ def validate_amount_input(text):
 
 
 
+def get_account_type_icon(account_type):
+    """Get icon for account type"""
+    icons = {
+        'checking': '🏦',
+        'savings': '💰', 
+        'investment': '📈',
+        'credit': '💳',
+        'other': '⚡'
+    }
+    return icons.get(account_type, '⚡')
+
+def get_account_health_status(balance):
+    """Get account health status based on balance"""
+    if balance <= 0:
+        return "🔴", "Empty", "#ff4444"
+    elif balance < 100_000:  # Less than 100k sats
+        return "🟡", "Low", "#ffaa00"
+    elif balance < 1_000_000:  # Less than 1M sats
+        return "🟢", "Good", "#44ff44"
+    else:  # 1M+ sats
+        return "💎", "Excellent", "#44aaff"
+
+def format_account_balance_with_health(balance):
+    """Format balance with health indicator"""
+    icon, status, color = get_account_health_status(balance)
+    return f"{icon} {format_sats(balance)}", status, color
+
 def get_current_month():
     """Return current month as 'YYYY-MM'"""
     return datetime.now().strftime('%Y-%m')
@@ -2163,10 +2190,29 @@ def main_page():
                 
                 with col1:
                     account_name = st.text_input("Account Name", placeholder="e.g., Checking, Bitcoin Savings")
-                    account_type = st.selectbox(
+                    
+                    # Enhanced account type selection with icons
+                    account_type_options = [
+                        "checking",
+                        "savings", 
+                        "investment",
+                        "credit",
+                        "other"
+                    ]
+                    
+                    # Create display options with icons
+                    account_type_display = []
+                    for acc_type in account_type_options:
+                        icon = get_account_type_icon(acc_type)
+                        account_type_display.append(f"{icon} {acc_type.title()}")
+                    
+                    selected_type_display = st.selectbox(
                         "Account Type", 
-                        ["checking", "savings", "investment", "credit", "other"]
+                        account_type_display
                     )
+                    
+                    # Extract the actual type from selection
+                    account_type = selected_type_display.split(" ", 1)[1].lower()
                 
                 with col2:
                     initial_balance = st.text_input(
@@ -2203,87 +2249,178 @@ def main_page():
                     else:
                         st.error("❌ Please fill in all required fields")
         
-        # Account Lists
+        # Enhanced Account Lists with Visual Improvements
         col1, col2 = st.columns(2)
         
         with col1:
             st.markdown("#### 🟢 Tracked Accounts (On-Budget)")
             if tracked_accounts:
-                # Create a more compact table-like display
-                account_data = []
-                for account in tracked_accounts:
-                    account_data.append({
-                        'Account': f"**{account['name']}** ({account['account_type']})",
-                        'Balance': format_sats(account['balance']),
-                        'Actions': f"📊 View | 🗑️ Delete",
-                        'ID': account['id'],
-                        'Name': account['name']
-                    })
-                
-                # Display accounts in a clean format
                 for i, account in enumerate(tracked_accounts):
-                    account_col1, account_col2, account_col3, account_col4 = st.columns([3, 2, 1, 1])
+                    # Get visual indicators
+                    type_icon = get_account_type_icon(account['account_type'])
+                    balance_text, health_status, health_color = format_account_balance_with_health(account['balance'])
                     
-                    with account_col1:
-                        st.write(f"**{account['name']}** ({account['account_type']})")
-                    
-                    with account_col2:
-                        st.write(format_sats(account['balance']))
-                    
-                    with account_col3:
-                        if st.button("📊", key=f"view_tracked_{account['id']}", help="View account transactions"):
-                            st.session_state.selected_account_id = account['id']
-                            st.session_state.selected_account_name = account['name']
-                            st.rerun()
-                    
-                    with account_col4:
-                        if st.button("🗑️", key=f"delete_tracked_{account['id']}", help="Delete account"):
-                            if delete_account(account['id']):
-                                st.success(f"Deleted {account['name']}")
+                    # Create enhanced account card
+                    with st.container():
+                        # Header row with account info
+                        header_col1, header_col2 = st.columns([3, 1])
+                        
+                        with header_col1:
+                            st.markdown(f"**{type_icon} {account['name']}**")
+                            st.caption(f"{account['account_type'].title()} • {health_status}")
+                        
+                        with header_col2:
+                            st.markdown(f"**{balance_text}**")
+                        
+                        # Visual balance bar based on account health
+                        if account['balance'] > 0:
+                            # Create a visual progress bar
+                            max_display = max(1_000_000, account['balance'])  # At least 1M sats for scale
+                            progress_value = min(1.0, account['balance'] / max_display)
+                            st.progress(progress_value)
+                        
+                        # Action buttons row
+                        action_col1, action_col2, action_col3 = st.columns(3)
+                        
+                        with action_col1:
+                            if st.button("📊 View", key=f"view_tracked_{account['id']}", help="View transactions", use_container_width=True):
+                                st.session_state.selected_account_id = account['id']
+                                st.session_state.selected_account_name = account['name']
                                 st.rerun()
-                            else:
-                                st.error("Cannot delete account with transactions")
+                        
+                        with action_col2:
+                            if st.button("✏️ Edit", key=f"edit_tracked_{account['id']}", help="Edit account", use_container_width=True):
+                                st.session_state[f'edit_account_{account["id"]}'] = True
+                                st.rerun()
+                        
+                        with action_col3:
+                            if st.button("🗑️ Delete", key=f"delete_tracked_{account['id']}", help="Delete account", use_container_width=True):
+                                if delete_account(account['id']):
+                                    st.success(f"Deleted {account['name']}")
+                                    st.rerun()
+                                else:
+                                    st.error("Cannot delete account with transactions")
+                        
+                        # Show edit form if in edit mode
+                        if st.session_state.get(f'edit_account_{account["id"]}', False):
+                            with st.form(f"edit_account_form_{account['id']}"):
+                                st.markdown("**Edit Account Balance**")
+                                new_balance = st.text_input(
+                                    "New Balance",
+                                    value=str(account['balance']),
+                                    help="Enter new account balance in satoshis"
+                                )
+                                
+                                edit_col1, edit_col2 = st.columns(2)
+                                with edit_col1:
+                                    if st.form_submit_button("💾 Save", use_container_width=True):
+                                        try:
+                                            balance_sats = parse_amount_input(new_balance)
+                                            if update_account_balance(account['id'], balance_sats):
+                                                st.success("✅ Balance updated!")
+                                                del st.session_state[f'edit_account_{account["id"]}']
+                                                st.rerun()
+                                            else:
+                                                st.error("❌ Failed to update balance")
+                                        except ValueError as e:
+                                            st.error(f"❌ {str(e)}")
+                                
+                                with edit_col2:
+                                    if st.form_submit_button("❌ Cancel", use_container_width=True):
+                                        del st.session_state[f'edit_account_{account["id"]}']
+                                        st.rerun()
                     
-                    # Add minimal spacing between accounts
+                    # Add spacing between account cards
                     if i < len(tracked_accounts) - 1:
-                        st.write("")  # Single line break instead of markdown separator
+                        st.markdown("---")
             else:
                 st.info("No tracked accounts yet. Add one above!")
         
         with col2:
             st.markdown("#### 🔵 Untracked Accounts (Off-Budget)")
             if untracked_accounts:
-                # Display accounts in a clean format
                 for i, account in enumerate(untracked_accounts):
-                    account_col1, account_col2, account_col3, account_col4 = st.columns([3, 2, 1, 1])
+                    # Get visual indicators
+                    type_icon = get_account_type_icon(account['account_type'])
+                    balance_text, health_status, health_color = format_account_balance_with_health(account['balance'])
                     
-                    with account_col1:
-                        st.write(f"**{account['name']}** ({account['account_type']})")
-                    
-                    with account_col2:
-                        st.write(format_sats(account['balance']))
-                    
-                    with account_col3:
-                        if st.button("📊", key=f"view_untracked_{account['id']}", help="View account transactions"):
-                            st.session_state.selected_account_id = account['id']
-                            st.session_state.selected_account_name = account['name']
-                            st.rerun()
-                    
-                    with account_col4:
-                        if st.button("🗑️", key=f"delete_untracked_{account['id']}", help="Delete account"):
-                            if delete_account(account['id']):
-                                st.success(f"Deleted {account['name']}")
+                    # Create enhanced account card
+                    with st.container():
+                        # Header row with account info
+                        header_col1, header_col2 = st.columns([3, 1])
+                        
+                        with header_col1:
+                            st.markdown(f"**{type_icon} {account['name']}**")
+                            st.caption(f"{account['account_type'].title()} • {health_status}")
+                        
+                        with header_col2:
+                            st.markdown(f"**{balance_text}**")
+                        
+                        # Visual balance bar based on account health
+                        if account['balance'] > 0:
+                            # Create a visual progress bar
+                            max_display = max(1_000_000, account['balance'])  # At least 1M sats for scale
+                            progress_value = min(1.0, account['balance'] / max_display)
+                            st.progress(progress_value)
+                        
+                        # Action buttons row
+                        action_col1, action_col2, action_col3 = st.columns(3)
+                        
+                        with action_col1:
+                            if st.button("📊 View", key=f"view_untracked_{account['id']}", help="View transactions", use_container_width=True):
+                                st.session_state.selected_account_id = account['id']
+                                st.session_state.selected_account_name = account['name']
                                 st.rerun()
-                            else:
-                                st.error("Cannot delete account with transactions")
+                        
+                        with action_col2:
+                            if st.button("✏️ Edit", key=f"edit_untracked_{account['id']}", help="Edit account", use_container_width=True):
+                                st.session_state[f'edit_account_{account["id"]}'] = True
+                                st.rerun()
+                        
+                        with action_col3:
+                            if st.button("🗑️ Delete", key=f"delete_untracked_{account['id']}", help="Delete account", use_container_width=True):
+                                if delete_account(account['id']):
+                                    st.success(f"Deleted {account['name']}")
+                                    st.rerun()
+                                else:
+                                    st.error("Cannot delete account with transactions")
+                        
+                        # Show edit form if in edit mode
+                        if st.session_state.get(f'edit_account_{account["id"]}', False):
+                            with st.form(f"edit_account_form_{account['id']}"):
+                                st.markdown("**Edit Account Balance**")
+                                new_balance = st.text_input(
+                                    "New Balance",
+                                    value=str(account['balance']),
+                                    help="Enter new account balance in satoshis"
+                                )
+                                
+                                edit_col1, edit_col2 = st.columns(2)
+                                with edit_col1:
+                                    if st.form_submit_button("💾 Save", use_container_width=True):
+                                        try:
+                                            balance_sats = parse_amount_input(new_balance)
+                                            if update_account_balance(account['id'], balance_sats):
+                                                st.success("✅ Balance updated!")
+                                                del st.session_state[f'edit_account_{account["id"]}']
+                                                st.rerun()
+                                            else:
+                                                st.error("❌ Failed to update balance")
+                                        except ValueError as e:
+                                            st.error(f"❌ {str(e)}")
+                                
+                                with edit_col2:
+                                    if st.form_submit_button("❌ Cancel", use_container_width=True):
+                                        del st.session_state[f'edit_account_{account["id"]}']
+                                        st.rerun()
                     
-                    # Add minimal spacing between accounts
+                    # Add spacing between account cards
                     if i < len(untracked_accounts) - 1:
-                        st.write("")  # Single line break instead of markdown separator
+                        st.markdown("---")
             else:
                 st.info("No untracked accounts yet. Add one above!")
         
-        # Account Transfers
+        # Enhanced Account Transfers
         st.markdown("#### 💸 Transfer Between Accounts")
         all_accounts = get_accounts()
         if len(all_accounts) >= 2:
@@ -2291,16 +2428,36 @@ def main_page():
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
-                    from_account = st.selectbox(
+                    # Enhanced account selection with icons and balances
+                    from_account_options = []
+                    for acc in all_accounts:
+                        icon = get_account_type_icon(acc['account_type'])
+                        balance_display = format_sats(acc['balance'])
+                        from_account_options.append(f"{icon} {acc['name']} ({balance_display})")
+                    
+                    selected_from = st.selectbox(
                         "From Account",
-                        [acc['name'] for acc in all_accounts]
+                        from_account_options
                     )
+                    
+                    # Extract account name
+                    from_account = selected_from.split(" ", 1)[1].split(" (")[0]
                 
                 with col2:
-                    to_account = st.selectbox(
+                    # Enhanced account selection with icons and balances
+                    to_account_options = []
+                    for acc in all_accounts:
+                        icon = get_account_type_icon(acc['account_type'])
+                        balance_display = format_sats(acc['balance'])
+                        to_account_options.append(f"{icon} {acc['name']} ({balance_display})")
+                    
+                    selected_to = st.selectbox(
                         "To Account",
-                        [acc['name'] for acc in all_accounts]
+                        to_account_options
                     )
+                    
+                    # Extract account name
+                    to_account = selected_to.split(" ", 1)[1].split(" (")[0]
                 
                 with col3:
                     transfer_amount = st.text_input(
