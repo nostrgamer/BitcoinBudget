@@ -1610,24 +1610,28 @@ def main_page():
         all_categories = get_categories()
         
         if master_categories or all_categories:
-            # Add sorting controls
-            col1, col2, col3 = st.columns([2, 2, 1])
-            with col1:
-                if st.button("📊 Sort Master Categories A-Z", help="Sort master categories alphabetically"):
-                    master_categories.sort(key=lambda x: x['name'])
-                    st.rerun()
-            with col2:
-                if st.button("📋 Sort Categories A-Z", help="Sort categories within each master category"):
-                    # Sort categories within their master categories
-                    for mc in master_categories:
-                        mc_categories = [cat for cat in all_categories if cat['master_category_id'] == mc['id']]
-                        mc_categories.sort(key=lambda x: x['name'])
-                    st.rerun()
-            with col3:
-                expand_all = st.button("📂 Expand All", help="Expand all master categories")
-                if expand_all:
-                    st.session_state.collapsed_master_categories.clear()
-                    st.rerun()
+            # Clean control panel
+            with st.expander("🛠️ Category Controls", expanded=False):
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    if st.button("📊 Sort Master A-Z", help="Sort master categories alphabetically"):
+                        master_categories.sort(key=lambda x: x['name'])
+                        st.rerun()
+                with col2:
+                    if st.button("📋 Sort Categories A-Z", help="Sort categories within each master category"):
+                        # Sort categories within their master categories
+                        for mc in master_categories:
+                            mc_categories = [cat for cat in all_categories if cat['master_category_id'] == mc['id']]
+                            mc_categories.sort(key=lambda x: x['name'])
+                        st.rerun()
+                with col3:
+                    if st.button("📂 Expand All", help="Expand all master categories"):
+                        st.session_state.collapsed_master_categories.clear()
+                        st.rerun()
+                with col4:
+                    if st.button("📁 Collapse All", help="Collapse all master categories"):
+                        st.session_state.collapsed_master_categories = set(master_names)
+                        st.rerun()
             
             # Build unified table data with proper grouping
             table_data = []
@@ -1679,7 +1683,7 @@ def main_page():
                 table_data.append({
                     'ID': f"master_{master_name}",
                     'Type': 'master',
-                    'Category': f"{collapse_icon} {master_name} ({len(categories_in_group)} categories)",
+                    'Category': f"{collapse_icon} **{master_name}** ({len(categories_in_group)} categories)",
                     'Master_Category_Assignment': master_name,
                     'Current_Balance': master_allocated,
                     'This_Month_Allocation': master_month_allocation,
@@ -1748,9 +1752,9 @@ def main_page():
                     "Type": None,  # Hide type column
                     "Category": st.column_config.TextColumn(
                         "Category", 
-                        help="Click to rename categories or master categories",
+                        help="Click folder icons (📂/📁) to expand/collapse master categories",
                         width="large",
-                        disabled=True  # Disable category name editing for now to focus on allocations
+                        disabled=False  # Enable to detect clicks on master categories
                     ),
                     "Master_Category_Assignment": st.column_config.SelectboxColumn(
                         "Master Category",
@@ -1782,11 +1786,28 @@ def main_page():
                 disabled=["Type", "Category", "Master_Category_Assignment", "Current_Balance", "Spent", "Status"]
             )
             
-            # Process changes with simplified logic focusing only on allocations
+            # Process changes (master category toggles and allocations)
             if not edited_df.equals(df):
                 changes_made = False
                 
-                # Only check allocation changes for individual categories
+                # Check for clicks on master categories first
+                for idx, row in edited_df.iterrows():
+                    original_row = df.iloc[idx]
+                    
+                    if row['Type'] == 'master':
+                        # Check if the category field was "edited" (user clicked on it)
+                        category_changed = row['Category'] != original_row['Category']
+                        if category_changed:
+                            # User clicked on master category - toggle collapse state
+                            master_name = row['Master_Category_Assignment']
+                            if master_name in st.session_state.collapsed_master_categories:
+                                st.session_state.collapsed_master_categories.remove(master_name)
+                            else:
+                                st.session_state.collapsed_master_categories.add(master_name)
+                            st.rerun()
+                            return  # Exit early to prevent other processing
+                
+                # Check allocation changes for individual categories
                 for idx, row in edited_df.iterrows():
                     if row['Type'] == 'category':  # Only process individual categories
                         category_id = row['ID']
@@ -1812,29 +1833,8 @@ def main_page():
                     st.session_state.data_editor_refresh_count += 1
                     st.rerun()
             
-            # Check if user clicked on a master category to toggle collapse/expand
-            # Add clickable areas for master categories
-            st.markdown("#### 📁 Click Master Categories to Collapse/Expand")
-            click_cols = st.columns(len(master_names) if master_names else 1)
-            
-            for i, master_name in enumerate(master_names):
-                with click_cols[i % len(click_cols)]:
-                    is_collapsed = master_name in st.session_state.collapsed_master_categories
-                    icon = "📁" if is_collapsed else "📂"
-                    
-                    # Count categories in this master
-                    if master_name == 'Uncategorized':
-                        cat_count = len([cat for cat in all_categories if cat['master_category_id'] is None])
-                    else:
-                        master_id = next((mc['id'] for mc in master_categories_sorted if mc['name'] == master_name), None)
-                        cat_count = len([cat for cat in all_categories if cat['master_category_id'] == master_id])
-                    
-                    if st.button(f"{icon} {master_name} ({cat_count})", key=f"toggle_{master_name}"):
-                        if is_collapsed:
-                            st.session_state.collapsed_master_categories.remove(master_name)
-                        else:
-                            st.session_state.collapsed_master_categories.add(master_name)
-                        st.rerun()
+            # Clean help tip
+            st.info("💡 **Tip:** Click on folder icons (📂/📁) in the table below to expand/collapse master categories")
             
             # Delete functionality section
             st.markdown("---")
@@ -2008,62 +2008,77 @@ def main_page():
         with col1:
             st.markdown("#### 🟢 Tracked Accounts (On-Budget)")
             if tracked_accounts:
+                # Create a more compact table-like display
+                account_data = []
                 for account in tracked_accounts:
-                    with st.container():
-                        account_col1, account_col2, account_col3, account_col4 = st.columns([3, 2, 1, 1])
-                        
-                        with account_col1:
-                            st.write(f"**{account['name']}** ({account['account_type']})")
-                        
-                        with account_col2:
-                            st.write(format_sats(account['balance']))
-                        
-                        with account_col3:
-                            if st.button("📊", key=f"view_tracked_{account['id']}", help="View account transactions"):
-                                st.session_state.selected_account_id = account['id']
-                                st.session_state.selected_account_name = account['name']
+                    account_data.append({
+                        'Account': f"**{account['name']}** ({account['account_type']})",
+                        'Balance': format_sats(account['balance']),
+                        'Actions': f"📊 View | 🗑️ Delete",
+                        'ID': account['id'],
+                        'Name': account['name']
+                    })
+                
+                # Display accounts in a clean format
+                for i, account in enumerate(tracked_accounts):
+                    account_col1, account_col2, account_col3, account_col4 = st.columns([3, 2, 1, 1])
+                    
+                    with account_col1:
+                        st.write(f"**{account['name']}** ({account['account_type']})")
+                    
+                    with account_col2:
+                        st.write(format_sats(account['balance']))
+                    
+                    with account_col3:
+                        if st.button("📊", key=f"view_tracked_{account['id']}", help="View account transactions"):
+                            st.session_state.selected_account_id = account['id']
+                            st.session_state.selected_account_name = account['name']
+                            st.rerun()
+                    
+                    with account_col4:
+                        if st.button("🗑️", key=f"delete_tracked_{account['id']}", help="Delete account"):
+                            if delete_account(account['id']):
+                                st.success(f"Deleted {account['name']}")
                                 st.rerun()
-                        
-                        with account_col4:
-                            if st.button("🗑️", key=f"delete_tracked_{account['id']}", help="Delete account"):
-                                if delete_account(account['id']):
-                                    st.success(f"Deleted {account['name']}")
-                                    st.rerun()
-                                else:
-                                    st.error("Cannot delete account with transactions")
-                        
-                        st.markdown("---")
+                            else:
+                                st.error("Cannot delete account with transactions")
+                    
+                    # Add minimal spacing between accounts
+                    if i < len(tracked_accounts) - 1:
+                        st.write("")  # Single line break instead of markdown separator
             else:
                 st.info("No tracked accounts yet. Add one above!")
         
         with col2:
             st.markdown("#### 🔵 Untracked Accounts (Off-Budget)")
             if untracked_accounts:
-                for account in untracked_accounts:
-                    with st.container():
-                        account_col1, account_col2, account_col3, account_col4 = st.columns([3, 2, 1, 1])
-                        
-                        with account_col1:
-                            st.write(f"**{account['name']}** ({account['account_type']})")
-                        
-                        with account_col2:
-                            st.write(format_sats(account['balance']))
-                        
-                        with account_col3:
-                            if st.button("📊", key=f"view_untracked_{account['id']}", help="View account transactions"):
-                                st.session_state.selected_account_id = account['id']
-                                st.session_state.selected_account_name = account['name']
+                # Display accounts in a clean format
+                for i, account in enumerate(untracked_accounts):
+                    account_col1, account_col2, account_col3, account_col4 = st.columns([3, 2, 1, 1])
+                    
+                    with account_col1:
+                        st.write(f"**{account['name']}** ({account['account_type']})")
+                    
+                    with account_col2:
+                        st.write(format_sats(account['balance']))
+                    
+                    with account_col3:
+                        if st.button("📊", key=f"view_untracked_{account['id']}", help="View account transactions"):
+                            st.session_state.selected_account_id = account['id']
+                            st.session_state.selected_account_name = account['name']
+                            st.rerun()
+                    
+                    with account_col4:
+                        if st.button("🗑️", key=f"delete_untracked_{account['id']}", help="Delete account"):
+                            if delete_account(account['id']):
+                                st.success(f"Deleted {account['name']}")
                                 st.rerun()
-                        
-                        with account_col4:
-                            if st.button("🗑️", key=f"delete_untracked_{account['id']}", help="Delete account"):
-                                if delete_account(account['id']):
-                                    st.success(f"Deleted {account['name']}")
-                                    st.rerun()
-                                else:
-                                    st.error("Cannot delete account with transactions")
-                        
-                        st.markdown("---")
+                            else:
+                                st.error("Cannot delete account with transactions")
+                    
+                    # Add minimal spacing between accounts
+                    if i < len(untracked_accounts) - 1:
+                        st.write("")  # Single line break instead of markdown separator
             else:
                 st.info("No untracked accounts yet. Add one above!")
         
