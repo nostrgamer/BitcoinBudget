@@ -1533,6 +1533,121 @@ def main_page():
             delta=f"Total: {format_sats(total_balance)}",
             help="Balance in tracked accounts (affects budget)"
         )
+    
+    # === BUDGET HEALTH SUMMARY ===
+    st.markdown("### 📊 Budget Health")
+    
+    # Calculate budget health metrics
+    allocated_percentage = (total_category_balances / tracked_balance * 100) if tracked_balance > 0 else 0
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Budget allocation progress
+        st.markdown("**Budget Allocation Progress**")
+        progress_value = min(allocated_percentage / 100, 1.0)
+        st.progress(progress_value)
+        
+        # Color-coded status
+        if allocated_percentage > 100:
+            st.error(f"🔴 Over-allocated: {allocated_percentage:.1f}% ({format_sats(total_category_balances - tracked_balance)} over)")
+        elif allocated_percentage >= 95:
+            st.success(f"🟢 Fully allocated: {allocated_percentage:.1f}%")
+        elif allocated_percentage >= 80:
+            st.info(f"🔵 Well allocated: {allocated_percentage:.1f}%")
+        else:
+            st.warning(f"🟡 Under-allocated: {allocated_percentage:.1f}%")
+    
+    with col2:
+        # Available funds status with quick actions
+        st.markdown("**Available Funds**")
+        if available_to_assign > 0:
+            st.success(f"💰 **{format_sats(available_to_assign)}** ready to allocate")
+            
+            # Quick allocation buttons
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.button("🚀 To Bitcoin Stack", help="Allocate all remaining funds to Bitcoin Stack"):
+                    # Find Bitcoin Stack category
+                    bitcoin_category = None
+                    for cat in get_categories():
+                        if 'bitcoin' in cat['name'].lower() or 'stack' in cat['name'].lower():
+                            bitcoin_category = cat
+                            break
+                    
+                    if bitcoin_category:
+                        current_allocation = get_category_allocated(bitcoin_category['id'], current_month)
+                        new_allocation = current_allocation + available_to_assign
+                        if allocate_to_category(bitcoin_category['id'], current_month, new_allocation):
+                            st.success(f"✅ Allocated {format_sats(available_to_assign)} to {bitcoin_category['name']}")
+                            st.rerun()
+                    else:
+                        st.error("❌ No Bitcoin/Stack category found")
+            
+            with col_b:
+                if st.button("⚖️ Distribute Evenly", help="Distribute remaining funds evenly across all categories"):
+                    categories = get_categories()
+                    if categories:
+                        amount_per_category = available_to_assign // len(categories)
+                        if amount_per_category > 0:
+                            for cat in categories:
+                                current_allocation = get_category_allocated(cat['id'], current_month)
+                                new_allocation = current_allocation + amount_per_category
+                                allocate_to_category(cat['id'], current_month, new_allocation)
+                            st.success(f"✅ Distributed {format_sats(amount_per_category)} to each category")
+                            st.rerun()
+                        else:
+                            st.warning("❌ Amount too small to distribute")
+                    else:
+                        st.error("❌ No categories found")
+                        
+        elif available_to_assign == 0:
+            st.info("✅ **Perfect balance** - all funds allocated")
+        else:
+            st.error(f"⚠️ **{format_sats(abs(available_to_assign))}** over-allocated")
+            
+            # Quick fix buttons for over-allocation
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.button("🔧 Auto-Fix", help="Automatically reduce allocations to balance budget"):
+                    # Find categories with allocations and reduce proportionally
+                    categories = get_categories()
+                    categories_with_allocations = []
+                    total_allocated = 0
+                    
+                    for cat in categories:
+                        allocation = get_category_allocated(cat['id'], current_month)
+                        if allocation > 0:
+                            categories_with_allocations.append((cat, allocation))
+                            total_allocated += allocation
+                    
+                    if categories_with_allocations and total_allocated > 0:
+                        reduction_needed = abs(available_to_assign)
+                        
+                        for cat, allocation in categories_with_allocations:
+                            # Reduce proportionally
+                            reduction = int((allocation / total_allocated) * reduction_needed)
+                            new_allocation = max(0, allocation - reduction)
+                            allocate_to_category(cat['id'], current_month, new_allocation)
+                        
+                        st.success(f"✅ Reduced allocations by {format_sats(reduction_needed)}")
+                        st.rerun()
+                    else:
+                        st.error("❌ No allocations to reduce")
+            
+            with col_b:
+                if st.button("📥 Clear All", help="Remove all allocations for this month"):
+                    categories = get_categories()
+                    cleared_count = 0
+                    for cat in categories:
+                        if allocate_to_category(cat['id'], current_month, 0):
+                            cleared_count += 1
+                    
+                    if cleared_count > 0:
+                        st.success(f"✅ Cleared allocations for {cleared_count} categories")
+                        st.rerun()
+                    else:
+                        st.error("❌ No allocations to clear")
 
     st.markdown("---")
 
@@ -1644,7 +1759,9 @@ def main_page():
             grand_spent = 0
             grand_balance = 0
             
-            # Group categories by master category with collapsible functionality
+            # Build hierarchy with explicit sort priority
+            sort_priority = 0
+            
             for master_name in master_names:
                 # Find categories for this master category
                 if master_name == 'Uncategorized':
@@ -1652,6 +1769,10 @@ def main_page():
                 else:
                     master_id = next((mc['id'] for mc in master_categories_sorted if mc['name'] == master_name), None)
                     categories_in_group = [cat for cat in all_categories if cat['master_category_id'] == master_id]
+                
+                # Skip if no categories in this group
+                if not categories_in_group:
+                    continue
                 
                 # Sort categories within this group alphabetically
                 categories_in_group.sort(key=lambda x: x['name'])
@@ -1661,7 +1782,6 @@ def main_page():
                 master_spent = 0
                 master_balance = 0
                 
-                # Calculate totals first
                 for cat in categories_in_group:
                     current_balance = get_category_balance(cat['id'], current_month)
                     spent = get_category_spent(cat['id'], current_month)
@@ -1673,95 +1793,150 @@ def main_page():
                 is_collapsed = master_name in st.session_state.collapsed_master_categories
                 collapse_icon = "📁" if is_collapsed else "📂"
                 
-                # Add master category header row with click functionality
+                # Add master category header with explicit sort priority
                 master_month_allocation = sum(get_category_allocated(cat['id'], current_month) for cat in categories_in_group)
+                
+                # Better master category display with visual hierarchy
+                category_count_text = f"({len(categories_in_group)} {'category' if len(categories_in_group) == 1 else 'categories'})"
+                master_display = f"{collapse_icon} {master_name} {category_count_text}"
+                
+                # Better status indicators for master categories
+                if master_balance >= 0:
+                    master_status = "🟢 Good" if master_balance > 0 else "⚪ Zero"
+                else:
+                    master_status = "🔴 Over"
                 
                 table_data.append({
                     'ID': f"master_{master_name}",
                     'Type': 'master',
-                    'Category': f"{collapse_icon} {master_name} ({len(categories_in_group)} categories)",
+                    'Category': master_display,
                     'Master_Category_Assignment': master_name,
                     'Current_Balance': master_allocated,
                     'This_Month_Allocation': master_month_allocation,
                     'Spent': master_spent,
-                    'Status': '📊 Total' if master_balance >= 0 else '⚠️ Over'
+                    'Status': master_status,
+                    'sort_priority': sort_priority
                 })
+                sort_priority += 1
                 
-                # Only show individual categories if not collapsed
+                # Add individual categories immediately after master (if not collapsed)
                 if not is_collapsed:
-                    # Add individual categories under this master category
-                    for cat in categories_in_group:
-                        # In account-based budgeting, we care about current balance, not monthly allocations
+                    for idx, cat in enumerate(categories_in_group):
                         current_balance = get_category_balance(cat['id'], current_month)
                         current_month_allocation = get_category_allocated(cat['id'], current_month)
                         spent = get_category_spent(cat['id'], current_month)
-                        
-                        # Get master category options for reassignment
-                        master_options_for_cat = ['Uncategorized'] + [mc['name'] for mc in master_categories]
                         current_master = cat['master_category_name'] or 'Uncategorized'
+                        
+                        # Create tree-style visual hierarchy
+                        is_last_in_group = (idx == len(categories_in_group) - 1)
+                        tree_symbol = "└─" if is_last_in_group else "├─"
+                        category_display = f"  {tree_symbol} {cat['name']}"
+                        
+                        # Better status indicators for individual categories
+                        if current_balance > 0:
+                            category_status = "🟢 Good"
+                        elif current_balance == 0:
+                            category_status = "⚪ Empty"
+                        else:
+                            category_status = "🔴 Overspent"
                         
                         table_data.append({
                             'ID': cat['id'],
                             'Type': 'category',
-                            'Category': f"    {cat['name']}", # Indent to show hierarchy
+                            'Category': category_display,
                             'Master_Category_Assignment': current_master,
                             'Current_Balance': current_balance,
-                            'This_Month_Allocation': current_month_allocation,  # Show current month's allocation
+                            'This_Month_Allocation': current_month_allocation,
                             'Spent': spent,
-                            'Status': '✅ Good' if current_balance >= 0 else '⚠️ Overspent'
+                            'Status': category_status,
+                            'sort_priority': sort_priority
                         })
+                        sort_priority += 1
                 
                 # Add to grand totals
                 grand_allocated += master_allocated
                 grand_spent += master_spent
                 grand_balance += master_balance
             
-            # Add grand total row
+            # Add grand total row at the END (bottom of hierarchy)
             grand_month_allocation = get_total_allocated(current_month)
+            
+            # Better grand total display and status
+            grand_total_display = "📊 GRAND TOTAL"
+            if grand_balance >= 0:
+                grand_total_status = "🟢 Balanced" if grand_balance > 0 else "⚪ Zero"
+            else:
+                grand_total_status = "🔴 Overspent"
+            
             table_data.append({
                 'ID': 'grand_total',
                 'Type': 'grand_total',
-                'Category': '📊 GRAND TOTAL',
+                'Category': grand_total_display,
                 'Master_Category_Assignment': 'Grand Total',
                 'Current_Balance': grand_allocated,
                 'This_Month_Allocation': grand_month_allocation,
                 'Spent': grand_spent,
-                'Status': '🎯 Total' if grand_balance >= 0 else '⚠️ Over'
+                'Status': grand_total_status,
+                'sort_priority': sort_priority  # Grand total gets highest priority (last)
             })
             
-            # Create DataFrame with consistent data types
+            # Create DataFrame and sort by explicit sort_priority
             df = pd.DataFrame(table_data)
+            
+            # Sort by sort_priority to maintain hierarchy (this should match our build order)
+            df = df.sort_values('sort_priority').reset_index(drop=True)
             
             # Ensure all numeric columns are properly typed as integers
             numeric_columns = ['Current_Balance', 'This_Month_Allocation', 'Spent']
             for col in numeric_columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype('int64')
             
-            # Display editable table (hierarchy maintained by avoiding column sorting)
+            # Add hierarchical sorting keys to make interactive sorting work correctly
+            df['master_group'] = ''
+            df['sort_within_group'] = 0
+            
+            # Assign master group names and within-group sorting
+            for idx, row in df.iterrows():
+                if row['Type'] == 'master':
+                    # Master categories get their own name as group and sort position 0
+                    master_name = row['Master_Category_Assignment']
+                    df.at[idx, 'master_group'] = master_name
+                    df.at[idx, 'sort_within_group'] = 0
+                elif row['Type'] == 'category':
+                    # Individual categories get their master's name as group and sort position 1
+                    master_name = row['Master_Category_Assignment']
+                    df.at[idx, 'master_group'] = master_name
+                    df.at[idx, 'sort_within_group'] = 1
+                elif row['Type'] == 'grand_total':
+                    # Grand total gets its own group at the end
+                    df.at[idx, 'master_group'] = 'ZZZ_GRAND_TOTAL'  # Ensures it sorts last
+                    df.at[idx, 'sort_within_group'] = 0
+            
+            # Display editable table with hierarchy-preserving sort
+            display_df = df[['Category', 'Master_Category_Assignment', 'Current_Balance', 'This_Month_Allocation', 'Spent', 'Status', 'master_group', 'sort_within_group']].copy()
+            
+            # Remove debug output and use data_editor with proper column config
             refresh_count = st.session_state.get('data_editor_refresh_count', 0)
             edited_df = st.data_editor(
-                df,
+                display_df,
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "ID": None,  # Hide ID column
-                    "Type": None,  # Hide type column
+                    "master_group": None,  # Hide grouping column
+                    "sort_within_group": None,  # Hide sorting column
                     "Category": st.column_config.TextColumn(
                         "Category", 
-                        help="Category name and type - hierarchy maintained",
-                        width="large",
-                        disabled=True
+                        help="Category hierarchy - sorting preserves master-child relationships",
+                        width="large"
                     ),
                     "Master_Category_Assignment": st.column_config.TextColumn(
                         "Master Category",
                         help="Master category assignment",
-                        width="medium",
-                        disabled=True
+                        width="medium"
                     ),
                     "Current_Balance": st.column_config.NumberColumn(
                         "Current Balance (sats)",
                         help="Current money in this category envelope",
-                        disabled=True,
                         format="%d"
                     ),
                     "This_Month_Allocation": st.column_config.NumberColumn(
@@ -1773,24 +1948,32 @@ def main_page():
                     ),
                     "Spent": st.column_config.NumberColumn(
                         "Spent This Month (sats)", 
-                        disabled=True,
                         format="%d"
                     ),
-                    "Status": st.column_config.TextColumn("Status", disabled=True)
+                    "Status": st.column_config.TextColumn("Status")
                 },
-                key=f"unified_categories_{refresh_count}",
-                disabled=["Type", "Category", "Master_Category_Assignment", "Current_Balance", "Spent", "Status"]
+                key=f"unified_categories_{refresh_count}"
             )
             
             # Process allocation changes only (simplified)
-            if not edited_df.equals(df):
+            if not edited_df.equals(display_df):
                 changes_made = False
                 
                 # Check allocation changes for individual categories
+                # We need to match edited rows back to original df by finding the same category
                 for idx, row in edited_df.iterrows():
-                    if row['Type'] == 'category':  # Only process individual categories
-                        category_id = row['ID']
-                        original_allocation = df.iloc[idx]['This_Month_Allocation']
+                    # Find matching row in original df by Category name and Master Category
+                    matching_original = None
+                    for orig_idx, orig_row in df.iterrows():
+                        if (orig_row['Category'] == row['Category'] and 
+                            orig_row['Master_Category_Assignment'] == row['Master_Category_Assignment'] and
+                            orig_row['Type'] == 'category'):
+                            matching_original = orig_row
+                            break
+                    
+                    if matching_original is not None:
+                        category_id = matching_original['ID']
+                        original_allocation = matching_original['This_Month_Allocation']
                         new_allocation = row['This_Month_Allocation']
                         
                         if original_allocation != new_allocation:

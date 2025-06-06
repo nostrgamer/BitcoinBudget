@@ -72,9 +72,12 @@ The application will open at `http://localhost:8501`
 ### 🏦 **Core Envelope Budgeting**
 - ✅ **Account Management**: Tracked accounts (on-budget) and untracked accounts (savings/long-term)
 - ✅ **Smart Income Entry**: Add Bitcoin income with flexible sats/BTC input and account selection
-- ✅ **Category Management**: Create master categories (Fixed, Variable, Savings) and subcategories
+- ✅ **Category Management**: Create master categories (Fixed, Variable, Savings) and subcategories with visual hierarchy
+- ✅ **Professional Category Display**: Tree-style visual hierarchy with 📂 master categories and ├─ subcategories
 - ✅ **Intelligent Allocation**: Allocate income with availability checking and rollover
-- ✅ **Real-time Balances**: Live category balances with overspending alerts and account tracking
+- ✅ **Budget Health Dashboard**: Visual progress bars, color-coded status, and allocation percentage tracking
+- ✅ **Quick Action Buttons**: Context-aware automation (Auto-Fix over-allocation, Distribute Evenly, To Bitcoin Stack)
+- ✅ **Real-time Balances**: Live category balances with 🟢🔴⚪ status indicators and account tracking
 - ✅ **Month Navigation**: Navigate between months with preserved data
 - ✅ **Transaction Management**: Edit, delete, and categorize all transactions with account tracking
 - ✅ **Account Transfers**: Move funds between different Bitcoin accounts
@@ -84,6 +87,15 @@ The application will open at `http://localhost:8501`
 - ✅ **Flexible Input**: Support "1000000", "1,000,000", or "0.01 BTC" formats
 - ✅ **Clear Display**: Shows as "1,000,000 sats" with comma formatting
 - ✅ **Bitcoin Power Law**: Built-in fair value calculations for projections
+
+### 🎨 **Modern UI/UX Features**
+- ✅ **Visual Category Hierarchy**: Professional tree-style display with 📂 master categories and ├─ └─ subcategories
+- ✅ **Interactive Sorting**: Maintains parent-child relationships even when sorting by different columns
+- ✅ **Budget Health Summary**: Progress bars showing allocation percentage with color-coded status
+- ✅ **Smart Status Indicators**: 🟢 Good, ⚪ Empty/Zero, 🔴 Overspent visual feedback
+- ✅ **Context-Aware Actions**: Quick buttons that adapt based on budget situation
+- ✅ **One-Click Automation**: Auto-fix over-allocation, distribute evenly, allocate to Bitcoin stack
+- ✅ **Professional Design**: Clean layout with proper spacing and visual hierarchy
 
 ### 📊 **Advanced Analytics & Reports**
 
