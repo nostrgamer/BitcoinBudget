@@ -1748,9 +1748,9 @@ def main_page():
                     "Type": None,  # Hide type column
                     "Category": st.column_config.TextColumn(
                         "Category", 
-                        help="Click folder icons (📂/📁) to expand/collapse master categories",
+                        help="Category name and type",
                         width="large",
-                        disabled=False  # Enable to detect clicks on master categories
+                        disabled=True  # Disabled for viewing only
                     ),
                     "Master_Category_Assignment": st.column_config.SelectboxColumn(
                         "Master Category",
@@ -1779,29 +1779,12 @@ def main_page():
                     "Status": st.column_config.TextColumn("Status", disabled=True)
                 },
                 key=f"unified_categories_{refresh_count}",
-                disabled=["Type", "Master_Category_Assignment", "Current_Balance", "Spent", "Status"]
+                disabled=["Type", "Category", "Master_Category_Assignment", "Current_Balance", "Spent", "Status"]
             )
             
-            # Process changes (master category toggles and allocations)
+            # Process allocation changes only (simplified)
             if not edited_df.equals(df):
                 changes_made = False
-                
-                # Check for clicks on master categories first
-                for idx, row in edited_df.iterrows():
-                    original_row = df.iloc[idx]
-                    
-                    if row['Type'] == 'master':
-                        # Check if the category field was "edited" (user clicked on it)
-                        category_changed = row['Category'] != original_row['Category']
-                        if category_changed:
-                            # User clicked on master category - toggle collapse state
-                            master_name = row['Master_Category_Assignment']
-                            if master_name in st.session_state.collapsed_master_categories:
-                                st.session_state.collapsed_master_categories.remove(master_name)
-                            else:
-                                st.session_state.collapsed_master_categories.add(master_name)
-                            st.rerun()
-                            return  # Exit early to prevent other processing
                 
                 # Check allocation changes for individual categories
                 for idx, row in edited_df.iterrows():
@@ -1829,14 +1812,8 @@ def main_page():
                     st.session_state.data_editor_refresh_count += 1
                     st.rerun()
             
-            # Interactive help
-            collapsed_count = len(st.session_state.collapsed_master_categories)
-            expanded_count = len(master_names) - collapsed_count
-            
-            if collapsed_count > 0:
-                st.info(f"💡 **{collapsed_count} master categories collapsed, {expanded_count} expanded.** Click master category names in the table to expand/collapse them, or use controls above.")
-            else:
-                st.info("💡 **All master categories expanded.** Click master category names (with 📂 icons) in the table to collapse them, or use controls above.")
+            # Simple help
+            st.info("💡 Use the **Category Controls** panel above to expand/collapse master categories and sort your budget.")
             
             # Delete functionality section
             st.markdown("---")
