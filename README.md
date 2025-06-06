@@ -173,10 +173,10 @@ def analyze_lifecycle_cost(amount_sats, years_ahead):
 
 ## Privacy & Data Protection
 
-### 🔒 **Your Data is Safe**
+### 🔒 **Your Data is Safe (But Temporary)**
 - **Session Isolation**: Each browser session has completely separate data
 - **No User Accounts**: No registration, login, or personal information required
-- **No Data Persistence**: Your data doesn't survive browser sessions (by design)
+- **⚠️ No Auto-Save**: Your data doesn't survive browser sessions - EXPORT TO SAVE
 - **No Analytics Tracking**: We don't track your usage or financial information
 - **No Server Storage**: Your budget data never touches our servers
 
@@ -256,11 +256,12 @@ README.md                # This documentation
 - **Simple Architecture**: Eliminates database complexity and security concerns
 - **Demo Friendly**: Perfect for trying the app without commitment
 
-### ⚠️ **Considerations**
-- **Session Only**: Data lost when browser/tab closes (by design for privacy)
-- **Demo Purpose**: Best for exploring features and short-term budgeting
-- **No Backup**: Users responsible for any data they want to preserve
-- **Fresh Start**: Each visit starts clean (good for privacy, neutral for persistence)
+### ⚠️ **Important: Data Storage**
+- **⚠️ SESSION ONLY**: Your data will be LOST when you close the browser tab
+- **💾 MANUAL SAVE REQUIRED**: Data is NOT automatically saved - you must export manually
+- **📥 Export Before Closing**: Always export your budget before closing the browser
+- **📤 Import to Restore**: Upload your exported JSON file to restore your budget
+- **🔒 Privacy Benefit**: No server storage means maximum privacy and security
 
 ## Technical Details
 
@@ -296,6 +297,30 @@ def calculate_future_purchasing_power(sats, years, inflation=0.08):
     
     return future_value / current_value  # Purchasing power multiplier
 ```
+
+## Data Management
+
+### 📁 **JSON Export/Import**
+The app includes simple file-based data management for users who want to backup or move their budget data:
+
+- **📥 Export**: Download your complete budget as a timestamped JSON file
+- **📤 Import**: Upload a previously exported JSON file to restore your data
+- **🔄 Reset**: Clear all data and start fresh with demo data
+- **🔒 Privacy**: All operations happen locally in your browser
+
+### 💾 **How to Use Data Management**
+1. **⚠️ IMPORTANT**: Your data exists ONLY while your browser tab is open
+2. **💾 Export to Save**: Click "💾 Download Budget" in the sidebar before closing browser
+3. **📤 Import to Restore**: Use "📥 Import Budget" to upload your saved JSON file
+4. **🔄 Cross-Device**: Export from one device, import on another to continue your budget
+5. **📅 Regular Backups**: Export your budget regularly to avoid losing work
+
+### 🛡️ **Data Ownership**
+Following Bitcoin's self-custody principles:
+- **You Own Your Data**: Complete control over your financial information
+- **No Server Storage**: Your data never leaves your device
+- **File-Based Backup**: Simple, transparent backup using standard JSON format
+- **Privacy by Design**: No accounts, no tracking, no data sharing
 
 ## Contributing
 

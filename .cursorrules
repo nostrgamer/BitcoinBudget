@@ -269,4 +269,42 @@ def main_page():
         accounts_page()
 ```
 
-Remember: **Simple is better than complex. Account-based is better than transaction-only. Privacy-first is better than shared data. Motivational is better than purely functional.** 
+Remember: **Simple is better than complex. Account-based is better than transaction-only. Privacy-first is better than shared data. Motivational is better than purely functional.**
+
+## Data Management
+
+### 📁 **JSON Export/Import** ✅ **IMPLEMENTED**
+The app includes simple file-based data management that maintains Bitcoin's self-custody principles:
+
+**Current Features**:
+- ✅ **Export Budget**: Download complete budget data as timestamped JSON file
+- ✅ **Import Budget**: Upload previously exported JSON file to restore data
+- ✅ **Reset to Demo**: Clear all data and start fresh with sample data
+- ✅ **Data Validation**: Import validation with error handling
+- ✅ **Privacy-First**: All operations happen locally in browser
+
+**File Operations Guidelines**:
+- **Streamlit file widgets**: Use st.file_uploader and st.download_button
+- **User feedback**: Clear success/error messages for import/export  
+- **Data validation**: Validate imports before applying to prevent corruption
+- **Privacy maintained**: No server-side storage, user controls all data
+
+**Technical Implementation**:
+```python
+def export_budget_data():
+    """Export complete budget data as JSON"""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"bitcoin_budget_{timestamp}.json"
+    return json.dumps(st.session_state.user_data, indent=2)
+
+def import_budget_data(json_data):
+    """Import and validate budget data from JSON"""
+    # Validate data structure and restore to session state
+```
+
+### 🎯 **Development Philosophy**
+- **Keep It Simple**: Focus on core budgeting functionality
+- **User Ownership**: Users control their own data files
+- **Privacy by Design**: No server storage, no tracking, no accounts
+- **Self-Custody**: Following Bitcoin ethos of personal responsibility
+- **Cross-Device**: Export/import enables device portability without complexity 
