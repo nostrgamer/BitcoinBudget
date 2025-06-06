@@ -1679,7 +1679,7 @@ def main_page():
                 table_data.append({
                     'ID': f"master_{master_name}",
                     'Type': 'master',
-                    'Category': f"{collapse_icon} **{master_name}** ({len(categories_in_group)} categories)",
+                    'Category': f"{collapse_icon} {master_name} ({len(categories_in_group)} categories)",
                     'Master_Category_Assignment': master_name,
                     'Current_Balance': master_allocated,
                     'This_Month_Allocation': master_month_allocation,
@@ -1737,7 +1737,7 @@ def main_page():
             for col in numeric_columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype('int64')
             
-            # Display editable table
+            # Display editable table (hierarchy maintained by avoiding column sorting)
             refresh_count = st.session_state.get('data_editor_refresh_count', 0)
             edited_df = st.data_editor(
                 df,
@@ -1748,15 +1748,15 @@ def main_page():
                     "Type": None,  # Hide type column
                     "Category": st.column_config.TextColumn(
                         "Category", 
-                        help="Category name and type",
+                        help="Category name and type - hierarchy maintained",
                         width="large",
-                        disabled=True  # Disabled for viewing only
+                        disabled=True
                     ),
-                    "Master_Category_Assignment": st.column_config.SelectboxColumn(
+                    "Master_Category_Assignment": st.column_config.TextColumn(
                         "Master Category",
-                        help="Click dropdown to reassign category to different master category",
-                        options=['Uncategorized'] + [mc['name'] for mc in master_categories],
-                        disabled=True  # Disable for now to focus on allocations
+                        help="Master category assignment",
+                        width="medium",
+                        disabled=True
                     ),
                     "Current_Balance": st.column_config.NumberColumn(
                         "Current Balance (sats)",
@@ -1813,7 +1813,7 @@ def main_page():
                     st.rerun()
             
             # Simple help
-            st.info("💡 Use the **Category Controls** panel above to expand/collapse master categories and sort your budget.")
+            st.info("💡 Use the **Category Controls** panel above to expand/collapse master categories and sort your budget. Note: Clicking column headers will break the hierarchy view - use the controls above instead.")
             
             # Delete functionality section
             st.markdown("---")
