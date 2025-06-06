@@ -389,7 +389,7 @@ def delete_transaction(transaction_id):
         st.error(f"Error deleting transaction: {e}")
         return False
 
-def update_transaction(transaction_id, date, description, amount, category_id=None):
+def update_transaction(transaction_id, date, description, amount, category_id=None, account_id=None):
     """Update a transaction"""
     try:
         for transaction in st.session_state.user_data['transactions']:
@@ -399,6 +399,8 @@ def update_transaction(transaction_id, date, description, amount, category_id=No
                 transaction['amount'] = amount
                 if category_id is not None:
                     transaction['category_id'] = category_id
+                if account_id is not None:
+                    transaction['account_id'] = account_id
                 return True
         return False
     except Exception as e:
@@ -558,6 +560,36 @@ def get_recent_transactions(limit=20):
         key=lambda x: x['date'], 
         reverse=True
     )[:limit]
+    
+    for transaction in sorted_transactions:
+        category_name = None
+        if transaction['category_id']:
+            for cat in st.session_state.user_data['categories']:
+                if cat['id'] == transaction['category_id']:
+                    category_name = cat['name']
+                    break
+        
+        transactions.append((
+            transaction['id'],
+            transaction['date'],
+            transaction['description'],
+            transaction['amount'],
+            transaction['type'],
+            category_name
+        ))
+    
+    return transactions
+
+def get_all_transactions():
+    """Get ALL transactions with IDs (no limit)"""
+    transactions = []
+    
+    # Sort transactions by date (most recent first)
+    sorted_transactions = sorted(
+        st.session_state.user_data['transactions'], 
+        key=lambda x: x['date'], 
+        reverse=True
+    )
     
     for transaction in sorted_transactions:
         category_name = None
@@ -1923,7 +1955,7 @@ def main_page():
             if tracked_accounts:
                 for account in tracked_accounts:
                     with st.container():
-                        account_col1, account_col2, account_col3 = st.columns([3, 2, 1])
+                        account_col1, account_col2, account_col3, account_col4 = st.columns([3, 2, 1, 1])
                         
                         with account_col1:
                             st.write(f"**{account['name']}** ({account['account_type']})")
@@ -1932,6 +1964,12 @@ def main_page():
                             st.write(format_sats(account['balance']))
                         
                         with account_col3:
+                            if st.button("📊", key=f"view_tracked_{account['id']}", help="View account transactions"):
+                                st.session_state.selected_account_id = account['id']
+                                st.session_state.selected_account_name = account['name']
+                                st.rerun()
+                        
+                        with account_col4:
                             if st.button("🗑️", key=f"delete_tracked_{account['id']}", help="Delete account"):
                                 if delete_account(account['id']):
                                     st.success(f"Deleted {account['name']}")
@@ -1948,7 +1986,7 @@ def main_page():
             if untracked_accounts:
                 for account in untracked_accounts:
                     with st.container():
-                        account_col1, account_col2, account_col3 = st.columns([3, 2, 1])
+                        account_col1, account_col2, account_col3, account_col4 = st.columns([3, 2, 1, 1])
                         
                         with account_col1:
                             st.write(f"**{account['name']}** ({account['account_type']})")
@@ -1957,6 +1995,12 @@ def main_page():
                             st.write(format_sats(account['balance']))
                         
                         with account_col3:
+                            if st.button("📊", key=f"view_untracked_{account['id']}", help="View account transactions"):
+                                st.session_state.selected_account_id = account['id']
+                                st.session_state.selected_account_name = account['name']
+                                st.rerun()
+                        
+                        with account_col4:
                             if st.button("🗑️", key=f"delete_untracked_{account['id']}", help="Delete account"):
                                 if delete_account(account['id']):
                                     st.success(f"Deleted {account['name']}")
@@ -2013,6 +2057,60 @@ def main_page():
                         st.error("❌ Please select different accounts and enter amount")
         else:
             st.info("Add at least 2 accounts to enable transfers")
+        
+        # Account Transaction View
+        if hasattr(st.session_state, 'selected_account_id') and st.session_state.selected_account_id:
+            st.markdown("---")
+            st.markdown(f"### 📊 Transactions for {st.session_state.selected_account_name}")
+            
+            # Get all transactions for this account
+            account_transactions = []
+            for trans in st.session_state.user_data['transactions']:
+                if trans.get('account_id') == st.session_state.selected_account_id:
+                    category_name = None
+                    if trans['category_id']:
+                        for cat in st.session_state.user_data['categories']:
+                            if cat['id'] == trans['category_id']:
+                                category_name = cat['name']
+                                break
+                    
+                    account_transactions.append({
+                        'Date': trans['date'],
+                        'Description': trans['description'],
+                        'Amount': f"+{format_sats(trans['amount'])}" if trans['type'] == 'income' else f"-{format_sats(trans['amount'])}",
+                        'Category': category_name if trans['type'] == 'expense' else 'Income',
+                        'Type': trans['type'].title()
+                    })
+            
+            if account_transactions:
+                # Sort by date (newest first)
+                account_transactions.sort(key=lambda x: x['Date'], reverse=True)
+                
+                df_account = pd.DataFrame(account_transactions)
+                st.dataframe(df_account, use_container_width=True, hide_index=True)
+                
+                # Account transaction summary
+                income_total = sum(trans['amount'] for trans in st.session_state.user_data['transactions'] 
+                                 if trans.get('account_id') == st.session_state.selected_account_id and trans['type'] == 'income')
+                expense_total = sum(trans['amount'] for trans in st.session_state.user_data['transactions'] 
+                                  if trans.get('account_id') == st.session_state.selected_account_id and trans['type'] == 'expense')
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Income", format_sats(income_total))
+                with col2:
+                    st.metric("Total Expenses", format_sats(expense_total))
+                with col3:
+                    st.metric("Net Activity", format_sats(income_total - expense_total))
+            else:
+                st.info(f"No transactions found for {st.session_state.selected_account_name}")
+            
+            if st.button("← Back to Accounts", key="back_to_accounts"):
+                if hasattr(st.session_state, 'selected_account_id'):
+                    delattr(st.session_state, 'selected_account_id')
+                if hasattr(st.session_state, 'selected_account_name'):
+                    delattr(st.session_state, 'selected_account_name')
+                st.rerun()
 
     # === TAB 3: TRANSACTIONS (Combined transaction entry + recent transactions) ===
     with tab3:
@@ -2166,10 +2264,10 @@ def main_page():
         # Add separator between transaction entry and recent transactions
         st.markdown("---")
         
-        # Recent transactions section (moved below transaction entry)
-        st.markdown("### 📋 Recent Transactions")
+        # All transactions section (moved below transaction entry)
+        st.markdown("### 📋 All Transactions")
         
-        transactions = get_recent_transactions(50)  # Get more transactions for editing
+        transactions = get_all_transactions()  # Get ALL transactions for editing
         
         if transactions:
             # Get all categories for dropdown options
@@ -2178,6 +2276,8 @@ def main_page():
             
             # Convert to dataframe with proper data types for editing
             trans_data = []
+            all_accounts = get_accounts()
+            
             for trans in transactions:
                 trans_id, date_str, desc, amount, trans_type, category = trans
                 
@@ -2187,12 +2287,21 @@ def main_page():
                 else:
                     category_display = category or "Unknown"
                 
+                # Find account name for this transaction
+                account_name = "No Account"
+                transaction_data = next((t for t in st.session_state.user_data['transactions'] if t['id'] == trans_id), None)
+                if transaction_data and transaction_data.get('account_id'):
+                    account = next((acc for acc in all_accounts if acc['id'] == transaction_data['account_id']), None)
+                    if account:
+                        account_name = account['name']
+                
                 trans_data.append({
                     'ID': trans_id,
                     'Date': datetime.strptime(date_str, '%Y-%m-%d').date(),
                     'Description': desc,
                     'Amount': amount,  # Store as raw number for editing
                     'Category': category_display,
+                    'Account': account_name,
                     'Type': trans_type,  # Keep track of original type
                     'Original_Category_ID': trans[0] if trans_type == 'expense' else None  # For reference
                 })
@@ -2200,6 +2309,8 @@ def main_page():
             df = pd.DataFrame(trans_data)
             
             # Display editable transactions table
+            account_options = ['No Account'] + [acc['name'] for acc in all_accounts]
+            
             edited_df = st.data_editor(
                 df,
                 use_container_width=True,
@@ -2229,6 +2340,11 @@ def main_page():
                         "Category",
                         help="Click to change transaction category",
                         options=category_options
+                    ),
+                    "Account": st.column_config.SelectboxColumn(
+                        "Account",
+                        help="Click to change transaction account",
+                        options=account_options
                     )
                 },
                 key="transactions_editor"
@@ -2246,17 +2362,27 @@ def main_page():
                     desc_changed = row['Description'] != original_row['Description']
                     amount_changed = row['Amount'] != original_row['Amount']
                     category_changed = row['Category'] != original_row['Category']
+                    account_changed = row['Account'] != original_row['Account']
                     
-                    if date_changed or desc_changed or amount_changed or category_changed:
+                    if date_changed or desc_changed or amount_changed or category_changed or account_changed:
                         # Determine if this is income or expense based on category
                         new_category = row['Category']
                         new_date = str(row['Date'])
                         new_description = row['Description']
                         new_amount = int(row['Amount'])
+                        new_account = row['Account']
+                        
+                        # Find account ID
+                        account_id = None
+                        if new_account != 'No Account':
+                            for acc in all_accounts:
+                                if acc['name'] == new_account:
+                                    account_id = acc['id']
+                                    break
                         
                         if new_category == 'Income':
                             # Income transaction
-                            if update_transaction(transaction_id, new_date, new_description, new_amount):
+                            if update_transaction(transaction_id, new_date, new_description, new_amount, account_id=account_id):
                                 st.success(f"✅ Updated income: {new_description}")
                                 changes_made = True
                             else:
@@ -2270,7 +2396,7 @@ def main_page():
                                     break
                             
                             if category_id:
-                                if update_transaction(transaction_id, new_date, new_description, new_amount, category_id):
+                                if update_transaction(transaction_id, new_date, new_description, new_amount, category_id, account_id):
                                     st.success(f"✅ Updated expense: {new_description}")
                                     changes_made = True
                                 else:
