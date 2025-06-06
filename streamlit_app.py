@@ -1551,12 +1551,270 @@ def landing_page():
     # Security notice
     st.info("🔒 **Privacy Notice**: Your data is stored securely in your browser session only. Each user has their own private data that is not shared with others. Data persists during your session but will be lost when you close your browser.")
 
+def show_onboarding_guide():
+    """Show interactive onboarding guide for first-time users"""
+    st.markdown("""
+        <div style="background: linear-gradient(135deg, #f7931a 0%, #ff6b35 100%); 
+             padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;">
+            <h3 style="color: white; text-align: center; margin: 0; font-size: 1.4rem;">
+                🎯 Welcome to Bitcoin Budget! Let's get you started
+            </h3>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Check current data state to provide contextual guidance
+    accounts = get_accounts()
+    categories = get_categories()
+    transactions = st.session_state.user_data['transactions']
+    
+    # Determine user's current step in setup
+    has_accounts = len(accounts) > 0
+    has_categories = len(categories) > 0
+    has_income = any(t['type'] == 'income' for t in transactions)
+    has_expenses = any(t['type'] == 'expense' for t in transactions)
+    has_allocations = len(st.session_state.user_data['allocations']) > 0
+    
+    # Progress indicators
+    steps_completed = sum([has_accounts, has_categories, has_income, has_allocations])
+    progress = steps_completed / 4
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown(f"**Setup Progress: {steps_completed}/4 steps completed**")
+        st.progress(progress)
+        
+        # Step-by-step guidance
+        if not has_accounts:
+            st.markdown("""
+                ### 🏦 Step 1: Set Up Your Accounts
+                Start by adding your Bitcoin accounts. You probably have demo accounts already - check the **Accounts** tab!
+                
+                **Why this matters:** Track your real Bitcoin balances across different wallets and accounts.
+            """)
+        elif not has_categories:
+            st.markdown("""
+                ### 📁 Step 2: Create Spending Categories  
+                Create categories to organize your spending (you may have demo categories already).
+                
+                **Quick Start:** Try categories like "Food", "Rent", "Bitcoin Stack", "Entertainment"
+                """)
+        elif not has_income:
+            st.markdown("""
+                ### 💰 Step 3: Add Your Income
+                Record Bitcoin income so you have funds to allocate to categories.
+                
+                **Try it:** Go to **Transactions** tab → **Add Income** → Enter amount in satoshis
+                """)
+        elif not has_allocations:
+            st.markdown("""
+                ### 🎯 Step 4: Allocate Your Money
+                Assign your income to spending categories - this is the core of envelope budgeting!
+                
+                **Look below:** You should see "Available to Assign" funds ready to allocate.
+                """)
+        else:
+            st.markdown("""
+                ### 🎉 You're All Set!
+                Great job! You've completed the basic setup. Now you can:
+                - Add expenses to track spending
+                - View reports to analyze your Bitcoin budget
+                - Use the powerful analytics tools
+                """)
+    
+    with col2:
+        # Quick actions based on current state
+        st.markdown("**Quick Actions:**")
+        
+        if not has_accounts and len(accounts) == 0:
+            if st.button("🏦 Add First Account", use_container_width=True):
+                st.session_state.quick_account_setup = True
+                st.rerun()
+        elif not has_categories and len(categories) == 0:
+            if st.button("📁 Add First Category", use_container_width=True):
+                st.session_state.quick_category_setup = True
+                st.rerun()
+        elif not has_income:
+            if st.button("💰 Add Income", use_container_width=True):
+                st.session_state.quick_income_setup = True
+                st.rerun()
+        else:
+            if st.button("📊 View Reports", use_container_width=True):
+                st.session_state.page = 'reports'
+                st.rerun()
+        
+        if st.button("📖 Back to Tutorial", use_container_width=True):
+            st.session_state.page = 'landing'
+            st.rerun()
+        
+        if st.button("✅ Hide This Guide", use_container_width=True):
+            st.session_state.first_visit = False
+            st.rerun()
+    
+    # Show contextual tips based on demo data
+    if has_accounts and has_categories and has_income:
+        st.info("""
+            💡 **You have demo data loaded!** This includes sample accounts, categories, and transactions. 
+            Feel free to experiment with it, or clear it and add your own real data.
+            """)
+
+
+def show_quick_setup_modals():
+    """Show quick setup modals for guided onboarding"""
+    
+    # Quick Account Setup
+    if st.session_state.get('quick_account_setup', False):
+        with st.expander("🏦 Quick Account Setup", expanded=True):
+            st.markdown("**Add your first Bitcoin account:**")
+            with st.form("quick_account_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    name = st.text_input("Account Name", value="My Bitcoin Wallet", placeholder="e.g., Main Checking, Cold Storage")
+                with col2:
+                    balance = st.text_input("Current Balance (sats)", value="1000000", placeholder="1000000")
+                
+                col3, col4 = st.columns(2)
+                with col3:
+                    account_type = st.selectbox("Account Type", 
+                        ['checking', 'savings', 'hot_wallet', 'cold_storage', 'lightning_node'], 
+                        format_func=lambda x: {
+                            'checking': '🏦 Checking',
+                            'savings': '💰 Savings', 
+                            'hot_wallet': '🔥 Hot Wallet',
+                            'cold_storage': '🧊 Cold Storage',
+                            'lightning_node': '⚡ Lightning Node'
+                        }.get(x, x))
+                with col4:
+                    is_tracked = st.selectbox("Budget Tracking", [True, False], 
+                        format_func=lambda x: "✅ On-Budget (Tracked)" if x else "📋 Off-Budget (Savings)")
+                
+                col_submit, col_cancel = st.columns(2)
+                with col_submit:
+                    if st.form_submit_button("✅ Add Account", use_container_width=True):
+                        try:
+                            balance_sats = parse_amount_input(balance)
+                            if add_account(name, balance_sats, is_tracked, account_type):
+                                st.success(f"✅ Added account: {name}")
+                                st.session_state.quick_account_setup = False
+                                st.rerun()
+                        except ValueError as e:
+                            st.error(f"❌ {str(e)}")
+                
+                with col_cancel:
+                    if st.form_submit_button("❌ Cancel", use_container_width=True):
+                        st.session_state.quick_account_setup = False
+                        st.rerun()
+    
+    # Quick Category Setup
+    if st.session_state.get('quick_category_setup', False):
+        with st.expander("📁 Quick Category Setup", expanded=True):
+            st.markdown("**Create your first spending categories:**")
+            
+            # Suggest common categories
+            suggested_categories = [
+                ("Fixed Expenses", ["Rent", "Phone", "Internet"]),
+                ("Variable Expenses", ["Food", "Transportation", "Entertainment"]),
+                ("Savings & Goals", ["Bitcoin Stack", "Emergency Fund"])
+            ]
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("🚀 Add Suggested Categories", use_container_width=True):
+                    categories_added = 0
+                    for master_name, category_names in suggested_categories:
+                        # Add master category
+                        if add_master_category(master_name):
+                            master_categories = get_master_categories()
+                            master_cat = next((mc for mc in master_categories if mc['name'] == master_name), None)
+                            
+                            if master_cat:
+                                # Add subcategories
+                                for cat_name in category_names:
+                                    if add_category(cat_name):
+                                        assign_category_to_master(get_categories()[-1]['id'], master_cat['id'])
+                                        categories_added += 1
+                    
+                    if categories_added > 0:
+                        st.success(f"✅ Added {categories_added} categories!")
+                        st.session_state.quick_category_setup = False
+                        st.rerun()
+            
+            with col2:
+                if st.button("❌ I'll Set Up Later", use_container_width=True):
+                    st.session_state.quick_category_setup = False
+                    st.rerun()
+            
+            st.markdown("**Or add a custom category:**")
+            with st.form("quick_category_form"):
+                new_category = st.text_input("Category Name", placeholder="e.g., Food, Rent, Bitcoin Stack")
+                
+                if st.form_submit_button("Add Category"):
+                    if new_category:
+                        if add_category(new_category):
+                            st.success(f"✅ Added category: {new_category}")
+                            st.session_state.quick_category_setup = False
+                            st.rerun()
+    
+    # Quick Income Setup  
+    if st.session_state.get('quick_income_setup', False):
+        with st.expander("💰 Quick Income Setup", expanded=True):
+            st.markdown("**Add your first income transaction:**")
+            
+            accounts = get_accounts()
+            if not accounts:
+                st.warning("⚠️ Please add an account first before adding income.")
+                if st.button("🏦 Add Account First"):
+                    st.session_state.quick_income_setup = False
+                    st.session_state.quick_account_setup = True
+                    st.rerun()
+            else:
+                with st.form("quick_income_form"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        amount = st.text_input("Income Amount (sats)", value="5000000", placeholder="5000000")
+                        description = st.text_input("Description", value="Salary/Work Payment", placeholder="e.g., Freelance payment, Salary")
+                    
+                    with col2:
+                        account_options = [f"{get_account_type_icon(acc['account_type'])} {acc['name']}" for acc in accounts]
+                        selected_account = st.selectbox("Account", account_options)
+                        
+                        # Extract account name for lookup
+                        account_name = selected_account.split(" ", 1)[1] if " " in selected_account else selected_account
+                        selected_account_obj = next((acc for acc in accounts if acc['name'] == account_name), accounts[0])
+                    
+                    col_submit, col_cancel = st.columns(2)
+                    with col_submit:
+                        if st.form_submit_button("✅ Add Income", use_container_width=True):
+                            try:
+                                amount_sats = parse_amount_input(amount)
+                                if add_income(amount_sats, description, datetime.now().strftime('%Y-%m-%d'), selected_account_obj['id']):
+                                    st.success(f"✅ Added income: {format_sats(amount_sats)}")
+                                    st.session_state.quick_income_setup = False
+                                    st.rerun()
+                            except ValueError as e:
+                                st.error(f"❌ {str(e)}")
+                    
+                    with col_cancel:
+                        if st.form_submit_button("❌ Cancel", use_container_width=True):
+                            st.session_state.quick_income_setup = False
+                            st.rerun()
+
+
 def main_page():
     """Main budget application page"""
     current_month = st.session_state.current_month
     
     # Header with current month
     st.title(f"₿ Bitcoin Budget - {current_month}")
+    
+    # === FIRST-TIME USER ONBOARDING ===
+    if st.session_state.get('first_visit', True):
+        show_onboarding_guide()
+        st.markdown("---")
+    
+    # === QUICK SETUP MODALS ===
+    show_quick_setup_modals()
     
     # === BUDGET SUMMARY METRICS ===
     st.markdown("### 💰 Budget Summary")
@@ -1578,11 +1836,19 @@ def main_page():
     col1, col2, col3 = st.columns(3)
     
     with col1:
+        # Enhanced available to assign with contextual help
+        if available_to_assign > 0:
+            help_text = f"You have {format_sats(available_to_assign)} ready to allocate to spending categories. This is the core of envelope budgeting!"
+        elif available_to_assign == 0:
+            help_text = "Perfect! All your money is allocated to categories. This means you have a complete budget plan."
+        else:
+            help_text = f"You're over-allocated by {format_sats(abs(available_to_assign))}. Either reduce allocations or add more income."
+        
         st.metric(
             label="🎯 Available to Assign",
             value=format_sats(available_to_assign),
             delta=None,
-            help="Current unallocated balance (consistent across all months)"
+            help=help_text
         )
     
     with col2:
@@ -1638,6 +1904,14 @@ def main_page():
     with col2:
         # Available funds status with quick actions
         st.markdown("**Available Funds**")
+        
+        # Contextual guidance for new users
+        if available_to_assign > 0 and st.session_state.get('first_visit', True):
+            st.markdown("""
+                💡 **Next Step:** Allocate your available funds to spending categories below. 
+                This is how envelope budgeting works - every satoshi gets a job!
+                """)
+        
         if available_to_assign > 0:
             st.success(f"💰 **{format_sats(available_to_assign)}** ready to allocate")
             
@@ -2994,20 +3268,58 @@ def sidebar_navigation():
 
         st.markdown("---")
         
-        # Navigation
+        # Navigation with helpful descriptions
         st.markdown("### 🚀 Navigation")
         
-        if st.button("📖 How to Use", use_container_width=True):
+        if st.button("📖 Tutorial & Examples", use_container_width=True, help="See examples and learn how Bitcoin budgeting works"):
             st.session_state.page = 'landing'
             st.rerun()
         
-        if st.button("🏠 Main Budget", use_container_width=True):
+        if st.button("🏠 Main Budget", use_container_width=True, help="Manage income, expenses, categories, and accounts"):
             st.session_state.page = 'main'
             st.rerun()
         
-        if st.button("📊 Reports", use_container_width=True):
+        if st.button("📊 Analytics & Reports", use_container_width=True, help="View spending patterns, net worth projections, and opportunity cost analysis"):
             st.session_state.page = 'reports'
             st.rerun()
+        
+        # Quick help section
+        if st.session_state.get('first_visit', True):
+            st.markdown("---")
+            st.markdown("### 💡 Quick Tips")
+            
+            # Contextual tips based on current state
+            accounts = get_accounts()
+            categories = get_categories()
+            transactions = st.session_state.user_data['transactions']
+            has_income = any(t['type'] == 'income' for t in transactions)
+            
+            if len(accounts) == 0:
+                st.info("👆 Start by going to **Tutorial & Examples** to understand the concepts!")
+            elif len(categories) == 0:
+                st.info("📁 Create spending categories to organize your Bitcoin budget")
+            elif not has_income:
+                st.info("💰 Add income transactions to fund your budget envelopes")
+            else:
+                st.info("🎯 Allocate your income to categories, then track spending against those envelopes")
+        
+        if not st.session_state.get('first_visit', True):
+            with st.expander("❓ Need Help?", expanded=False):
+                st.markdown("""
+                    **Getting Started:**
+                    - 📖 View tutorial and examples
+                    - 🏦 Set up your Bitcoin accounts  
+                    - 📁 Create spending categories
+                    - 💰 Add income transactions
+                    - 🎯 Allocate money to categories
+                    - 💸 Track expenses
+                    
+                    **Advanced Features:**
+                    - 📊 View detailed analytics
+                    - 🚀 See future value projections
+                    - 💔 Analyze opportunity costs
+                    - 💾 Export/import your data
+                    """)
         
         st.markdown("---")
         
