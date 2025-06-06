@@ -98,51 +98,210 @@ def import_budget_data(json_data):
         return False, f"Error importing data: {e}"
 
 def get_demo_data():
-    """Get default demo data structure"""
+    """Get default demo data structure with realistic budget"""
     current_month = get_current_month()
     
     default_master_cats = [
         {'id': 1, 'name': 'Fixed Expenses'},
         {'id': 2, 'name': 'Variable Expenses'},
-        {'id': 3, 'name': 'Savings'}
+        {'id': 3, 'name': 'Savings & Goals'},
+        {'id': 4, 'name': 'Fun & Entertainment'}
     ]
     
     default_categories = [
-        {'id': 1, 'name': 'Rent', 'master_category_id': 1},
-        {'id': 2, 'name': 'Food', 'master_category_id': 2},
-        {'id': 3, 'name': 'Bitcoin Stack', 'master_category_id': 3}
+        # Fixed Expenses
+        {'id': 1, 'name': 'Rent/Mortgage', 'master_category_id': 1},
+        {'id': 2, 'name': 'Phone & Internet', 'master_category_id': 1},
+        {'id': 3, 'name': 'Insurance', 'master_category_id': 1},
+        {'id': 4, 'name': 'Utilities', 'master_category_id': 1},
+        
+        # Variable Expenses
+        {'id': 5, 'name': 'Groceries', 'master_category_id': 2},
+        {'id': 6, 'name': 'Gas & Transportation', 'master_category_id': 2},
+        {'id': 7, 'name': 'Restaurants', 'master_category_id': 2},
+        {'id': 8, 'name': 'Personal Care', 'master_category_id': 2},
+        {'id': 9, 'name': 'Clothing', 'master_category_id': 2},
+        
+        # Savings & Goals
+        {'id': 10, 'name': 'Bitcoin Stack', 'master_category_id': 3},
+        {'id': 11, 'name': 'Emergency Fund', 'master_category_id': 3},
+        {'id': 12, 'name': 'Vacation Fund', 'master_category_id': 3},
+        
+        # Fun & Entertainment
+        {'id': 13, 'name': 'Entertainment', 'master_category_id': 4},
+        {'id': 14, 'name': 'Hobbies', 'master_category_id': 4}
     ]
     
     demo_transactions = [
+        # Income
         {
             'id': 1,
             'date': current_month + '-01',
-            'description': 'Monthly Salary',
-            'amount': 100000,  # 100k sats
+            'description': 'Salary',
+            'amount': 300000000,  # 3M sats (about $2k at current prices)
             'type': 'income',
             'category_id': None,
+            'account_id': 1
+        },
+        {
+            'id': 2,
+            'date': current_month + '-15',
+            'description': 'Freelance Work',
+            'amount': 75000000,  # 750k sats
+            'type': 'income',
+            'category_id': None,
+            'account_id': 1
+        },
+        
+        # Fixed Expenses
+        {
+            'id': 3,
+            'date': current_month + '-01',
+            'description': 'Rent Payment',
+            'amount': 120000000,  # 1.2M sats
+            'type': 'expense',
+            'category_id': 1,
+            'account_id': 1
+        },
+        {
+            'id': 4,
+            'date': current_month + '-05',
+            'description': 'Phone & Internet Bill',
+            'amount': 8000000,  # 80k sats
+            'type': 'expense',
+            'category_id': 2,
+            'account_id': 1
+        },
+        {
+            'id': 5,
+            'date': current_month + '-10',
+            'description': 'Car Insurance',
+            'amount': 15000000,  # 150k sats
+            'type': 'expense',
+            'category_id': 3,
+            'account_id': 1
+        },
+        {
+            'id': 6,
+            'date': current_month + '-12',
+            'description': 'Electric Bill',
+            'amount': 12000000,  # 120k sats
+            'type': 'expense',
+            'category_id': 4,
+            'account_id': 1
+        },
+        
+        # Variable Expenses
+        {
+            'id': 7,
+            'date': current_month + '-03',
+            'description': 'Grocery Shopping',
+            'amount': 25000000,  # 250k sats
+            'type': 'expense',
+            'category_id': 5,
+            'account_id': 1
+        },
+        {
+            'id': 8,
+            'date': current_month + '-07',
+            'description': 'Gas Station',
+            'amount': 7000000,  # 70k sats
+            'type': 'expense',
+            'category_id': 6,
+            'account_id': 1
+        },
+        {
+            'id': 9,
+            'date': current_month + '-14',
+            'description': 'Restaurant Dinner',
+            'amount': 6000000,  # 60k sats
+            'type': 'expense',
+            'category_id': 7,
+            'account_id': 1
+        },
+        {
+            'id': 10,
+            'date': current_month + '-08',
+            'description': 'Haircut',
+            'amount': 4000000,  # 40k sats
+            'type': 'expense',
+            'category_id': 8,
+            'account_id': 1
+        },
+        {
+            'id': 11,
+            'date': current_month + '-16',
+            'description': 'Grocery Shopping',
+            'amount': 28000000,  # 280k sats
+            'type': 'expense',
+            'category_id': 5,
+            'account_id': 1
+        },
+        
+        # Fun & Entertainment
+        {
+            'id': 12,
+            'date': current_month + '-09',
+            'description': 'Movie Tickets',
+            'amount': 3000000,  # 30k sats
+            'type': 'expense',
+            'category_id': 13,
+            'account_id': 1
+        },
+        {
+            'id': 13,
+            'date': current_month + '-18',
+            'description': 'Book Purchase',
+            'amount': 2500000,  # 25k sats
+            'type': 'expense',
+            'category_id': 14,
             'account_id': 1
         }
     ]
     
     demo_allocations = [
-        {'id': 1, 'category_id': 1, 'month': current_month, 'amount': 50000},
-        {'id': 2, 'category_id': 2, 'month': current_month, 'amount': 30000},
-        {'id': 3, 'category_id': 3, 'month': current_month, 'amount': 20000}
+        # Fixed Expenses - allocated for full amounts
+        {'id': 1, 'category_id': 1, 'month': current_month, 'amount': 120000000},  # Rent
+        {'id': 2, 'category_id': 2, 'month': current_month, 'amount': 10000000},   # Phone
+        {'id': 3, 'category_id': 3, 'month': current_month, 'amount': 20000000},   # Insurance
+        {'id': 4, 'category_id': 4, 'month': current_month, 'amount': 15000000},   # Utilities
+        
+        # Variable Expenses - allocated for expected amounts
+        {'id': 5, 'category_id': 5, 'month': current_month, 'amount': 60000000},   # Groceries
+        {'id': 6, 'category_id': 6, 'month': current_month, 'amount': 20000000},   # Gas
+        {'id': 7, 'category_id': 7, 'month': current_month, 'amount': 15000000},   # Restaurants
+        {'id': 8, 'category_id': 8, 'month': current_month, 'amount': 8000000},    # Personal Care
+        {'id': 9, 'category_id': 9, 'month': current_month, 'amount': 12000000},   # Clothing
+        
+        # Savings & Goals  
+        {'id': 10, 'category_id': 10, 'month': current_month, 'amount': 50000000}, # Bitcoin Stack
+        {'id': 11, 'category_id': 11, 'month': current_month, 'amount': 20000000}, # Emergency Fund
+        {'id': 12, 'category_id': 12, 'month': current_month, 'amount': 5000000},  # Vacation Fund
+        
+        # Fun & Entertainment
+        {'id': 13, 'category_id': 13, 'month': current_month, 'amount': 10000000}, # Entertainment
+        {'id': 14, 'category_id': 14, 'month': current_month, 'amount': 5000000}   # Hobbies
     ]
     
     demo_accounts = [
         {
             'id': 1,
             'name': 'Checking Account',
-            'balance': 100000,
+            'balance': 144500000,  # Reflects income minus expenses
             'is_tracked': True,
             'account_type': 'checking'
         },
         {
             'id': 2,
-            'name': 'Bitcoin Savings',
-            'balance': 500000,
+            'name': 'Bitcoin Cold Storage',
+            'balance': 1000000000,  # 10M sats long-term savings
+            'is_tracked': False,
+            'account_type': 'savings'
+        },
+        {
+            'id': 3,
+            'name': 'Emergency Cash',
+            'balance': 200000000,  # 2M sats emergency fund
             'is_tracked': False,
             'account_type': 'savings'
         }
@@ -154,11 +313,28 @@ def get_demo_data():
         'master_categories': default_master_cats,
         'allocations': demo_allocations,
         'accounts': demo_accounts,
-        'next_transaction_id': 2,
-        'next_category_id': 4,
-        'next_master_category_id': 4,
-        'next_allocation_id': 4,
-        'next_account_id': 3
+        'next_transaction_id': 14,
+        'next_category_id': 15,
+        'next_master_category_id': 5,
+        'next_allocation_id': 15,
+        'next_account_id': 4
+    }
+
+def get_fresh_data():
+    """Get empty data structure for fresh start"""
+    current_month = get_current_month()
+    
+    return {
+        'transactions': [],
+        'categories': [],
+        'master_categories': [],
+        'allocations': [],
+        'accounts': [],
+        'next_transaction_id': 1,
+        'next_category_id': 1,
+        'next_master_category_id': 1,
+        'next_allocation_id': 1,
+        'next_account_id': 1
     }
 
 # === DATA FUNCTIONS (NO CHANGES NEEDED - ALREADY SESSION-BASED) ===
@@ -3331,18 +3507,20 @@ def sidebar_navigation():
             except Exception as e:
                 st.error(f"Error reading file: {e}")
         
-        # Reset to demo data
+        # Reset data options
         st.markdown("#### 🔄 Reset Data")
-        if st.button("🗑️ Reset to Demo", use_container_width=True, type="secondary"):
-            if st.session_state.get('confirm_reset', False):
-                st.session_state.user_data = get_demo_data()
-                st.session_state.confirm_reset = False
-                st.success("✅ Reset to demo data")
-                st.rerun()
-            else:
-                st.session_state.confirm_reset = True
-                st.warning("⚠️ Click again to confirm reset")
-                st.rerun()
+        
+        # Reset to demo data
+        if st.button("🔄 Reset to Demo Budget", use_container_width=True, type="secondary", help="Load realistic example budget with income, expenses, and categories"):
+            st.session_state.user_data = get_demo_data()
+            st.success("✅ Reset to demo data")
+            st.rerun()
+        
+        # Fresh start
+        if st.button("🆕 Fresh Start (Empty)", use_container_width=True, type="secondary", help="Start completely fresh with no data"):
+            st.session_state.user_data = get_fresh_data()
+            st.success("✅ Fresh start - all data cleared")
+            st.rerun()
 
 def main():
     """Main application entry point"""
