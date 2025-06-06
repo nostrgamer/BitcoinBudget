@@ -1449,9 +1449,6 @@ def main_page():
     # Header with current month
     st.title(f"₿ Bitcoin Budget - {current_month}")
     
-    # Important data warning at the top
-    st.error("⚠️ **CRITICAL**: Your data will be LOST when you close this browser tab! Use 'Export Budget' in the sidebar to save your work.")
-    
     # === BUDGET SUMMARY METRICS ===
     st.markdown("### 💰 Budget Summary")
     
