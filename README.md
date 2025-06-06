@@ -148,6 +148,24 @@ The application will open at `http://localhost:8501`
 - **Comprehensive Analysis**: Detailed explanations with bottom-line impact
 - **Key Insights**: Amount spent, future value, opportunity cost, purchasing power multiplier
 
+#### 🏖️ Retire on a Bitcoin Standard
+- **Retirement Planning Calculator**: Determine minimum BTC stack needed for retirement
+- **Spend-Down Strategy**: Calculate BTC needed using realistic spend-down approach over time
+- **Two Price Models**:
+  - **Fair Price Model**: Standard Bitcoin Power Law projections
+  - **Super Conservative Floor Price**: 42% of Fair Price for extra safety margin
+- **Configurable Parameters**:
+  - Annual retirement expenses (default $100,000)
+  - Inflation rate (default 8%)
+  - Retirement duration (10-50 years, default 50)
+- **Interactive Analysis**:
+  - Main chart: BTC needed vs retirement start year (2025-2040)
+  - Bitcoin price projections using Power Law
+  - Expense inflation comparison
+  - Spend-down simulation showing BTC balance over time
+- **Key Insights**: Early retirement needs significantly less BTC due to Bitcoin's price appreciation
+- **Conservative Planning**: Floor Price model requires ~2.4x more BTC for ultra-safe retirement planning
+
 ## How It Works
 
 ### 🏗️ **Session-Based Architecture**
@@ -173,7 +191,7 @@ st.session_state.user_data = {
 │ [🏦 Accounts] [📁 Categories] [💳 Transactions] (Tabs)         │
 │ Modern forms with validation and editable data tables          │
 ├─────────────────────────────────────────────────────────────────┤
-│ Sidebar: Month Navigation + Reports (5 types) + How to Use     │
+│ Sidebar: Month Navigation + Reports (6 types) + How to Use     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -256,7 +274,7 @@ streamlit run streamlit_app.py
 streamlit_app.py           # Main application (1,750 lines)
 modules/
   ├── __init__.py         # Package initialization
-  └── reports.py          # All reports functionality (900+ lines)
+  └── reports.py          # All reports functionality (1,650+ lines)
 requirements.txt          # Production dependencies
 README.md                # This documentation
 ```

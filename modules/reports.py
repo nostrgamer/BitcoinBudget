@@ -284,7 +284,7 @@ def show():
     # Report type selector
     report_type = st.selectbox(
         "Choose Report Type",
-        ["📊 Spending Breakdown", "📈 Net Worth Analysis", "🚀 Net Worth Future Value", "🔮 Future Purchasing Power", "⏳ Lifecycle Cost Analysis"],
+        ["📊 Spending Breakdown", "📈 Net Worth Analysis", "🚀 Net Worth Future Value", "🔮 Future Purchasing Power", "⏳ Lifecycle Cost Analysis", "🏖️ Retire on a Bitcoin Standard"],
         index=0
     )
     
@@ -298,6 +298,8 @@ def show():
         future_purchasing_power_report()
     elif report_type == "⏳ Lifecycle Cost Analysis":
         lifecycle_cost_report()
+    elif report_type == "🏖️ Retire on a Bitcoin Standard":
+        retire_on_bitcoin_standard_report()
 
 def spending_breakdown_report():
     """Spending breakdown report with pie chart"""
@@ -1282,4 +1284,382 @@ def lifecycle_cost_report():
         (even after accounting for {inflation_rate*100:.0f}% annual inflation).
         
         This represents a **{real_purchasing_power_gain:.1f}x improvement in purchasing power!**
+        """) 
+
+def calculate_minimum_btc_for_retirement(retirement_year, annual_expenses, inflation_rate, retirement_years, use_floor_price=False):
+    """Calculate minimum BTC needed using spend-down approach over retirement_years"""
+    
+    # Binary search to find minimum BTC needed
+    min_btc = 0.1
+    max_btc = 50.0
+    tolerance = 0.01
+    
+    while max_btc - min_btc > tolerance:
+        test_btc = (min_btc + max_btc) / 2
+        
+        # Simulate retirement with this amount of BTC
+        remaining_btc = test_btc
+        
+        for year_offset in range(retirement_years):
+            current_year = retirement_year + year_offset
+            
+            # Get Bitcoin price for this year
+            current_date = datetime(current_year, 1, 1)
+            days_since_genesis = get_days_since_genesis(current_date)
+            btc_fair_price = calculate_btc_fair_value(days_since_genesis)
+            btc_price = btc_fair_price * 0.42 if use_floor_price else btc_fair_price
+            
+            # Calculate inflation-adjusted expenses for this year
+            inflated_expenses = annual_expenses * ((1 + inflation_rate) ** year_offset)
+            
+            # Calculate BTC needed to sell for this year's expenses
+            btc_to_sell = inflated_expenses / btc_price
+            
+            # Subtract from remaining BTC
+            remaining_btc -= btc_to_sell
+            
+            # If we run out of BTC, this amount is too low
+            if remaining_btc < 0:
+                break
+        
+        # Adjust search range based on result
+        if remaining_btc < 0:
+            min_btc = test_btc  # Need more BTC
+        else:
+            max_btc = test_btc  # This amount works, try less
+    
+    return max_btc
+
+
+def retire_on_bitcoin_standard_report():
+    """Retire on a Bitcoin Standard - Calculate BTC needed for retirement based on Power Law"""
+    st.markdown("## 🏖️ Retire on a Bitcoin Standard")
+    st.markdown("*Calculate how many BTC you need to retire at different years using Bitcoin Power Law projections*")
+    
+    # User input controls
+    st.markdown("### ⚙️ Retirement Planning Parameters")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        annual_expenses = st.number_input(
+            "Annual Retirement Expenses (USD):",
+            min_value=10000,
+            max_value=1000000,
+            value=100000,
+            step=5000,
+            help="How much do you need per year in retirement?"
+        )
+        
+    with col2:
+        inflation_rate = st.slider(
+            "Annual Inflation Rate:",
+            min_value=0.0,
+            max_value=15.0,
+            value=8.0,
+            step=0.5,
+            format="%.1f%%",
+            help="Expected annual inflation rate"
+        ) / 100.0
+    
+    # Add retirement duration parameter
+    st.markdown("### ⏰ Retirement Duration")
+    retirement_years = st.slider(
+        "Years in Retirement:",
+        min_value=10,
+        max_value=50,
+        value=50,
+        step=5,
+        help="Maximum retirement duration (50 years recommended)"
+    )
+    
+    # Add Power Law model selection
+    st.markdown("### 📊 Bitcoin Price Model")
+    use_floor_price = st.checkbox(
+        "Use Super Conservative Floor Price (42% of Fair Price)",
+        value=False,
+        help="Conservative model uses 42% of Power Law Fair Price for extra safety margin"
+    )
+    
+    st.markdown("---")
+    
+    # Calculate retirement BTC requirements
+    start_year = 2025
+    end_year = 2040
+    years = list(range(start_year, end_year + 1))
+    
+    retirement_data = []
+    
+    for year in years:
+        # Calculate minimum BTC needed to retire in this year
+        min_btc_needed = calculate_minimum_btc_for_retirement(year, annual_expenses, inflation_rate, retirement_years, use_floor_price)
+        
+        # Get Bitcoin price for this retirement year
+        target_date = datetime(year, 1, 1)
+        days_since_genesis = get_days_since_genesis(target_date)
+        btc_price_usd = calculate_btc_fair_value(days_since_genesis)
+        
+        retirement_data.append({
+            'year': year,
+            'btc_price': btc_price_usd,
+            'expenses_nominal': annual_expenses,
+            'expenses_inflated': annual_expenses * ((1 + inflation_rate) ** (year - 2025)),
+            'btc_needed': min_btc_needed
+        })
+    
+    # Create interactive chart
+    st.markdown("### 📊 Bitcoin Retirement Requirements Over Time")
+    
+    df = pd.DataFrame(retirement_data)
+    
+    # Main chart: BTC needed over time
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatter(
+        x=df['year'],
+        y=df['btc_needed'],
+        mode='lines+markers',
+        name='BTC Needed for Retirement',
+        line=dict(color='#FF8C00', width=4),
+        marker=dict(size=8, color='#FF8C00'),
+        hovertemplate='<b>Year: %{x}</b><br>' +
+                     'BTC Needed: %{y:.2f}<br>' +
+                     '<extra></extra>'
+    ))
+    
+    model_name = "Floor Price (42%)" if use_floor_price else "Fair Price"
+    fig.update_layout(
+        title=f'Minimum Bitcoin Stack for {retirement_years}-Year Retirement - {model_name} Model: ${annual_expenses:,}/year + {inflation_rate*100:.1f}% inflation',
+        xaxis_title='Retirement Start Year',
+        yaxis_title='Minimum Bitcoin (BTC) Stack Needed',
+        height=500,
+        showlegend=False,
+        hovermode='x unified'
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Key insights
+    st.markdown("### 💡 Key Insights")
+    
+    btc_2025 = df[df['year'] == 2025]['btc_needed'].iloc[0]
+    btc_2030 = df[df['year'] == 2030]['btc_needed'].iloc[0]
+    btc_2035 = df[df['year'] == 2035]['btc_needed'].iloc[0]
+    btc_2040 = df[df['year'] == 2040]['btc_needed'].iloc[0]
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            label="🏁 2025 Minimum Stack",
+            value=f"{btc_2025:.2f} BTC",
+            delta=f"{retirement_years} years max"
+        )
+    
+    with col2:
+        st.metric(
+            label="📅 2030 Minimum Stack",
+            value=f"{btc_2030:.2f} BTC",
+            delta=f"{((btc_2030/btc_2025-1)*100):+.1f}% vs 2025"
+        )
+    
+    with col3:
+        st.metric(
+            label="🔮 2035 Minimum Stack",
+            value=f"{btc_2035:.2f} BTC",
+            delta=f"{((btc_2035/btc_2025-1)*100):+.1f}% vs 2025"
+        )
+    
+    with col4:
+        st.metric(
+            label="🚀 2040 Minimum Stack",
+            value=f"{btc_2040:.2f} BTC",
+            delta=f"{((btc_2040/btc_2025-1)*100):+.1f}% vs 2025"
+        )
+    
+    # Supporting data charts
+    st.markdown("### 📈 Supporting Analysis")
+    
+    tab1, tab2, tab3, tab4 = st.tabs(["💰 Bitcoin Price Projection", "📊 Expense Inflation", "📉 Spend-Down Simulation", "🏦 Data Table"])
+    
+    with tab1:
+        # Bitcoin price chart (adjust for floor price if needed)
+        price_data = df.copy()
+        if use_floor_price:
+            price_data['btc_price'] = price_data['btc_price'] * 0.42
+        
+        fig_price = px.line(
+            price_data, 
+            x='year', 
+            y='btc_price',
+            title=f'Bitcoin Power Law {model_name} Projection',
+            labels={'btc_price': 'Bitcoin Price (USD)', 'year': 'Year'},
+            markers=True
+        )
+        fig_price.update_traces(line_color='#2E8B57', line=dict(width=3), marker=dict(size=6))
+        fig_price.update_layout(height=400)
+        st.plotly_chart(fig_price, use_container_width=True)
+    
+    with tab2:
+        # Inflation comparison chart
+        fig_inflation = go.Figure()
+        
+        fig_inflation.add_trace(go.Scatter(
+            x=df['year'],
+            y=df['expenses_nominal'],
+            mode='lines+markers',
+            name=f'Nominal Expenses (${annual_expenses:,})',
+            line=dict(color='#DC143C', width=3),
+            marker=dict(size=6)
+        ))
+        
+        fig_inflation.add_trace(go.Scatter(
+            x=df['year'],
+            y=df['expenses_inflated'],
+            mode='lines+markers',
+            name=f'Inflation-Adjusted ({inflation_rate*100:.1f}%)',
+            line=dict(color='#FF8C00', width=3),
+            marker=dict(size=6)
+        ))
+        
+        fig_inflation.update_layout(
+            title='Annual Expenses: Nominal vs Inflation-Adjusted',
+            xaxis_title='Year',
+            yaxis_title='Annual Expenses (USD)',
+            height=400
+        )
+        
+        st.plotly_chart(fig_inflation, use_container_width=True)
+    
+    with tab3:
+        # Spend-down simulation for 2025 retirement
+        st.markdown("#### 📉 2025 Retirement Spend-Down Simulation")
+        
+        # Allow user to select which retirement year to simulate
+        simulation_year = st.selectbox(
+            "Select Retirement Year to Simulate:",
+            [2025, 2030, 2035, 2040],
+            index=0
+        )
+        
+        # Get the minimum BTC needed for this year
+        min_btc_for_year = df[df['year'] == simulation_year]['btc_needed'].iloc[0]
+        
+        # Generate spend-down data
+        spend_down_data = []
+        remaining_btc = min_btc_for_year
+        
+        for year_offset in range(min(retirement_years, 30)):  # Show first 30 years max for chart readability
+            current_year = simulation_year + year_offset
+            
+            # Get Bitcoin price for this year
+            current_date = datetime(current_year, 1, 1)
+            days_since_genesis = get_days_since_genesis(current_date)
+            btc_fair_price = calculate_btc_fair_value(days_since_genesis)
+            btc_price = btc_fair_price * 0.42 if use_floor_price else btc_fair_price
+            
+            # Calculate inflation-adjusted expenses for this year
+            inflated_expenses = annual_expenses * ((1 + inflation_rate) ** year_offset)
+            
+            # Calculate BTC needed to sell for this year's expenses
+            btc_to_sell = inflated_expenses / btc_price
+            
+            # Record data before spending
+            spend_down_data.append({
+                'year': current_year,
+                'btc_balance': remaining_btc,
+                'btc_to_sell': btc_to_sell,
+                'btc_price': btc_price,
+                'expenses': inflated_expenses
+            })
+            
+            # Subtract from remaining BTC
+            remaining_btc -= btc_to_sell
+        
+        # Create spend-down chart
+        spend_df = pd.DataFrame(spend_down_data)
+        
+        fig_spend = go.Figure()
+        
+        fig_spend.add_trace(go.Scatter(
+            x=spend_df['year'],
+            y=spend_df['btc_balance'],
+            mode='lines+markers',
+            name='BTC Balance',
+            line=dict(color='#FF8C00', width=3),
+            marker=dict(size=6)
+        ))
+        
+        fig_spend.update_layout(
+            title=f'{simulation_year} Retirement - {model_name} Model: BTC Balance Over Time (Starting with {min_btc_for_year:.2f} BTC)',
+            xaxis_title='Year',
+            yaxis_title='Bitcoin Balance (BTC)',
+            height=400
+        )
+        
+        st.plotly_chart(fig_spend, use_container_width=True)
+        
+        # Show some key data points
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Starting Stack", f"{min_btc_for_year:.2f} BTC")
+        with col2:
+            final_balance = spend_df['btc_balance'].iloc[-1] - spend_df['btc_to_sell'].iloc[-1]
+            st.metric(f"Balance After {len(spend_df)} Years", f"{final_balance:.2f} BTC")
+        with col3:
+            avg_btc_sold = spend_df['btc_to_sell'].mean()
+            st.metric("Avg BTC Sold/Year", f"{avg_btc_sold:.3f} BTC")
+    
+    with tab4:
+        # Data table
+        display_df = df.copy()
+        if use_floor_price:
+            display_df['btc_price'] = display_df['btc_price'] * 0.42
+        display_df['btc_price'] = display_df['btc_price'].apply(lambda x: f"${x:,.0f}")
+        display_df['expenses_nominal'] = display_df['expenses_nominal'].apply(lambda x: f"${x:,.0f}")
+        display_df['expenses_inflated'] = display_df['expenses_inflated'].apply(lambda x: f"${x:,.0f}")
+        display_df['btc_needed'] = display_df['btc_needed'].apply(lambda x: f"{x:.3f}")
+        
+        price_column_name = f"BTC {model_name}"
+        display_df.columns = ['Year', price_column_name, 'Base Expenses', 'Inflation-Adjusted', 'BTC Required']
+        
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+    
+    # Detailed explanation
+    with st.expander("📝 Methodology & Assumptions", expanded=False):
+        st.markdown(f"""
+        **🔬 How This Analysis Works:**
+        
+        **📊 Bitcoin Power Law Model:**
+        - Uses the established Bitcoin Power Law: Price = 1.0117e-17 × (days since genesis)^5.82
+        - Genesis date: January 3, 2009
+        - Historically accurate model for Bitcoin's long-term price trajectory
+        - **{"Floor Price (42%)" if use_floor_price else "Fair Price"}** model selected
+        {"- **Super Conservative Floor Price:** 42% of Fair Price for extra safety margin" if use_floor_price else ""}
+        
+        **💰 Spend-Down Retirement Calculation:**
+        - **Base Annual Expenses:** ${annual_expenses:,}
+        - **Inflation Rate:** {inflation_rate*100:.1f}% per year
+        - **Maximum Retirement:** {retirement_years} years
+        - **Method:** Find minimum BTC stack that lasts {retirement_years} years when selling only what's needed each year
+        
+        **📈 Inflation Impact:**
+        - Your ${annual_expenses:,} in 2025 = ${annual_expenses * ((1 + inflation_rate) ** 5):,.0f} in 2030
+        - Your ${annual_expenses:,} in 2025 = ${annual_expenses * ((1 + inflation_rate) ** 10):,.0f} in 2035
+        - Your ${annual_expenses:,} in 2025 = ${annual_expenses * ((1 + inflation_rate) ** 15):,.0f} in 2040
+        
+        **🎯 Key Takeaways:**
+        
+        1. **Spend-Down Strategy:** You only sell the BTC needed each year, preserving the rest for growth
+        2. **Early Retirement Advantage:** Bitcoin's rapid price appreciation means earlier retirement needs less BTC
+        3. **Power Law Magic:** Each year you need to sell LESS BTC as Bitcoin appreciates faster than inflation
+        4. **50-Year Maximum:** This model assumes maximum {retirement_years}-year retirement duration
+        
+        **⚠️ Important Notes:**
+        - This model assumes the Power Law continues (past performance ≠ future results)
+        - Actual retirement needs may vary based on lifestyle changes
+        - Consider having additional fiat savings for diversification
+        - Plan for healthcare, emergency funds, and other non-budgeted expenses
+        
+        **🚀 Pro Tip:** With just {btc_2025:.2f} BTC, you could retire in 2025 and maintain ${annual_expenses:,}/year 
+        purchasing power for {retirement_years} years by selling progressively smaller amounts each year!
         """) 
