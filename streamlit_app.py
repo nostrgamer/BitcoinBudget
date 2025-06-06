@@ -2330,9 +2330,7 @@ def main_page():
                                         del st.session_state[f'edit_account_{account["id"]}']
                                         st.rerun()
                     
-                    # Add spacing between account cards
-                    if i < len(tracked_accounts) - 1:
-                        st.markdown("---")
+
             else:
                 st.info("No tracked accounts yet. Add one above!")
         
@@ -2406,9 +2404,7 @@ def main_page():
                                         del st.session_state[f'edit_account_{account["id"]}']
                                         st.rerun()
                     
-                    # Add spacing between account cards
-                    if i < len(untracked_accounts) - 1:
-                        st.markdown("---")
+
             else:
                 st.info("No untracked accounts yet. Add one above!")
         
