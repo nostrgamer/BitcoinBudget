@@ -70,8 +70,15 @@ The application will open at `http://localhost:8501`
 ## Features
 
 ### 🏦 **Core Envelope Budgeting**
-- ✅ **Account Management**: Tracked accounts (on-budget) and untracked accounts (savings/long-term)
-- ✅ **Smart Income Entry**: Add Bitcoin income with flexible sats/BTC input and account selection
+- ✅ **Enhanced Account Management**: Tracked accounts (on-budget) and untracked accounts (savings/long-term)
+  - **9 Account Types**: 🏦 Checking, 💰 Savings, 📈 Investment, 💳 Credit, 🏠 Loan, 🧊 Cold Storage, ⚡ Lightning Node, 🔥 Hot Wallet, 📱 Other
+  - **Full-Width Edit Forms**: Professional account editing with balance and type changes
+  - **Streamlined Actions**: Clean button layout with 📊 View, ✏️ Edit, 🗑️ Delete options
+  - **Real-time Validation**: Enhanced input validation with immediate feedback
+- ✅ **Smart Transaction Entry**: Enhanced forms with real-time validation and sats-only standard (rejecting BIP 178)
+  - **Live Amount Preview**: See formatted satoshi amounts as you type
+  - **Enhanced Validation**: Clear error messages and positive feedback for valid amounts
+  - **Account Integration**: All transactions linked to specific Bitcoin accounts
 - ✅ **Category Management**: Create master categories (Fixed, Variable, Savings) and subcategories with visual hierarchy
 - ✅ **Professional Category Display**: Tree-style visual hierarchy with 📂 master categories and ├─ subcategories
 - ✅ **Intelligent Allocation**: Allocate income with availability checking and rollover
@@ -84,8 +91,9 @@ The application will open at `http://localhost:8501`
 
 ### ₿ **Bitcoin-Native Features**
 - ✅ **Satoshi Precision**: All calculations in satoshis (no floating point errors)
-- ✅ **Flexible Input**: Support "1000000", "1,000,000", or "0.01 BTC" formats
+- ✅ **Sats-Only Standard**: Enhanced validation that formally rejects BIP 178 (no BTC input)
 - ✅ **Clear Display**: Shows as "1,000,000 sats" with comma formatting
+- ✅ **Bitcoin-Specific Account Types**: Cold storage, lightning nodes, hot wallets designed for Bitcoin users
 - ✅ **Bitcoin Power Law**: Built-in fair value calculations for projections
 
 ### 🎨 **Modern UI/UX Features**

@@ -102,7 +102,9 @@ if __name__ == "__main__":
 - **Data display**: st.dataframe, st.metric, st.plotly_chart with hierarchical sorting
 - **Visual hierarchy**: Tree-style indicators (📂, ├─, └─) for category parent-child relationships
 - **Status indicators**: Color-coded status (🟢 Good, ⚪ Empty/Zero, 🔴 Overspent)
-- **Progress visualization**: st.progress bars with color-coded budget health status
+- **Enhanced form patterns**: Real-time validation with immediate user feedback
+- **Account management**: Full-width edit forms outside column constraints for better UX
+- **Action buttons**: Clean, individual action buttons rather than dropdown menus
 - **Context-aware UI**: Quick action buttons that adapt to budget situation
 - **Layout**: Wide layout with responsive columns
 - **Navigation**: Sidebar with session state management
@@ -110,9 +112,10 @@ if __name__ == "__main__":
 
 ### Bitcoin-Specific Rules
 - **Satoshis everywhere**: Always work in satoshis (integers)
-- **Display formatting**: Show as "1,000,000 sats" or "0.01000000 BTC"
+- **Sats-only standard**: Formally reject BIP 178, only accept satoshi input
+- **Display formatting**: Show as "1,000,000 sats" with comma formatting
 - **No decimals**: Avoid floating point for Bitcoin amounts
-- **Input validation**: Ensure positive integers for amounts
+- **Input validation**: Ensure positive integers for amounts with real-time feedback
 
 ### Simplicity Rules
 ❌ **NO** complex state management beyond st.session_state

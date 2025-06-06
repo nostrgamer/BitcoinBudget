@@ -696,6 +696,22 @@ def update_account_balance(account_id, new_balance):
     except Exception:
         return False
 
+def update_account(account_id, new_balance=None, new_type=None, new_name=None):
+    """Update account with multiple fields"""
+    try:
+        for account in st.session_state.user_data['accounts']:
+            if account['id'] == account_id:
+                if new_balance is not None:
+                    account['balance'] = new_balance
+                if new_type is not None:
+                    account['account_type'] = new_type
+                if new_name is not None:
+                    account['name'] = new_name
+                return True
+        return False
+    except Exception:
+        return False
+
 def transfer_between_accounts(from_account_id, to_account_id, amount):
     """Transfer money between accounts"""
     try:
@@ -2279,56 +2295,22 @@ def main_page():
                         st.markdown(f"**{balance_text}**")
                     
                     with account_col3:
-                        # Simple dropdown menu for actions
-                        action = st.selectbox(
-                            "Actions",
-                            ["...", "📊 View", "✏️ Edit", "🗑️ Delete"],
-                            key=f"action_tracked_{account['id']}",
-                            label_visibility="collapsed"
-                        )
-                        
-                        if action == "📊 View":
+                        # Action buttons in a row
+                        if st.button("📊 View", help="View Details", key=f"view_tracked_{account['id']}"):
                             st.session_state.selected_account_id = account['id']
                             st.session_state.selected_account_name = account['name']
                             st.rerun()
-                        elif action == "✏️ Edit":
+                        
+                        if st.button("✏️ Edit", help="Edit Account", key=f"edit_tracked_{account['id']}"):
                             st.session_state[f'edit_account_{account["id"]}'] = True
                             st.rerun()
-                        elif action == "🗑️ Delete":
+                        
+                        if st.button("🗑️ Delete", help="Delete Account", key=f"delete_tracked_{account['id']}"):
                             if delete_account(account['id']):
                                 st.success(f"Deleted {account['name']}")
                                 st.rerun()
                             else:
                                 st.error("Cannot delete account with transactions")
-                        
-                        # Show edit form if in edit mode
-                        if st.session_state.get(f'edit_account_{account["id"]}', False):
-                            with st.form(f"edit_account_form_{account['id']}"):
-                                st.markdown("**Edit Account Balance**")
-                                new_balance = st.text_input(
-                                    "New Balance",
-                                    value=str(account['balance']),
-                                    help="Enter new account balance in satoshis"
-                                )
-                                
-                                edit_col1, edit_col2 = st.columns(2)
-                                with edit_col1:
-                                    if st.form_submit_button("💾 Save", use_container_width=True):
-                                        try:
-                                            balance_sats = parse_amount_input(new_balance)
-                                            if update_account_balance(account['id'], balance_sats):
-                                                st.success("✅ Balance updated!")
-                                                del st.session_state[f'edit_account_{account["id"]}']
-                                                st.rerun()
-                                            else:
-                                                st.error("❌ Failed to update balance")
-                                        except ValueError as e:
-                                            st.error(f"❌ {str(e)}")
-                                
-                                with edit_col2:
-                                    if st.form_submit_button("❌ Cancel", use_container_width=True):
-                                        del st.session_state[f'edit_account_{account["id"]}']
-                                        st.rerun()
                     
 
             else:
@@ -2353,60 +2335,138 @@ def main_page():
                         st.markdown(f"**{balance_text}**")
                     
                     with account_col3:
-                        # Simple dropdown menu for actions
-                        action = st.selectbox(
-                            "Actions",
-                            ["...", "📊 View", "✏️ Edit", "🗑️ Delete"],
-                            key=f"action_untracked_{account['id']}",
-                            label_visibility="collapsed"
-                        )
-                        
-                        if action == "📊 View":
+                        # Action buttons in a row
+                        if st.button("📊 View", help="View Details", key=f"view_untracked_{account['id']}"):
                             st.session_state.selected_account_id = account['id']
                             st.session_state.selected_account_name = account['name']
                             st.rerun()
-                        elif action == "✏️ Edit":
+                        
+                        if st.button("✏️ Edit", help="Edit Account", key=f"edit_untracked_{account['id']}"):
                             st.session_state[f'edit_account_{account["id"]}'] = True
                             st.rerun()
-                        elif action == "🗑️ Delete":
+                        
+                        if st.button("🗑️ Delete", help="Delete Account", key=f"delete_untracked_{account['id']}"):
                             if delete_account(account['id']):
                                 st.success(f"Deleted {account['name']}")
                                 st.rerun()
                             else:
                                 st.error("Cannot delete account with transactions")
-                        
-                        # Show edit form if in edit mode
-                        if st.session_state.get(f'edit_account_{account["id"]}', False):
-                            with st.form(f"edit_account_form_{account['id']}"):
-                                st.markdown("**Edit Account Balance**")
-                                new_balance = st.text_input(
-                                    "New Balance",
-                                    value=str(account['balance']),
-                                    help="Enter new account balance in satoshis"
-                                )
-                                
-                                edit_col1, edit_col2 = st.columns(2)
-                                with edit_col1:
-                                    if st.form_submit_button("💾 Save", use_container_width=True):
-                                        try:
-                                            balance_sats = parse_amount_input(new_balance)
-                                            if update_account_balance(account['id'], balance_sats):
-                                                st.success("✅ Balance updated!")
-                                                del st.session_state[f'edit_account_{account["id"]}']
-                                                st.rerun()
-                                            else:
-                                                st.error("❌ Failed to update balance")
-                                        except ValueError as e:
-                                            st.error(f"❌ {str(e)}")
-                                
-                                with edit_col2:
-                                    if st.form_submit_button("❌ Cancel", use_container_width=True):
-                                        del st.session_state[f'edit_account_{account["id"]}']
-                                        st.rerun()
                     
 
             else:
                 st.info("No untracked accounts yet. Add one above!")
+        
+        # Edit Account Forms (Full Width)
+        all_accounts = get_accounts()
+        for account in all_accounts:
+            if st.session_state.get(f'edit_account_{account["id"]}', False):
+                st.markdown("---")
+                current_icon = get_account_type_icon(account['account_type'])
+                st.markdown(f"### ✏️ Edit Account: {current_icon} {account['name']}")
+                
+                with st.form(f"edit_account_form_{account['id']}"):
+                    # Enhanced layout with account type selection
+                    col1, col2, col3 = st.columns([2, 2, 2])
+                    
+                    with col1:
+                        st.markdown("**💰 Balance**")
+                        new_balance = st.text_input(
+                            "New Balance (satoshis)",
+                            value=str(account['balance']),
+                            help="Enter new account balance in satoshis"
+                        )
+                        
+                        # Real-time balance validation
+                        if new_balance:
+                            is_valid, message, preview = validate_amount_input(new_balance)
+                            if is_valid:
+                                st.success(f"{message}: {preview}")
+                            else:
+                                st.error(message)
+                        
+                        st.caption(f"Current: {format_sats(account['balance'])}")
+                    
+                    with col2:
+                        st.markdown("**🏷️ Account Type**")
+                        account_types = [
+                            ('checking', '🏦 Checking'),
+                            ('savings', '💰 Savings'),
+                            ('investment', '📈 Investment'),
+                            ('credit', '💳 Credit'),
+                            ('loan', '🏠 Loan'),
+                            ('cold_storage', '🧊 Cold Storage'),
+                            ('lightning_node', '⚡ Lightning Node'),
+                            ('hot_wallet', '🔥 Hot Wallet'),
+                            ('other', '📱 Other')
+                        ]
+                        
+                        # Find current selection index
+                        current_index = 0
+                        for i, (type_key, _) in enumerate(account_types):
+                            if type_key == account['account_type']:
+                                current_index = i
+                                break
+                        
+                        new_type = st.selectbox(
+                            "Account Type",
+                            options=[type_key for type_key, _ in account_types],
+                            format_func=lambda x: next(display for type_key, display in account_types if type_key == x),
+                            index=current_index,
+                            help="Select the type of account"
+                        )
+                        
+                        current_type_display = next(display for type_key, display in account_types if type_key == account['account_type'])
+                        st.caption(f"Current: {current_type_display}")
+                    
+                    with col3:
+                        st.markdown("**🎯 Actions**")
+                        
+                        # Show what will change
+                        changes = []
+                        if new_balance and new_balance != str(account['balance']):
+                            try:
+                                new_sats = parse_amount_input(new_balance)
+                                if new_sats != account['balance']:
+                                    changes.append("Balance")
+                            except:
+                                pass
+                        
+                        if new_type != account['account_type']:
+                            changes.append("Type")
+                        
+                        if changes:
+                            st.info(f"Will update: {', '.join(changes)}")
+                        else:
+                            st.info("No changes detected")
+                        
+                        if st.form_submit_button("💾 Save Changes", use_container_width=True):
+                            try:
+                                balance_sats = parse_amount_input(new_balance)
+                                if update_account(account['id'], 
+                                                new_balance=balance_sats, 
+                                                new_type=new_type):
+                                    updates = []
+                                    if balance_sats != account['balance']:
+                                        updates.append(f"balance to {format_sats(balance_sats)}")
+                                    if new_type != account['account_type']:
+                                        new_type_display = next(display for type_key, display in account_types if type_key == new_type)
+                                        updates.append(f"type to {new_type_display}")
+                                    
+                                    if updates:
+                                        st.success(f"✅ Updated {', '.join(updates)}!")
+                                    else:
+                                        st.info("No changes were made")
+                                    
+                                    del st.session_state[f'edit_account_{account["id"]}']
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Failed to update account")
+                            except ValueError as e:
+                                st.error(f"❌ {str(e)}")
+                        
+                        if st.form_submit_button("❌ Cancel", use_container_width=True):
+                            del st.session_state[f'edit_account_{account["id"]}']
+                            st.rerun()
         
         # Enhanced Account Transfers
         st.markdown("#### 💸 Transfer Between Accounts")
