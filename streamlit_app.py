@@ -844,16 +844,7 @@ def validate_amount_input(text):
     except ValueError as e:
         return False, f"❌ {str(e)}", ""
 
-def get_unique_descriptions(transaction_type=None, limit=20):
-    """Get unique transaction descriptions for autocomplete suggestions"""
-    descriptions = set()
-    
-    for trans in st.session_state.user_data['transactions']:
-        if transaction_type is None or trans['type'] == transaction_type:
-            descriptions.add(trans['description'])
-    
-    # Return most recent unique descriptions (sorted alphabetically for consistency)
-    return sorted(list(descriptions))[:limit]
+
 
 def get_current_month():
     """Return current month as 'YYYY-MM'"""
@@ -2418,22 +2409,8 @@ def main_page():
             help="Select whether this is income or an expense"
         )
         
-        # Get autocomplete suggestions
-        income_descriptions = get_unique_descriptions('income', 10)
-        expense_descriptions = get_unique_descriptions('expense', 10)
-        
         # Dynamic form based on transaction type
         if transaction_type == "Income":
-            # Autocomplete suggestions outside the form
-            if income_descriptions:
-                st.markdown("💡 **Quick-fill from recent income descriptions:**")
-                suggestion_cols = st.columns(min(3, len(income_descriptions)))
-                for i, desc in enumerate(income_descriptions[:3]):  # Show top 3
-                    with suggestion_cols[i % len(suggestion_cols)]:
-                        if st.button(f"📝 {desc[:15]}...", key=f"income_desc_{i}", help=desc):
-                            st.session_state.income_description_suggestion = desc
-                            st.rerun()
-            
             with st.form("add_income_form"):
                 col1, col2 = st.columns(2)
                 
@@ -2461,7 +2438,6 @@ def main_page():
                 with col2:
                     transaction_description = st.text_input(
                         "Description",
-                        value=st.session_state.get('income_description_suggestion', ''),
                         placeholder="Salary, freelance, etc.",
                         help="Brief description of income source"
                     )
@@ -2492,9 +2468,6 @@ def main_page():
                                         break
                             
                             if add_income(amount_sats, transaction_description, str(transaction_date), account_id):
-                                # Clear suggestion after successful submission
-                                if 'income_description_suggestion' in st.session_state:
-                                    del st.session_state.income_description_suggestion
                                 st.success(f"✅ Added income: {format_sats(amount_sats)} - {transaction_description}")
                                 st.rerun()
                             else:
@@ -2507,16 +2480,6 @@ def main_page():
         else:  # Expense
             categories = get_categories()
             if categories:
-                # Autocomplete suggestions outside the form
-                if expense_descriptions:
-                    st.markdown("💡 **Quick-fill from recent expense descriptions:**")
-                    suggestion_cols = st.columns(min(3, len(expense_descriptions)))
-                    for i, desc in enumerate(expense_descriptions[:3]):  # Show top 3
-                        with suggestion_cols[i % len(suggestion_cols)]:
-                            if st.button(f"📝 {desc[:15]}...", key=f"expense_desc_{i}", help=desc):
-                                st.session_state.expense_description_suggestion = desc
-                                st.rerun()
-                
                 with st.form("add_expense_form"):
                     col1, col2 = st.columns(2)
                     
@@ -2550,7 +2513,6 @@ def main_page():
                         
                         transaction_description = st.text_input(
                             "Description",
-                            value=st.session_state.get('expense_description_suggestion', ''),
                             placeholder="Coffee, groceries, etc.",
                             help="Brief description of expense"
                         )
@@ -2589,9 +2551,6 @@ def main_page():
                                 
                                 if category_id:
                                     if add_expense(amount_sats, transaction_description, category_id, str(transaction_date), account_id):
-                                        # Clear suggestion after successful submission
-                                        if 'expense_description_suggestion' in st.session_state:
-                                            del st.session_state.expense_description_suggestion
                                         st.success(f"✅ Added expense: {format_sats(amount_sats)} - {transaction_description}")
                                         st.rerun()
                                     else:
