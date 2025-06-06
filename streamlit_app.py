@@ -846,9 +846,13 @@ def get_account_type_icon(account_type):
         'savings': '💰', 
         'investment': '📈',
         'credit': '💳',
-        'other': '⚡'
+        'loan': '🏠',
+        'cold_storage': '🧊',
+        'lightning_node': '⚡',
+        'hot_wallet': '🔥',
+        'other': '📱'
     }
-    return icons.get(account_type, '⚡')
+    return icons.get(account_type, '📱')
 
 def get_account_health_status(balance):
     """Get account health status based on balance"""
@@ -2197,6 +2201,10 @@ def main_page():
                         "savings", 
                         "investment",
                         "credit",
+                        "loan",
+                        "cold_storage",
+                        "lightning_node", 
+                        "hot_wallet",
                         "other"
                     ]
                     
@@ -2260,46 +2268,38 @@ def main_page():
                     type_icon = get_account_type_icon(account['account_type'])
                     balance_text, health_status, health_color = format_account_balance_with_health(account['balance'])
                     
-                    # Create enhanced account card
-                    with st.container():
-                        # Header row with account info
-                        header_col1, header_col2 = st.columns([3, 1])
+                    # Streamlined account display
+                    account_col1, account_col2, account_col3 = st.columns([4, 2, 1])
+                    
+                    with account_col1:
+                        st.markdown(f"**{type_icon} {account['name']}**")
+                        st.caption(f"{account['account_type'].replace('_', ' ').title()} • {health_status}")
+                    
+                    with account_col2:
+                        st.markdown(f"**{balance_text}**")
+                    
+                    with account_col3:
+                        # Simple dropdown menu for actions
+                        action = st.selectbox(
+                            "Actions",
+                            ["...", "📊 View", "✏️ Edit", "🗑️ Delete"],
+                            key=f"action_tracked_{account['id']}",
+                            label_visibility="collapsed"
+                        )
                         
-                        with header_col1:
-                            st.markdown(f"**{type_icon} {account['name']}**")
-                            st.caption(f"{account['account_type'].title()} • {health_status}")
-                        
-                        with header_col2:
-                            st.markdown(f"**{balance_text}**")
-                        
-                        # Visual balance bar based on account health
-                        if account['balance'] > 0:
-                            # Create a visual progress bar
-                            max_display = max(1_000_000, account['balance'])  # At least 1M sats for scale
-                            progress_value = min(1.0, account['balance'] / max_display)
-                            st.progress(progress_value)
-                        
-                        # Action buttons row
-                        action_col1, action_col2, action_col3 = st.columns(3)
-                        
-                        with action_col1:
-                            if st.button("📊 View", key=f"view_tracked_{account['id']}", help="View transactions", use_container_width=True):
-                                st.session_state.selected_account_id = account['id']
-                                st.session_state.selected_account_name = account['name']
+                        if action == "📊 View":
+                            st.session_state.selected_account_id = account['id']
+                            st.session_state.selected_account_name = account['name']
+                            st.rerun()
+                        elif action == "✏️ Edit":
+                            st.session_state[f'edit_account_{account["id"]}'] = True
+                            st.rerun()
+                        elif action == "🗑️ Delete":
+                            if delete_account(account['id']):
+                                st.success(f"Deleted {account['name']}")
                                 st.rerun()
-                        
-                        with action_col2:
-                            if st.button("✏️ Edit", key=f"edit_tracked_{account['id']}", help="Edit account", use_container_width=True):
-                                st.session_state[f'edit_account_{account["id"]}'] = True
-                                st.rerun()
-                        
-                        with action_col3:
-                            if st.button("🗑️ Delete", key=f"delete_tracked_{account['id']}", help="Delete account", use_container_width=True):
-                                if delete_account(account['id']):
-                                    st.success(f"Deleted {account['name']}")
-                                    st.rerun()
-                                else:
-                                    st.error("Cannot delete account with transactions")
+                            else:
+                                st.error("Cannot delete account with transactions")
                         
                         # Show edit form if in edit mode
                         if st.session_state.get(f'edit_account_{account["id"]}', False):
@@ -2344,46 +2344,38 @@ def main_page():
                     type_icon = get_account_type_icon(account['account_type'])
                     balance_text, health_status, health_color = format_account_balance_with_health(account['balance'])
                     
-                    # Create enhanced account card
-                    with st.container():
-                        # Header row with account info
-                        header_col1, header_col2 = st.columns([3, 1])
+                    # Streamlined account display
+                    account_col1, account_col2, account_col3 = st.columns([4, 2, 1])
+                    
+                    with account_col1:
+                        st.markdown(f"**{type_icon} {account['name']}**")
+                        st.caption(f"{account['account_type'].replace('_', ' ').title()} • {health_status}")
+                    
+                    with account_col2:
+                        st.markdown(f"**{balance_text}**")
+                    
+                    with account_col3:
+                        # Simple dropdown menu for actions
+                        action = st.selectbox(
+                            "Actions",
+                            ["...", "📊 View", "✏️ Edit", "🗑️ Delete"],
+                            key=f"action_untracked_{account['id']}",
+                            label_visibility="collapsed"
+                        )
                         
-                        with header_col1:
-                            st.markdown(f"**{type_icon} {account['name']}**")
-                            st.caption(f"{account['account_type'].title()} • {health_status}")
-                        
-                        with header_col2:
-                            st.markdown(f"**{balance_text}**")
-                        
-                        # Visual balance bar based on account health
-                        if account['balance'] > 0:
-                            # Create a visual progress bar
-                            max_display = max(1_000_000, account['balance'])  # At least 1M sats for scale
-                            progress_value = min(1.0, account['balance'] / max_display)
-                            st.progress(progress_value)
-                        
-                        # Action buttons row
-                        action_col1, action_col2, action_col3 = st.columns(3)
-                        
-                        with action_col1:
-                            if st.button("📊 View", key=f"view_untracked_{account['id']}", help="View transactions", use_container_width=True):
-                                st.session_state.selected_account_id = account['id']
-                                st.session_state.selected_account_name = account['name']
+                        if action == "📊 View":
+                            st.session_state.selected_account_id = account['id']
+                            st.session_state.selected_account_name = account['name']
+                            st.rerun()
+                        elif action == "✏️ Edit":
+                            st.session_state[f'edit_account_{account["id"]}'] = True
+                            st.rerun()
+                        elif action == "🗑️ Delete":
+                            if delete_account(account['id']):
+                                st.success(f"Deleted {account['name']}")
                                 st.rerun()
-                        
-                        with action_col2:
-                            if st.button("✏️ Edit", key=f"edit_untracked_{account['id']}", help="Edit account", use_container_width=True):
-                                st.session_state[f'edit_account_{account["id"]}'] = True
-                                st.rerun()
-                        
-                        with action_col3:
-                            if st.button("🗑️ Delete", key=f"delete_untracked_{account['id']}", help="Delete account", use_container_width=True):
-                                if delete_account(account['id']):
-                                    st.success(f"Deleted {account['name']}")
-                                    st.rerun()
-                                else:
-                                    st.error("Cannot delete account with transactions")
+                            else:
+                                st.error("Cannot delete account with transactions")
                         
                         # Show edit form if in edit mode
                         if st.session_state.get(f'edit_account_{account["id"]}', False):
