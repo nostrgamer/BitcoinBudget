@@ -1430,7 +1430,7 @@ def landing_page():
             1. Click "Get Started" to enter the app
             2. Go to the "Transactions" tab
             3. Click "Add Income" in the Income section
-            4. Enter amount in satoshis (e.g., 1000000 for 0.01 BTC)
+            4. Enter amount in satoshis (e.g., 1000000 sats = 0.01 BTC, but we only use sats here)
             5. Add a description like "Freelance payment"
             
             ### Step 2: Create Spending Categories 📁
@@ -1463,7 +1463,7 @@ def landing_page():
         st.markdown("""
             Here's what a typical Bitcoin budget might look like:
             
-            **Monthly Income:** 5,000,000 sats (0.05 BTC)
+            **Monthly Income:** 5,000,000 sats
             
             **Master Categories:**
             
@@ -1581,46 +1581,25 @@ def show_onboarding_guide():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.markdown(f"**Setup Progress: {steps_completed}/4 steps completed**")
+        st.markdown(f"**Setup Progress: {steps_completed}/4 steps**")
         st.progress(progress)
         
-        # Step-by-step guidance
+        # Simple step-by-step guidance
         if not has_accounts:
-            st.markdown("""
-                ### 🏦 Step 1: Set Up Your Accounts
-                Start by adding your Bitcoin accounts. You probably have demo accounts already - check the **Accounts** tab!
-                
-                **Why this matters:** Track your real Bitcoin balances across different wallets and accounts.
-            """)
+            st.markdown("### 🏦 Step 1: Add Bitcoin Accounts")
+            st.markdown("Check the **Accounts** tab - you likely have demo accounts to start with.")
         elif not has_categories:
-            st.markdown("""
-                ### 📁 Step 2: Create Spending Categories  
-                Create categories to organize your spending (you may have demo categories already).
-                
-                **Quick Start:** Try categories like "Food", "Rent", "Bitcoin Stack", "Entertainment"
-                """)
+            st.markdown("### 📁 Step 2: Create Spending Categories")
+            st.markdown("Use the **Categories** tab to organize your spending (Food, Rent, etc.)")
         elif not has_income:
-            st.markdown("""
-                ### 💰 Step 3: Add Your Income
-                Record Bitcoin income so you have funds to allocate to categories.
-                
-                **Try it:** Go to **Transactions** tab → **Add Income** → Enter amount in satoshis
-                """)
+            st.markdown("### 💰 Step 3: Add Income")
+            st.markdown("Go to **Transactions** → **Add Income** → Enter satoshis")
         elif not has_allocations:
-            st.markdown("""
-                ### 🎯 Step 4: Allocate Your Money
-                Assign your income to spending categories - this is the core of envelope budgeting!
-                
-                **Look below:** You should see "Available to Assign" funds ready to allocate.
-                """)
+            st.markdown("### 🎯 Step 4: Allocate Money to Categories")
+            st.markdown("Look below for 'Available to Assign' - this is envelope budgeting!")
         else:
-            st.markdown("""
-                ### 🎉 You're All Set!
-                Great job! You've completed the basic setup. Now you can:
-                - Add expenses to track spending
-                - View reports to analyze your Bitcoin budget
-                - Use the powerful analytics tools
-                """)
+            st.markdown("### 🎉 Setup Complete!")
+            st.markdown("Now track expenses and view reports to analyze your Bitcoin budget.")
     
     with col2:
         # Quick actions based on current state
@@ -1651,12 +1630,9 @@ def show_onboarding_guide():
             st.session_state.first_visit = False
             st.rerun()
     
-    # Show contextual tips based on demo data
+    # Simple demo data notice
     if has_accounts and has_categories and has_income:
-        st.info("""
-            💡 **You have demo data loaded!** This includes sample accounts, categories, and transactions. 
-            Feel free to experiment with it, or clear it and add your own real data.
-            """)
+        st.info("💡 **Demo data loaded.** Feel free to experiment or clear it and add your own data.")
 
 
 def show_quick_setup_modals():
@@ -1818,6 +1794,10 @@ def main_page():
     
     # === BUDGET SUMMARY METRICS ===
     st.markdown("### 💰 Budget Summary")
+    
+    # Simple Bitcoin unit explanation for first-time users
+    if st.session_state.get('first_visit', True):
+        st.info("💡 **Bitcoin Units:** 100,000,000 sats = 1 BTC. This app uses sats only for precision.")
     
     # Account-based calculations (simplified)
     tracked_balance = get_total_account_balance(tracked_only=True)
@@ -3283,43 +3263,25 @@ def sidebar_navigation():
             st.session_state.page = 'reports'
             st.rerun()
         
-        # Quick help section
+        # Simple contextual tip for first-time users
         if st.session_state.get('first_visit', True):
             st.markdown("---")
-            st.markdown("### 💡 Quick Tips")
+            st.markdown("### 💡 Next Step")
             
-            # Contextual tips based on current state
+            # Simple, clear guidance
             accounts = get_accounts()
             categories = get_categories()
             transactions = st.session_state.user_data['transactions']
             has_income = any(t['type'] == 'income' for t in transactions)
             
             if len(accounts) == 0:
-                st.info("👆 Start by going to **Tutorial & Examples** to understand the concepts!")
+                st.info("**Start:** Go to Tutorial & Examples to learn the basics")
             elif len(categories) == 0:
-                st.info("📁 Create spending categories to organize your Bitcoin budget")
+                st.info("**Create:** Add spending categories in the main app")
             elif not has_income:
-                st.info("💰 Add income transactions to fund your budget envelopes")
+                st.info("**Add Income:** Record Bitcoin income to begin budgeting")
             else:
-                st.info("🎯 Allocate your income to categories, then track spending against those envelopes")
-        
-        if not st.session_state.get('first_visit', True):
-            with st.expander("❓ Need Help?", expanded=False):
-                st.markdown("""
-                    **Getting Started:**
-                    - 📖 View tutorial and examples
-                    - 🏦 Set up your Bitcoin accounts  
-                    - 📁 Create spending categories
-                    - 💰 Add income transactions
-                    - 🎯 Allocate money to categories
-                    - 💸 Track expenses
-                    
-                    **Advanced Features:**
-                    - 📊 View detailed analytics
-                    - 🚀 See future value projections
-                    - 💔 Analyze opportunity costs
-                    - 💾 Export/import your data
-                    """)
+                st.info("**Allocate:** Assign your income to spending categories")
         
         st.markdown("---")
         
