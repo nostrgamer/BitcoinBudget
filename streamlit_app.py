@@ -800,27 +800,20 @@ def format_btc(satoshis):
     return f"{btc:.8f} BTC"
 
 def parse_amount_input(text):
-    """Parse user input to satoshis with improved validation"""
+    """Parse user input to satoshis - sats only, no BTC (rejecting BIP 178)"""
     text = text.strip().replace(',', '')
     
     if not text:
         raise ValueError("Amount cannot be empty")
     
+    # Reject BTC input completely (formally rejecting BIP 178)
+    if 'btc' in text.lower():
+        raise ValueError("BTC input not supported. Please enter amount in satoshis only.")
+    
     try:
-        if text.lower().endswith(' btc'):
-            btc_amount = float(text[:-4])
-            if btc_amount < 0:
-                raise ValueError("Amount must be positive")
-            result = int(btc_amount * 100_000_000)
-        elif text.lower().endswith('btc'):
-            btc_amount = float(text[:-3])
-            if btc_amount < 0:
-                raise ValueError("Amount must be positive")
-            result = int(btc_amount * 100_000_000)
-        else:
-            result = int(float(text))
-            if result < 0:
-                raise ValueError("Amount must be positive")
+        result = int(float(text))
+        if result < 0:
+            raise ValueError("Amount must be positive")
         
         # Check for reasonable limits
         if result > 21_000_000 * 100_000_000:  # More than total Bitcoin supply
@@ -829,7 +822,7 @@ def parse_amount_input(text):
         return result
     except (ValueError, TypeError) as e:
         if "could not convert" in str(e).lower() or "invalid literal" in str(e).lower():
-            raise ValueError("Invalid number format. Use formats like: 1000000, 1,000,000, or 0.01 BTC")
+            raise ValueError("Invalid number format. Enter satoshis as numbers only (e.g., 1000000 or 1,000,000)")
         raise e
 
 def validate_amount_input(text):
@@ -2178,8 +2171,8 @@ def main_page():
                 with col2:
                     initial_balance = st.text_input(
                         "Initial Balance", 
-                        placeholder="50000 or 0.0005 BTC",
-                        help="Enter current account balance"
+                        placeholder="50000",
+                        help="Enter current account balance in satoshis"
                     )
                     
                     # Real-time balance validation
@@ -2312,7 +2305,7 @@ def main_page():
                 with col3:
                     transfer_amount = st.text_input(
                         "Amount",
-                        placeholder="25000 or 0.00025 BTC"
+                        placeholder="25000"
                     )
                     
                     # Real-time transfer amount validation
@@ -2423,8 +2416,8 @@ def main_page():
                     
                     transaction_amount = st.text_input(
                         "Amount",
-                        placeholder="1000000 or 0.01 BTC",
-                        help="Enter amount in sats or BTC"
+                        placeholder="1000000",
+                        help="Enter amount in satoshis"
                     )
                     
                     # Real-time amount validation
@@ -2499,8 +2492,8 @@ def main_page():
                     with col2:
                         transaction_amount = st.text_input(
                             "Amount",
-                            placeholder="50000 or 0.0005 BTC",
-                            help="Enter amount in sats or BTC"
+                            placeholder="50000",
+                            help="Enter amount in satoshis"
                         )
                         
                         # Real-time amount validation
