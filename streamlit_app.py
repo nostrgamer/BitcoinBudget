@@ -838,7 +838,7 @@ def parse_amount_input(text):
         return result
     except (ValueError, TypeError) as e:
         if "could not convert" in str(e).lower() or "invalid literal" in str(e).lower():
-            raise ValueError("Invalid number format. Enter satoshis as numbers only (e.g., 1000000 or 1,000,000)")
+            raise ValueError("Invalid number format. Enter satoshis as numbers only (e.g., 1,000,000)")
         raise e
 
 def validate_amount_input(text):
@@ -1430,7 +1430,7 @@ def landing_page():
             1. Click "Get Started" to enter the app
             2. Go to the "Transactions" tab
             3. Click "Add Income" in the Income section
-            4. Enter amount in satoshis (e.g., 1000000 sats = 0.01 BTC, but we only use sats here)
+            4. Enter amount in satoshis (e.g., 1,000,000 sats = 0.01 BTC, but we only use sats here)
             5. Add a description like "Freelance payment"
             
             ### Step 2: Create Spending Categories 📁
@@ -1647,7 +1647,7 @@ def show_quick_setup_modals():
                 with col1:
                     name = st.text_input("Account Name", value="My Bitcoin Wallet", placeholder="e.g., Main Checking, Cold Storage")
                 with col2:
-                    balance = st.text_input("Current Balance (sats)", value="1000000", placeholder="1000000")
+                    balance = st.text_input("Current Balance (sats)", value="1,000,000", placeholder="1,000,000")
                 
                 col3, col4 = st.columns(2)
                 with col3:
@@ -1748,7 +1748,7 @@ def show_quick_setup_modals():
                 with st.form("quick_income_form"):
                     col1, col2 = st.columns(2)
                     with col1:
-                        amount = st.text_input("Income Amount (sats)", value="5000000", placeholder="5000000")
+                        amount = st.text_input("Income Amount (sats)", value="5,000,000", placeholder="5,000,000")
                         description = st.text_input("Description", value="Salary/Work Payment", placeholder="e.g., Freelance payment, Salary")
                     
                     with col2:
@@ -2875,7 +2875,7 @@ def main_page():
                     
                     transaction_amount = st.text_input(
                         "Amount",
-                        placeholder="1000000",
+                        placeholder="1,000,000",
                         help="Enter amount in satoshis"
                     )
                     
