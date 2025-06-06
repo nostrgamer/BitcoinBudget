@@ -1601,84 +1601,115 @@ def main_page():
 
         st.markdown("---")
 
+        # Initialize collapsed state if not present
+        if 'collapsed_master_categories' not in st.session_state:
+            st.session_state.collapsed_master_categories = set()
+        
         # Get all master categories and categories
         master_categories = get_master_categories()
         all_categories = get_categories()
         
         if master_categories or all_categories:
+            # Add sorting controls
+            col1, col2, col3 = st.columns([2, 2, 1])
+            with col1:
+                if st.button("📊 Sort Master Categories A-Z", help="Sort master categories alphabetically"):
+                    master_categories.sort(key=lambda x: x['name'])
+                    st.rerun()
+            with col2:
+                if st.button("📋 Sort Categories A-Z", help="Sort categories within each master category"):
+                    # Sort categories within their master categories
+                    for mc in master_categories:
+                        mc_categories = [cat for cat in all_categories if cat['master_category_id'] == mc['id']]
+                        mc_categories.sort(key=lambda x: x['name'])
+                    st.rerun()
+            with col3:
+                expand_all = st.button("📂 Expand All", help="Expand all master categories")
+                if expand_all:
+                    st.session_state.collapsed_master_categories.clear()
+                    st.rerun()
+            
             # Build unified table data with proper grouping
             table_data = []
             grand_allocated = 0
             grand_spent = 0
             grand_balance = 0
             
+            # Sort master categories alphabetically
+            master_categories_sorted = sorted(master_categories, key=lambda x: x['name'])
+            
             # Get all master category names (including empty ones)
-            master_names = [mc['name'] for mc in master_categories]
+            master_names = [mc['name'] for mc in master_categories_sorted]
             
             # Add "Uncategorized" for categories without master category
             master_names.append('Uncategorized')
             
-            # Group categories by master category
+            # Group categories by master category with collapsible functionality
             for master_name in master_names:
                 # Find categories for this master category
                 if master_name == 'Uncategorized':
                     categories_in_group = [cat for cat in all_categories if cat['master_category_id'] is None]
                 else:
-                    master_id = next((mc['id'] for mc in master_categories if mc['name'] == master_name), None)
+                    master_id = next((mc['id'] for mc in master_categories_sorted if mc['name'] == master_name), None)
                     categories_in_group = [cat for cat in all_categories if cat['master_category_id'] == master_id]
+                
+                # Sort categories within this group alphabetically
+                categories_in_group.sort(key=lambda x: x['name'])
                 
                 # Calculate master category totals
                 master_allocated = 0
                 master_spent = 0
                 master_balance = 0
                 
-                # Add master category header row
-                table_data.append({
-                    'ID': f"master_{master_name}",
-                    'Type': 'master',
-                    'Category': f"📂 {master_name}",
-                    'Master_Category_Assignment': master_name,
-                    'Current_Balance': 0,  # Will be calculated
-                    'This_Month_Allocation': 0,  # Will be calculated
-                    'Spent': 0,      # Will be calculated
-                    'Status': '📊 Total'
-                })
-                
-                # Add individual categories under this master category
+                # Calculate totals first
                 for cat in categories_in_group:
-                    # In account-based budgeting, we care about current balance, not monthly allocations
                     current_balance = get_category_balance(cat['id'], current_month)
-                    current_month_allocation = get_category_allocated(cat['id'], current_month)
                     spent = get_category_spent(cat['id'], current_month)
-                    
                     master_allocated += current_balance
                     master_spent += spent
                     master_balance += current_balance
-                    
-                    # Get master category options for reassignment
-                    master_options_for_cat = ['Uncategorized'] + [mc['name'] for mc in master_categories]
-                    current_master = cat['master_category_name'] or 'Uncategorized'
-                    
-                    table_data.append({
-                        'ID': cat['id'],
-                        'Type': 'category',
-                        'Category': f"    {cat['name']}", # Indent to show hierarchy
-                        'Master_Category_Assignment': current_master,
-                        'Current_Balance': current_balance,
-                        'This_Month_Allocation': current_month_allocation,  # Show current month's allocation
-                        'Spent': spent,
-                        'Status': '✅ Good' if current_balance >= 0 else '⚠️ Overspent'
-                    })
                 
-                # Update master category totals in the header row
+                # Check if this master category is collapsed
+                is_collapsed = master_name in st.session_state.collapsed_master_categories
+                collapse_icon = "📁" if is_collapsed else "📂"
+                
+                # Add master category header row with click functionality
                 master_month_allocation = sum(get_category_allocated(cat['id'], current_month) for cat in categories_in_group)
-                for row in table_data:
-                    if row['ID'] == f"master_{master_name}":
-                        row['Current_Balance'] = master_allocated
-                        row['This_Month_Allocation'] = master_month_allocation
-                        row['Spent'] = master_spent
-                        row['Status'] = '📊 Total' if master_balance >= 0 else '⚠️ Over'
-                        break
+                
+                table_data.append({
+                    'ID': f"master_{master_name}",
+                    'Type': 'master',
+                    'Category': f"{collapse_icon} {master_name} ({len(categories_in_group)} categories)",
+                    'Master_Category_Assignment': master_name,
+                    'Current_Balance': master_allocated,
+                    'This_Month_Allocation': master_month_allocation,
+                    'Spent': master_spent,
+                    'Status': '📊 Total' if master_balance >= 0 else '⚠️ Over'
+                })
+                
+                # Only show individual categories if not collapsed
+                if not is_collapsed:
+                    # Add individual categories under this master category
+                    for cat in categories_in_group:
+                        # In account-based budgeting, we care about current balance, not monthly allocations
+                        current_balance = get_category_balance(cat['id'], current_month)
+                        current_month_allocation = get_category_allocated(cat['id'], current_month)
+                        spent = get_category_spent(cat['id'], current_month)
+                        
+                        # Get master category options for reassignment
+                        master_options_for_cat = ['Uncategorized'] + [mc['name'] for mc in master_categories]
+                        current_master = cat['master_category_name'] or 'Uncategorized'
+                        
+                        table_data.append({
+                            'ID': cat['id'],
+                            'Type': 'category',
+                            'Category': f"    {cat['name']}", # Indent to show hierarchy
+                            'Master_Category_Assignment': current_master,
+                            'Current_Balance': current_balance,
+                            'This_Month_Allocation': current_month_allocation,  # Show current month's allocation
+                            'Spent': spent,
+                            'Status': '✅ Good' if current_balance >= 0 else '⚠️ Overspent'
+                        })
                 
                 # Add to grand totals
                 grand_allocated += master_allocated
@@ -1780,6 +1811,30 @@ def main_page():
                         st.session_state.data_editor_refresh_count = 0
                     st.session_state.data_editor_refresh_count += 1
                     st.rerun()
+            
+            # Check if user clicked on a master category to toggle collapse/expand
+            # Add clickable areas for master categories
+            st.markdown("#### 📁 Click Master Categories to Collapse/Expand")
+            click_cols = st.columns(len(master_names) if master_names else 1)
+            
+            for i, master_name in enumerate(master_names):
+                with click_cols[i % len(click_cols)]:
+                    is_collapsed = master_name in st.session_state.collapsed_master_categories
+                    icon = "📁" if is_collapsed else "📂"
+                    
+                    # Count categories in this master
+                    if master_name == 'Uncategorized':
+                        cat_count = len([cat for cat in all_categories if cat['master_category_id'] is None])
+                    else:
+                        master_id = next((mc['id'] for mc in master_categories_sorted if mc['name'] == master_name), None)
+                        cat_count = len([cat for cat in all_categories if cat['master_category_id'] == master_id])
+                    
+                    if st.button(f"{icon} {master_name} ({cat_count})", key=f"toggle_{master_name}"):
+                        if is_collapsed:
+                            st.session_state.collapsed_master_categories.remove(master_name)
+                        else:
+                            st.session_state.collapsed_master_categories.add(master_name)
+                        st.rerun()
             
             # Delete functionality section
             st.markdown("---")
