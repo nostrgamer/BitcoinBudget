@@ -800,14 +800,60 @@ def format_btc(satoshis):
     return f"{btc:.8f} BTC"
 
 def parse_amount_input(text):
-    """Parse user input to satoshis"""
+    """Parse user input to satoshis with improved validation"""
     text = text.strip().replace(',', '')
     
-    if text.lower().endswith(' btc'):
-        btc_amount = float(text[:-4])
-        return int(btc_amount * 100_000_000)
-    else:
-        return int(text)
+    if not text:
+        raise ValueError("Amount cannot be empty")
+    
+    try:
+        if text.lower().endswith(' btc'):
+            btc_amount = float(text[:-4])
+            if btc_amount < 0:
+                raise ValueError("Amount must be positive")
+            result = int(btc_amount * 100_000_000)
+        elif text.lower().endswith('btc'):
+            btc_amount = float(text[:-3])
+            if btc_amount < 0:
+                raise ValueError("Amount must be positive")
+            result = int(btc_amount * 100_000_000)
+        else:
+            result = int(float(text))
+            if result < 0:
+                raise ValueError("Amount must be positive")
+        
+        # Check for reasonable limits
+        if result > 21_000_000 * 100_000_000:  # More than total Bitcoin supply
+            raise ValueError("Amount too large - exceeds total Bitcoin supply")
+        
+        return result
+    except (ValueError, TypeError) as e:
+        if "could not convert" in str(e).lower() or "invalid literal" in str(e).lower():
+            raise ValueError("Invalid number format. Use formats like: 1000000, 1,000,000, or 0.01 BTC")
+        raise e
+
+def validate_amount_input(text):
+    """Validate amount input and return (is_valid, message, formatted_preview)"""
+    if not text:
+        return False, "", ""
+    
+    try:
+        amount_sats = parse_amount_input(text)
+        formatted = format_sats(amount_sats)
+        return True, f"✅ Valid amount", f"{formatted}"
+    except ValueError as e:
+        return False, f"❌ {str(e)}", ""
+
+def get_unique_descriptions(transaction_type=None, limit=20):
+    """Get unique transaction descriptions for autocomplete suggestions"""
+    descriptions = set()
+    
+    for trans in st.session_state.user_data['transactions']:
+        if transaction_type is None or trans['type'] == transaction_type:
+            descriptions.add(trans['description'])
+    
+    # Return most recent unique descriptions (sorted alphabetically for consistency)
+    return sorted(list(descriptions))[:limit]
 
 def get_current_month():
     """Return current month as 'YYYY-MM'"""
@@ -2144,6 +2190,15 @@ def main_page():
                         placeholder="50000 or 0.0005 BTC",
                         help="Enter current account balance"
                     )
+                    
+                    # Real-time balance validation
+                    if initial_balance:
+                        is_valid, message, preview = validate_amount_input(initial_balance)
+                        if is_valid:
+                            st.success(f"{message}: {preview}")
+                        else:
+                            st.error(message)
+                    
                     is_tracked = st.checkbox(
                         "Tracked Account", 
                         value=True,
@@ -2159,8 +2214,8 @@ def main_page():
                                 st.rerun()
                             else:
                                 st.error("❌ Account name already exists")
-                        except ValueError:
-                            st.error("❌ Invalid balance format")
+                        except ValueError as e:
+                            st.error(f"❌ {str(e)}")
                     else:
                         st.error("❌ Please fill in all required fields")
         
@@ -2268,6 +2323,14 @@ def main_page():
                         "Amount",
                         placeholder="25000 or 0.00025 BTC"
                     )
+                    
+                    # Real-time transfer amount validation
+                    if transfer_amount:
+                        is_valid, message, preview = validate_amount_input(transfer_amount)
+                        if is_valid:
+                            st.success(f"{message}: {preview}")
+                        else:
+                            st.error(message)
                 
                 if st.form_submit_button("Transfer"):
                     if from_account != to_account and transfer_amount:
@@ -2283,8 +2346,8 @@ def main_page():
                                 st.rerun()
                             else:
                                 st.error("❌ Transfer failed - insufficient funds")
-                        except ValueError:
-                            st.error("❌ Invalid amount format")
+                        except ValueError as e:
+                            st.error(f"❌ {str(e)}")
                     else:
                         st.error("❌ Please select different accounts and enter amount")
         else:
@@ -2355,8 +2418,22 @@ def main_page():
             help="Select whether this is income or an expense"
         )
         
+        # Get autocomplete suggestions
+        income_descriptions = get_unique_descriptions('income', 10)
+        expense_descriptions = get_unique_descriptions('expense', 10)
+        
         # Dynamic form based on transaction type
         if transaction_type == "Income":
+            # Autocomplete suggestions outside the form
+            if income_descriptions:
+                st.markdown("💡 **Quick-fill from recent income descriptions:**")
+                suggestion_cols = st.columns(min(3, len(income_descriptions)))
+                for i, desc in enumerate(income_descriptions[:3]):  # Show top 3
+                    with suggestion_cols[i % len(suggestion_cols)]:
+                        if st.button(f"📝 {desc[:15]}...", key=f"income_desc_{i}", help=desc):
+                            st.session_state.income_description_suggestion = desc
+                            st.rerun()
+            
             with st.form("add_income_form"):
                 col1, col2 = st.columns(2)
                 
@@ -2372,10 +2449,19 @@ def main_page():
                         placeholder="1000000 or 0.01 BTC",
                         help="Enter amount in sats or BTC"
                     )
+                    
+                    # Real-time amount validation
+                    if transaction_amount:
+                        is_valid, message, preview = validate_amount_input(transaction_amount)
+                        if is_valid:
+                            st.success(f"{message}: {preview}")
+                        else:
+                            st.error(message)
                 
                 with col2:
                     transaction_description = st.text_input(
                         "Description",
+                        value=st.session_state.get('income_description_suggestion', ''),
                         placeholder="Salary, freelance, etc.",
                         help="Brief description of income source"
                     )
@@ -2406,18 +2492,31 @@ def main_page():
                                         break
                             
                             if add_income(amount_sats, transaction_description, str(transaction_date), account_id):
+                                # Clear suggestion after successful submission
+                                if 'income_description_suggestion' in st.session_state:
+                                    del st.session_state.income_description_suggestion
                                 st.success(f"✅ Added income: {format_sats(amount_sats)} - {transaction_description}")
                                 st.rerun()
                             else:
                                 st.error("❌ Failed to add income")
-                        except ValueError:
-                            st.error("❌ Invalid amount format")
+                        except ValueError as e:
+                            st.error(f"❌ {str(e)}")
                     else:
                         st.error("❌ Please fill in all required fields")
         
         else:  # Expense
             categories = get_categories()
             if categories:
+                # Autocomplete suggestions outside the form
+                if expense_descriptions:
+                    st.markdown("💡 **Quick-fill from recent expense descriptions:**")
+                    suggestion_cols = st.columns(min(3, len(expense_descriptions)))
+                    for i, desc in enumerate(expense_descriptions[:3]):  # Show top 3
+                        with suggestion_cols[i % len(suggestion_cols)]:
+                            if st.button(f"📝 {desc[:15]}...", key=f"expense_desc_{i}", help=desc):
+                                st.session_state.expense_description_suggestion = desc
+                                st.rerun()
+                
                 with st.form("add_expense_form"):
                     col1, col2 = st.columns(2)
                     
@@ -2441,8 +2540,17 @@ def main_page():
                             help="Enter amount in sats or BTC"
                         )
                         
+                        # Real-time amount validation
+                        if transaction_amount:
+                            is_valid, message, preview = validate_amount_input(transaction_amount)
+                            if is_valid:
+                                st.success(f"{message}: {preview}")
+                            else:
+                                st.error(message)
+                        
                         transaction_description = st.text_input(
                             "Description",
+                            value=st.session_state.get('expense_description_suggestion', ''),
                             placeholder="Coffee, groceries, etc.",
                             help="Brief description of expense"
                         )
@@ -2481,12 +2589,15 @@ def main_page():
                                 
                                 if category_id:
                                     if add_expense(amount_sats, transaction_description, category_id, str(transaction_date), account_id):
+                                        # Clear suggestion after successful submission
+                                        if 'expense_description_suggestion' in st.session_state:
+                                            del st.session_state.expense_description_suggestion
                                         st.success(f"✅ Added expense: {format_sats(amount_sats)} - {transaction_description}")
                                         st.rerun()
                                     else:
                                         st.error("❌ Failed to add expense")
-                            except ValueError:
-                                st.error("❌ Invalid amount format")
+                            except ValueError as e:
+                                st.error(f"❌ {str(e)}")
                         else:
                             st.error("❌ Please fill in all required fields")
             else:
