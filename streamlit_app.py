@@ -389,7 +389,7 @@ def delete_transaction(transaction_id):
         st.error(f"Error deleting transaction: {e}")
         return False
 
-def update_transaction(transaction_id, date, description, amount, category_id=None):
+def update_transaction(transaction_id, date, description, amount, category_id=None, account_id=None):
     """Update a transaction"""
     try:
         for transaction in st.session_state.user_data['transactions']:
@@ -399,6 +399,8 @@ def update_transaction(transaction_id, date, description, amount, category_id=No
                 transaction['amount'] = amount
                 if category_id is not None:
                     transaction['category_id'] = category_id
+                if account_id is not None:
+                    transaction['account_id'] = account_id
                 return True
         return False
     except Exception as e:
@@ -578,6 +580,36 @@ def get_recent_transactions(limit=20):
     
     return transactions
 
+def get_all_transactions():
+    """Get ALL transactions with IDs (no limit)"""
+    transactions = []
+    
+    # Sort transactions by date (most recent first)
+    sorted_transactions = sorted(
+        st.session_state.user_data['transactions'], 
+        key=lambda x: x['date'], 
+        reverse=True
+    )
+    
+    for transaction in sorted_transactions:
+        category_name = None
+        if transaction['category_id']:
+            for cat in st.session_state.user_data['categories']:
+                if cat['id'] == transaction['category_id']:
+                    category_name = cat['name']
+                    break
+        
+        transactions.append((
+            transaction['id'],
+            transaction['date'],
+            transaction['description'],
+            transaction['amount'],
+            transaction['type'],
+            category_name
+        ))
+    
+    return transactions
+
 def get_expense_transactions(limit=50):
     """Get recent expense transactions for lifecycle cost analysis"""
     transactions = []
@@ -659,6 +691,22 @@ def update_account_balance(account_id, new_balance):
         for account in st.session_state.user_data['accounts']:
             if account['id'] == account_id:
                 account['balance'] = new_balance
+                return True
+        return False
+    except Exception:
+        return False
+
+def update_account(account_id, new_balance=None, new_type=None, new_name=None):
+    """Update account with multiple fields"""
+    try:
+        for account in st.session_state.user_data['accounts']:
+            if account['id'] == account_id:
+                if new_balance is not None:
+                    account['balance'] = new_balance
+                if new_type is not None:
+                    account['account_type'] = new_type
+                if new_name is not None:
+                    account['name'] = new_name
                 return True
         return False
     except Exception:
@@ -768,14 +816,75 @@ def format_btc(satoshis):
     return f"{btc:.8f} BTC"
 
 def parse_amount_input(text):
-    """Parse user input to satoshis"""
+    """Parse user input to satoshis - sats only, no BTC (rejecting BIP 178)"""
     text = text.strip().replace(',', '')
     
-    if text.lower().endswith(' btc'):
-        btc_amount = float(text[:-4])
-        return int(btc_amount * 100_000_000)
-    else:
-        return int(text)
+    if not text:
+        raise ValueError("Amount cannot be empty")
+    
+    # Reject BTC input completely (formally rejecting BIP 178)
+    if 'btc' in text.lower():
+        raise ValueError("BTC input not supported. Please enter amount in satoshis only.")
+    
+    try:
+        result = int(float(text))
+        if result < 0:
+            raise ValueError("Amount must be positive")
+        
+        # Check for reasonable limits
+        if result > 21_000_000 * 100_000_000:  # More than total Bitcoin supply
+            raise ValueError("Amount too large - exceeds total Bitcoin supply")
+        
+        return result
+    except (ValueError, TypeError) as e:
+        if "could not convert" in str(e).lower() or "invalid literal" in str(e).lower():
+            raise ValueError("Invalid number format. Enter satoshis as numbers only (e.g., 1000000 or 1,000,000)")
+        raise e
+
+def validate_amount_input(text):
+    """Validate amount input and return (is_valid, message, formatted_preview)"""
+    if not text:
+        return False, "", ""
+    
+    try:
+        amount_sats = parse_amount_input(text)
+        formatted = format_sats(amount_sats)
+        return True, f"✅ Valid amount", f"{formatted}"
+    except ValueError as e:
+        return False, f"❌ {str(e)}", ""
+
+
+
+def get_account_type_icon(account_type):
+    """Get icon for account type"""
+    icons = {
+        'checking': '🏦',
+        'savings': '💰', 
+        'investment': '📈',
+        'credit': '💳',
+        'loan': '🏠',
+        'cold_storage': '🧊',
+        'lightning_node': '⚡',
+        'hot_wallet': '🔥',
+        'other': '📱'
+    }
+    return icons.get(account_type, '📱')
+
+def get_account_health_status(balance):
+    """Get account health status based on balance"""
+    if balance <= 0:
+        return "🔴", "Empty", "#ff4444"
+    elif balance < 100_000:  # Less than 100k sats
+        return "🟡", "Low", "#ffaa00"
+    elif balance < 1_000_000:  # Less than 1M sats
+        return "🟢", "Good", "#44ff44"
+    else:  # 1M+ sats
+        return "💎", "Excellent", "#44aaff"
+
+def format_account_balance_with_health(balance):
+    """Format balance with health indicator"""
+    icon, status, color = get_account_health_status(balance)
+    return f"{icon} {format_sats(balance)}", status, color
 
 def get_current_month():
     """Return current month as 'YYYY-MM'"""
@@ -1321,7 +1430,7 @@ def landing_page():
             1. Click "Get Started" to enter the app
             2. Go to the "Transactions" tab
             3. Click "Add Income" in the Income section
-            4. Enter amount in satoshis (e.g., 1000000 for 0.01 BTC)
+            4. Enter amount in satoshis (e.g., 1000000 sats = 0.01 BTC, but we only use sats here)
             5. Add a description like "Freelance payment"
             
             ### Step 2: Create Spending Categories 📁
@@ -1354,7 +1463,7 @@ def landing_page():
         st.markdown("""
             Here's what a typical Bitcoin budget might look like:
             
-            **Monthly Income:** 5,000,000 sats (0.05 BTC)
+            **Monthly Income:** 5,000,000 sats
             
             **Master Categories:**
             
@@ -1442,6 +1551,232 @@ def landing_page():
     # Security notice
     st.info("🔒 **Privacy Notice**: Your data is stored securely in your browser session only. Each user has their own private data that is not shared with others. Data persists during your session but will be lost when you close your browser.")
 
+def show_onboarding_guide():
+    """Show interactive onboarding guide for first-time users"""
+    st.markdown("""
+        <div style="background: linear-gradient(135deg, #f7931a 0%, #ff6b35 100%); 
+             padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;">
+            <h3 style="color: white; text-align: center; margin: 0; font-size: 1.4rem;">
+                🎯 Welcome to Bitcoin Budget! Let's get you started
+            </h3>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Check current data state to provide contextual guidance
+    accounts = get_accounts()
+    categories = get_categories()
+    transactions = st.session_state.user_data['transactions']
+    
+    # Determine user's current step in setup
+    has_accounts = len(accounts) > 0
+    has_categories = len(categories) > 0
+    has_income = any(t['type'] == 'income' for t in transactions)
+    has_expenses = any(t['type'] == 'expense' for t in transactions)
+    has_allocations = len(st.session_state.user_data['allocations']) > 0
+    
+    # Progress indicators
+    steps_completed = sum([has_accounts, has_categories, has_income, has_allocations])
+    progress = steps_completed / 4
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown(f"**Setup Progress: {steps_completed}/4 steps**")
+        st.progress(progress)
+        
+        # Simple step-by-step guidance
+        if not has_accounts:
+            st.markdown("### 🏦 Step 1: Add Bitcoin Accounts")
+            st.markdown("Check the **Accounts** tab - you likely have demo accounts to start with.")
+        elif not has_categories:
+            st.markdown("### 📁 Step 2: Create Spending Categories")
+            st.markdown("Use the **Categories** tab to organize your spending (Food, Rent, etc.)")
+        elif not has_income:
+            st.markdown("### 💰 Step 3: Add Income")
+            st.markdown("Go to **Transactions** → **Add Income** → Enter satoshis")
+        elif not has_allocations:
+            st.markdown("### 🎯 Step 4: Allocate Money to Categories")
+            st.markdown("Look below for 'Available to Assign' - this is envelope budgeting!")
+        else:
+            st.markdown("### 🎉 Setup Complete!")
+            st.markdown("Now track expenses and view reports to analyze your Bitcoin budget.")
+    
+    with col2:
+        # Quick actions based on current state
+        st.markdown("**Quick Actions:**")
+        
+        if not has_accounts and len(accounts) == 0:
+            if st.button("🏦 Add First Account", use_container_width=True):
+                st.session_state.quick_account_setup = True
+                st.rerun()
+        elif not has_categories and len(categories) == 0:
+            if st.button("📁 Add First Category", use_container_width=True):
+                st.session_state.quick_category_setup = True
+                st.rerun()
+        elif not has_income:
+            if st.button("💰 Add Income", use_container_width=True):
+                st.session_state.quick_income_setup = True
+                st.rerun()
+        else:
+            if st.button("📊 View Reports", use_container_width=True):
+                st.session_state.page = 'reports'
+                st.rerun()
+        
+        if st.button("📖 Back to Tutorial", use_container_width=True):
+            st.session_state.page = 'landing'
+            st.rerun()
+        
+        if st.button("✅ Hide This Guide", use_container_width=True):
+            st.session_state.first_visit = False
+            st.rerun()
+    
+    # Simple demo data notice
+    if has_accounts and has_categories and has_income:
+        st.info("💡 **Demo data loaded.** Feel free to experiment or clear it and add your own data.")
+
+
+def show_quick_setup_modals():
+    """Show quick setup modals for guided onboarding"""
+    
+    # Quick Account Setup
+    if st.session_state.get('quick_account_setup', False):
+        with st.expander("🏦 Quick Account Setup", expanded=True):
+            st.markdown("**Add your first Bitcoin account:**")
+            with st.form("quick_account_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    name = st.text_input("Account Name", value="My Bitcoin Wallet", placeholder="e.g., Main Checking, Cold Storage")
+                with col2:
+                    balance = st.text_input("Current Balance (sats)", value="1000000", placeholder="1000000")
+                
+                col3, col4 = st.columns(2)
+                with col3:
+                    account_type = st.selectbox("Account Type", 
+                        ['checking', 'savings', 'hot_wallet', 'cold_storage', 'lightning_node'], 
+                        format_func=lambda x: {
+                            'checking': '🏦 Checking',
+                            'savings': '💰 Savings', 
+                            'hot_wallet': '🔥 Hot Wallet',
+                            'cold_storage': '🧊 Cold Storage',
+                            'lightning_node': '⚡ Lightning Node'
+                        }.get(x, x))
+                with col4:
+                    is_tracked = st.selectbox("Budget Tracking", [True, False], 
+                        format_func=lambda x: "✅ On-Budget (Tracked)" if x else "📋 Off-Budget (Savings)")
+                
+                col_submit, col_cancel = st.columns(2)
+                with col_submit:
+                    if st.form_submit_button("✅ Add Account", use_container_width=True):
+                        try:
+                            balance_sats = parse_amount_input(balance)
+                            if add_account(name, balance_sats, is_tracked, account_type):
+                                st.success(f"✅ Added account: {name}")
+                                st.session_state.quick_account_setup = False
+                                st.rerun()
+                        except ValueError as e:
+                            st.error(f"❌ {str(e)}")
+                
+                with col_cancel:
+                    if st.form_submit_button("❌ Cancel", use_container_width=True):
+                        st.session_state.quick_account_setup = False
+                        st.rerun()
+    
+    # Quick Category Setup
+    if st.session_state.get('quick_category_setup', False):
+        with st.expander("📁 Quick Category Setup", expanded=True):
+            st.markdown("**Create your first spending categories:**")
+            
+            # Suggest common categories
+            suggested_categories = [
+                ("Fixed Expenses", ["Rent", "Phone", "Internet"]),
+                ("Variable Expenses", ["Food", "Transportation", "Entertainment"]),
+                ("Savings & Goals", ["Bitcoin Stack", "Emergency Fund"])
+            ]
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("🚀 Add Suggested Categories", use_container_width=True):
+                    categories_added = 0
+                    for master_name, category_names in suggested_categories:
+                        # Add master category
+                        if add_master_category(master_name):
+                            master_categories = get_master_categories()
+                            master_cat = next((mc for mc in master_categories if mc['name'] == master_name), None)
+                            
+                            if master_cat:
+                                # Add subcategories
+                                for cat_name in category_names:
+                                    if add_category(cat_name):
+                                        assign_category_to_master(get_categories()[-1]['id'], master_cat['id'])
+                                        categories_added += 1
+                    
+                    if categories_added > 0:
+                        st.success(f"✅ Added {categories_added} categories!")
+                        st.session_state.quick_category_setup = False
+                        st.rerun()
+            
+            with col2:
+                if st.button("❌ I'll Set Up Later", use_container_width=True):
+                    st.session_state.quick_category_setup = False
+                    st.rerun()
+            
+            st.markdown("**Or add a custom category:**")
+            with st.form("quick_category_form"):
+                new_category = st.text_input("Category Name", placeholder="e.g., Food, Rent, Bitcoin Stack")
+                
+                if st.form_submit_button("Add Category"):
+                    if new_category:
+                        if add_category(new_category):
+                            st.success(f"✅ Added category: {new_category}")
+                            st.session_state.quick_category_setup = False
+                            st.rerun()
+    
+    # Quick Income Setup  
+    if st.session_state.get('quick_income_setup', False):
+        with st.expander("💰 Quick Income Setup", expanded=True):
+            st.markdown("**Add your first income transaction:**")
+            
+            accounts = get_accounts()
+            if not accounts:
+                st.warning("⚠️ Please add an account first before adding income.")
+                if st.button("🏦 Add Account First"):
+                    st.session_state.quick_income_setup = False
+                    st.session_state.quick_account_setup = True
+                    st.rerun()
+            else:
+                with st.form("quick_income_form"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        amount = st.text_input("Income Amount (sats)", value="5000000", placeholder="5000000")
+                        description = st.text_input("Description", value="Salary/Work Payment", placeholder="e.g., Freelance payment, Salary")
+                    
+                    with col2:
+                        account_options = [f"{get_account_type_icon(acc['account_type'])} {acc['name']}" for acc in accounts]
+                        selected_account = st.selectbox("Account", account_options)
+                        
+                        # Extract account name for lookup
+                        account_name = selected_account.split(" ", 1)[1] if " " in selected_account else selected_account
+                        selected_account_obj = next((acc for acc in accounts if acc['name'] == account_name), accounts[0])
+                    
+                    col_submit, col_cancel = st.columns(2)
+                    with col_submit:
+                        if st.form_submit_button("✅ Add Income", use_container_width=True):
+                            try:
+                                amount_sats = parse_amount_input(amount)
+                                if add_income(amount_sats, description, datetime.now().strftime('%Y-%m-%d'), selected_account_obj['id']):
+                                    st.success(f"✅ Added income: {format_sats(amount_sats)}")
+                                    st.session_state.quick_income_setup = False
+                                    st.rerun()
+                            except ValueError as e:
+                                st.error(f"❌ {str(e)}")
+                    
+                    with col_cancel:
+                        if st.form_submit_button("❌ Cancel", use_container_width=True):
+                            st.session_state.quick_income_setup = False
+                            st.rerun()
+
+
 def main_page():
     """Main budget application page"""
     current_month = st.session_state.current_month
@@ -1449,8 +1784,20 @@ def main_page():
     # Header with current month
     st.title(f"₿ Bitcoin Budget - {current_month}")
     
+    # === FIRST-TIME USER ONBOARDING ===
+    if st.session_state.get('first_visit', True):
+        show_onboarding_guide()
+        st.markdown("---")
+    
+    # === QUICK SETUP MODALS ===
+    show_quick_setup_modals()
+    
     # === BUDGET SUMMARY METRICS ===
     st.markdown("### 💰 Budget Summary")
+    
+    # Simple Bitcoin unit explanation for first-time users
+    if st.session_state.get('first_visit', True):
+        st.info("💡 **Bitcoin Units:** 100,000,000 sats = 1 BTC. This app uses sats only for precision.")
     
     # Account-based calculations (simplified)
     tracked_balance = get_total_account_balance(tracked_only=True)
@@ -1469,11 +1816,19 @@ def main_page():
     col1, col2, col3 = st.columns(3)
     
     with col1:
+        # Enhanced available to assign with contextual help
+        if available_to_assign > 0:
+            help_text = f"You have {format_sats(available_to_assign)} ready to allocate to spending categories. This is the core of envelope budgeting!"
+        elif available_to_assign == 0:
+            help_text = "Perfect! All your money is allocated to categories. This means you have a complete budget plan."
+        else:
+            help_text = f"You're over-allocated by {format_sats(abs(available_to_assign))}. Either reduce allocations or add more income."
+        
         st.metric(
             label="🎯 Available to Assign",
             value=format_sats(available_to_assign),
             delta=None,
-            help="Current unallocated balance (consistent across all months)"
+            help=help_text
         )
     
     with col2:
@@ -1501,6 +1856,129 @@ def main_page():
             delta=f"Total: {format_sats(total_balance)}",
             help="Balance in tracked accounts (affects budget)"
         )
+    
+    # === BUDGET HEALTH SUMMARY ===
+    st.markdown("### 📊 Budget Health")
+    
+    # Calculate budget health metrics
+    allocated_percentage = (total_category_balances / tracked_balance * 100) if tracked_balance > 0 else 0
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Budget allocation progress
+        st.markdown("**Budget Allocation Progress**")
+        progress_value = min(allocated_percentage / 100, 1.0)
+        st.progress(progress_value)
+        
+        # Color-coded status
+        if allocated_percentage > 100:
+            st.error(f"🔴 Over-allocated: {allocated_percentage:.1f}% ({format_sats(total_category_balances - tracked_balance)} over)")
+        elif allocated_percentage >= 95:
+            st.success(f"🟢 Fully allocated: {allocated_percentage:.1f}%")
+        elif allocated_percentage >= 80:
+            st.info(f"🔵 Well allocated: {allocated_percentage:.1f}%")
+        else:
+            st.warning(f"🟡 Under-allocated: {allocated_percentage:.1f}%")
+    
+    with col2:
+        # Available funds status with quick actions
+        st.markdown("**Available Funds**")
+        
+        # Contextual guidance for new users
+        if available_to_assign > 0 and st.session_state.get('first_visit', True):
+            st.markdown("""
+                💡 **Next Step:** Allocate your available funds to spending categories below. 
+                This is how envelope budgeting works - every satoshi gets a job!
+                """)
+        
+        if available_to_assign > 0:
+            st.success(f"💰 **{format_sats(available_to_assign)}** ready to allocate")
+            
+            # Quick allocation buttons
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.button("🚀 To Bitcoin Stack", help="Allocate all remaining funds to Bitcoin Stack"):
+                    # Find Bitcoin Stack category
+                    bitcoin_category = None
+                    for cat in get_categories():
+                        if 'bitcoin' in cat['name'].lower() or 'stack' in cat['name'].lower():
+                            bitcoin_category = cat
+                            break
+                    
+                    if bitcoin_category:
+                        current_allocation = get_category_allocated(bitcoin_category['id'], current_month)
+                        new_allocation = current_allocation + available_to_assign
+                        if allocate_to_category(bitcoin_category['id'], current_month, new_allocation):
+                            st.success(f"✅ Allocated {format_sats(available_to_assign)} to {bitcoin_category['name']}")
+                            st.rerun()
+                    else:
+                        st.error("❌ No Bitcoin/Stack category found")
+            
+            with col_b:
+                if st.button("⚖️ Distribute Evenly", help="Distribute remaining funds evenly across all categories"):
+                    categories = get_categories()
+                    if categories:
+                        amount_per_category = available_to_assign // len(categories)
+                        if amount_per_category > 0:
+                            for cat in categories:
+                                current_allocation = get_category_allocated(cat['id'], current_month)
+                                new_allocation = current_allocation + amount_per_category
+                                allocate_to_category(cat['id'], current_month, new_allocation)
+                            st.success(f"✅ Distributed {format_sats(amount_per_category)} to each category")
+                            st.rerun()
+                        else:
+                            st.warning("❌ Amount too small to distribute")
+                    else:
+                        st.error("❌ No categories found")
+                        
+        elif available_to_assign == 0:
+            st.info("✅ **Perfect balance** - all funds allocated")
+        else:
+            st.error(f"⚠️ **{format_sats(abs(available_to_assign))}** over-allocated")
+            
+            # Quick fix buttons for over-allocation
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.button("🔧 Auto-Fix", help="Automatically reduce allocations to balance budget"):
+                    # Find categories with allocations and reduce proportionally
+                    categories = get_categories()
+                    categories_with_allocations = []
+                    total_allocated = 0
+                    
+                    for cat in categories:
+                        allocation = get_category_allocated(cat['id'], current_month)
+                        if allocation > 0:
+                            categories_with_allocations.append((cat, allocation))
+                            total_allocated += allocation
+                    
+                    if categories_with_allocations and total_allocated > 0:
+                        reduction_needed = abs(available_to_assign)
+                        
+                        for cat, allocation in categories_with_allocations:
+                            # Reduce proportionally
+                            reduction = int((allocation / total_allocated) * reduction_needed)
+                            new_allocation = max(0, allocation - reduction)
+                            allocate_to_category(cat['id'], current_month, new_allocation)
+                        
+                        st.success(f"✅ Reduced allocations by {format_sats(reduction_needed)}")
+                        st.rerun()
+                    else:
+                        st.error("❌ No allocations to reduce")
+            
+            with col_b:
+                if st.button("📥 Clear All", help="Remove all allocations for this month"):
+                    categories = get_categories()
+                    cleared_count = 0
+                    for cat in categories:
+                        if allocate_to_category(cat['id'], current_month, 0):
+                            cleared_count += 1
+                    
+                    if cleared_count > 0:
+                        st.success(f"✅ Cleared allocations for {cleared_count} categories")
+                        st.rerun()
+                    else:
+                        st.error("❌ No allocations to clear")
 
     st.markdown("---")
 
@@ -1569,136 +2047,227 @@ def main_page():
 
         st.markdown("---")
 
+        # Initialize collapsed state if not present
+        if 'collapsed_master_categories' not in st.session_state:
+            st.session_state.collapsed_master_categories = set()
+        
         # Get all master categories and categories
         master_categories = get_master_categories()
         all_categories = get_categories()
         
         if master_categories or all_categories:
+            # Sort master categories alphabetically and get names first
+            master_categories_sorted = sorted(master_categories, key=lambda x: x['name'])
+            master_names = [mc['name'] for mc in master_categories_sorted]
+            master_names.append('Uncategorized')  # Add "Uncategorized" for categories without master category
+            
+            # Clean control panel
+            with st.expander("🛠️ Category Controls", expanded=False):
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    if st.button("📊 Sort Master A-Z", help="Sort master categories alphabetically"):
+                        master_categories.sort(key=lambda x: x['name'])
+                        st.rerun()
+                with col2:
+                    if st.button("📋 Sort Categories A-Z", help="Sort categories within each master category"):
+                        # Sort categories within their master categories
+                        for mc in master_categories:
+                            mc_categories = [cat for cat in all_categories if cat['master_category_id'] == mc['id']]
+                            mc_categories.sort(key=lambda x: x['name'])
+                        st.rerun()
+                with col3:
+                    if st.button("📂 Expand All", help="Expand all master categories"):
+                        st.session_state.collapsed_master_categories.clear()
+                        st.rerun()
+                with col4:
+                    if st.button("📁 Collapse All", help="Collapse all master categories"):
+                        st.session_state.collapsed_master_categories = set(master_names)
+                        st.rerun()
+            
             # Build unified table data with proper grouping
             table_data = []
             grand_allocated = 0
             grand_spent = 0
             grand_balance = 0
             
-            # Get all master category names (including empty ones)
-            master_names = [mc['name'] for mc in master_categories]
+            # Build hierarchy with explicit sort priority
+            sort_priority = 0
             
-            # Add "Uncategorized" for categories without master category
-            master_names.append('Uncategorized')
-            
-            # Group categories by master category
             for master_name in master_names:
                 # Find categories for this master category
                 if master_name == 'Uncategorized':
                     categories_in_group = [cat for cat in all_categories if cat['master_category_id'] is None]
                 else:
-                    master_id = next((mc['id'] for mc in master_categories if mc['name'] == master_name), None)
+                    master_id = next((mc['id'] for mc in master_categories_sorted if mc['name'] == master_name), None)
                     categories_in_group = [cat for cat in all_categories if cat['master_category_id'] == master_id]
+                
+                # Skip if no categories in this group
+                if not categories_in_group:
+                    continue
+                
+                # Sort categories within this group alphabetically
+                categories_in_group.sort(key=lambda x: x['name'])
                 
                 # Calculate master category totals
                 master_allocated = 0
                 master_spent = 0
                 master_balance = 0
                 
-                # Add master category header row
-                table_data.append({
-                    'ID': f"master_{master_name}",
-                    'Type': 'master',
-                    'Category': f"📂 {master_name}",
-                    'Master_Category_Assignment': master_name,
-                    'Current_Balance': 0,  # Will be calculated
-                    'This_Month_Allocation': 0,  # Will be calculated
-                    'Spent': 0,      # Will be calculated
-                    'Status': '📊 Total'
-                })
-                
-                # Add individual categories under this master category
                 for cat in categories_in_group:
-                    # In account-based budgeting, we care about current balance, not monthly allocations
                     current_balance = get_category_balance(cat['id'], current_month)
-                    current_month_allocation = get_category_allocated(cat['id'], current_month)
                     spent = get_category_spent(cat['id'], current_month)
-                    
                     master_allocated += current_balance
                     master_spent += spent
                     master_balance += current_balance
-                    
-                    # Get master category options for reassignment
-                    master_options_for_cat = ['Uncategorized'] + [mc['name'] for mc in master_categories]
-                    current_master = cat['master_category_name'] or 'Uncategorized'
-                    
-                    table_data.append({
-                        'ID': cat['id'],
-                        'Type': 'category',
-                        'Category': f"    {cat['name']}", # Indent to show hierarchy
-                        'Master_Category_Assignment': current_master,
-                        'Current_Balance': current_balance,
-                        'This_Month_Allocation': current_month_allocation,  # Show current month's allocation
-                        'Spent': spent,
-                        'Status': '✅ Good' if current_balance >= 0 else '⚠️ Overspent'
-                    })
                 
-                # Update master category totals in the header row
+                # Check if this master category is collapsed
+                is_collapsed = master_name in st.session_state.collapsed_master_categories
+                collapse_icon = "📁" if is_collapsed else "📂"
+                
+                # Add master category header with explicit sort priority
                 master_month_allocation = sum(get_category_allocated(cat['id'], current_month) for cat in categories_in_group)
-                for row in table_data:
-                    if row['ID'] == f"master_{master_name}":
-                        row['Current_Balance'] = master_allocated
-                        row['This_Month_Allocation'] = master_month_allocation
-                        row['Spent'] = master_spent
-                        row['Status'] = '📊 Total' if master_balance >= 0 else '⚠️ Over'
-                        break
+                
+                # Better master category display with visual hierarchy
+                category_count_text = f"({len(categories_in_group)} {'category' if len(categories_in_group) == 1 else 'categories'})"
+                master_display = f"{collapse_icon} {master_name} {category_count_text}"
+                
+                # Better status indicators for master categories
+                if master_balance >= 0:
+                    master_status = "🟢 Good" if master_balance > 0 else "⚪ Zero"
+                else:
+                    master_status = "🔴 Over"
+                
+                table_data.append({
+                    'ID': f"master_{master_name}",
+                    'Type': 'master',
+                    'Category': master_display,
+                    'Master_Category_Assignment': master_name,
+                    'Current_Balance': master_allocated,
+                    'This_Month_Allocation': master_month_allocation,
+                    'Spent': master_spent,
+                    'Status': master_status,
+                    'sort_priority': sort_priority
+                })
+                sort_priority += 1
+                
+                # Add individual categories immediately after master (if not collapsed)
+                if not is_collapsed:
+                    for idx, cat in enumerate(categories_in_group):
+                        current_balance = get_category_balance(cat['id'], current_month)
+                        current_month_allocation = get_category_allocated(cat['id'], current_month)
+                        spent = get_category_spent(cat['id'], current_month)
+                        current_master = cat['master_category_name'] or 'Uncategorized'
+                        
+                        # Create tree-style visual hierarchy
+                        is_last_in_group = (idx == len(categories_in_group) - 1)
+                        tree_symbol = "└─" if is_last_in_group else "├─"
+                        category_display = f"  {tree_symbol} {cat['name']}"
+                        
+                        # Better status indicators for individual categories
+                        if current_balance > 0:
+                            category_status = "🟢 Good"
+                        elif current_balance == 0:
+                            category_status = "⚪ Empty"
+                        else:
+                            category_status = "🔴 Overspent"
+                        
+                        table_data.append({
+                            'ID': cat['id'],
+                            'Type': 'category',
+                            'Category': category_display,
+                            'Master_Category_Assignment': current_master,
+                            'Current_Balance': current_balance,
+                            'This_Month_Allocation': current_month_allocation,
+                            'Spent': spent,
+                            'Status': category_status,
+                            'sort_priority': sort_priority
+                        })
+                        sort_priority += 1
                 
                 # Add to grand totals
                 grand_allocated += master_allocated
                 grand_spent += master_spent
                 grand_balance += master_balance
             
-            # Add grand total row
+            # Add grand total row at the END (bottom of hierarchy)
             grand_month_allocation = get_total_allocated(current_month)
+            
+            # Better grand total display and status
+            grand_total_display = "📊 GRAND TOTAL"
+            if grand_balance >= 0:
+                grand_total_status = "🟢 Balanced" if grand_balance > 0 else "⚪ Zero"
+            else:
+                grand_total_status = "🔴 Overspent"
+            
             table_data.append({
                 'ID': 'grand_total',
                 'Type': 'grand_total',
-                'Category': '📊 GRAND TOTAL',
+                'Category': grand_total_display,
                 'Master_Category_Assignment': 'Grand Total',
                 'Current_Balance': grand_allocated,
                 'This_Month_Allocation': grand_month_allocation,
                 'Spent': grand_spent,
-                'Status': '🎯 Total' if grand_balance >= 0 else '⚠️ Over'
+                'Status': grand_total_status,
+                'sort_priority': sort_priority  # Grand total gets highest priority (last)
             })
             
-            # Create DataFrame with consistent data types
+            # Create DataFrame and sort by explicit sort_priority
             df = pd.DataFrame(table_data)
+            
+            # Sort by sort_priority to maintain hierarchy (this should match our build order)
+            df = df.sort_values('sort_priority').reset_index(drop=True)
             
             # Ensure all numeric columns are properly typed as integers
             numeric_columns = ['Current_Balance', 'This_Month_Allocation', 'Spent']
             for col in numeric_columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype('int64')
             
-            # Display editable table
+            # Add hierarchical sorting keys to make interactive sorting work correctly
+            df['master_group'] = ''
+            df['sort_within_group'] = 0
+            
+            # Assign master group names and within-group sorting
+            for idx, row in df.iterrows():
+                if row['Type'] == 'master':
+                    # Master categories get their own name as group and sort position 0
+                    master_name = row['Master_Category_Assignment']
+                    df.at[idx, 'master_group'] = master_name
+                    df.at[idx, 'sort_within_group'] = 0
+                elif row['Type'] == 'category':
+                    # Individual categories get their master's name as group and sort position 1
+                    master_name = row['Master_Category_Assignment']
+                    df.at[idx, 'master_group'] = master_name
+                    df.at[idx, 'sort_within_group'] = 1
+                elif row['Type'] == 'grand_total':
+                    # Grand total gets its own group at the end
+                    df.at[idx, 'master_group'] = 'ZZZ_GRAND_TOTAL'  # Ensures it sorts last
+                    df.at[idx, 'sort_within_group'] = 0
+            
+            # Display editable table with hierarchy-preserving sort
+            display_df = df[['Category', 'Master_Category_Assignment', 'Current_Balance', 'This_Month_Allocation', 'Spent', 'Status', 'master_group', 'sort_within_group']].copy()
+            
+            # Remove debug output and use data_editor with proper column config
             refresh_count = st.session_state.get('data_editor_refresh_count', 0)
             edited_df = st.data_editor(
-                df,
+                display_df,
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "ID": None,  # Hide ID column
-                    "Type": None,  # Hide type column
+                    "master_group": None,  # Hide grouping column
+                    "sort_within_group": None,  # Hide sorting column
                     "Category": st.column_config.TextColumn(
                         "Category", 
-                        help="Click to rename categories or master categories",
-                        width="large",
-                        disabled=True  # Disable category name editing for now to focus on allocations
+                        help="Category hierarchy - sorting preserves master-child relationships",
+                        width="large"
                     ),
-                    "Master_Category_Assignment": st.column_config.SelectboxColumn(
+                    "Master_Category_Assignment": st.column_config.TextColumn(
                         "Master Category",
-                        help="Click dropdown to reassign category to different master category",
-                        options=['Uncategorized'] + [mc['name'] for mc in master_categories],
-                        disabled=True  # Disable for now to focus on allocations
+                        help="Master category assignment",
+                        width="medium"
                     ),
                     "Current_Balance": st.column_config.NumberColumn(
                         "Current Balance (sats)",
                         help="Current money in this category envelope",
-                        disabled=True,
                         format="%d"
                     ),
                     "This_Month_Allocation": st.column_config.NumberColumn(
@@ -1710,24 +2279,32 @@ def main_page():
                     ),
                     "Spent": st.column_config.NumberColumn(
                         "Spent This Month (sats)", 
-                        disabled=True,
                         format="%d"
                     ),
-                    "Status": st.column_config.TextColumn("Status", disabled=True)
+                    "Status": st.column_config.TextColumn("Status")
                 },
-                key=f"unified_categories_{refresh_count}",
-                disabled=["Type", "Category", "Master_Category_Assignment", "Current_Balance", "Spent", "Status"]
+                key=f"unified_categories_{refresh_count}"
             )
             
-            # Process changes with simplified logic focusing only on allocations
-            if not edited_df.equals(df):
+            # Process allocation changes only (simplified)
+            if not edited_df.equals(display_df):
                 changes_made = False
                 
-                # Only check allocation changes for individual categories
+                # Check allocation changes for individual categories
+                # We need to match edited rows back to original df by finding the same category
                 for idx, row in edited_df.iterrows():
-                    if row['Type'] == 'category':  # Only process individual categories
-                        category_id = row['ID']
-                        original_allocation = df.iloc[idx]['This_Month_Allocation']
+                    # Find matching row in original df by Category name and Master Category
+                    matching_original = None
+                    for orig_idx, orig_row in df.iterrows():
+                        if (orig_row['Category'] == row['Category'] and 
+                            orig_row['Master_Category_Assignment'] == row['Master_Category_Assignment'] and
+                            orig_row['Type'] == 'category'):
+                            matching_original = orig_row
+                            break
+                    
+                    if matching_original is not None:
+                        category_id = matching_original['ID']
+                        original_allocation = matching_original['This_Month_Allocation']
                         new_allocation = row['This_Month_Allocation']
                         
                         if original_allocation != new_allocation:
@@ -1748,6 +2325,9 @@ def main_page():
                         st.session_state.data_editor_refresh_count = 0
                     st.session_state.data_editor_refresh_count += 1
                     st.rerun()
+            
+            # Simple help
+            st.info("💡 Use the **Category Controls** panel above to expand/collapse master categories and sort your budget. Note: Clicking column headers will break the hierarchy view - use the controls above instead.")
             
             # Delete functionality section
             st.markdown("---")
@@ -1884,17 +2464,49 @@ def main_page():
                 
                 with col1:
                     account_name = st.text_input("Account Name", placeholder="e.g., Checking, Bitcoin Savings")
-                    account_type = st.selectbox(
+                    
+                    # Enhanced account type selection with icons
+                    account_type_options = [
+                        "checking",
+                        "savings", 
+                        "investment",
+                        "credit",
+                        "loan",
+                        "cold_storage",
+                        "lightning_node", 
+                        "hot_wallet",
+                        "other"
+                    ]
+                    
+                    # Create display options with icons
+                    account_type_display = []
+                    for acc_type in account_type_options:
+                        icon = get_account_type_icon(acc_type)
+                        account_type_display.append(f"{icon} {acc_type.title()}")
+                    
+                    selected_type_display = st.selectbox(
                         "Account Type", 
-                        ["checking", "savings", "investment", "credit", "other"]
+                        account_type_display
                     )
+                    
+                    # Extract the actual type from selection
+                    account_type = selected_type_display.split(" ", 1)[1].lower()
                 
                 with col2:
                     initial_balance = st.text_input(
                         "Initial Balance", 
-                        placeholder="50000 or 0.0005 BTC",
-                        help="Enter current account balance"
+                        placeholder="50000",
+                        help="Enter current account balance in satoshis"
                     )
+                    
+                    # Real-time balance validation
+                    if initial_balance:
+                        is_valid, message, preview = validate_amount_input(initial_balance)
+                        if is_valid:
+                            st.success(f"{message}: {preview}")
+                        else:
+                            st.error(message)
+                    
                     is_tracked = st.checkbox(
                         "Tracked Account", 
                         value=True,
@@ -1910,65 +2522,207 @@ def main_page():
                                 st.rerun()
                             else:
                                 st.error("❌ Account name already exists")
-                        except ValueError:
-                            st.error("❌ Invalid balance format")
+                        except ValueError as e:
+                            st.error(f"❌ {str(e)}")
                     else:
                         st.error("❌ Please fill in all required fields")
         
-        # Account Lists
+        # Enhanced Account Lists with Visual Improvements
         col1, col2 = st.columns(2)
         
         with col1:
             st.markdown("#### 🟢 Tracked Accounts (On-Budget)")
             if tracked_accounts:
-                for account in tracked_accounts:
-                    with st.container():
-                        account_col1, account_col2, account_col3 = st.columns([3, 2, 1])
+                for i, account in enumerate(tracked_accounts):
+                    # Get visual indicators
+                    type_icon = get_account_type_icon(account['account_type'])
+                    balance_text, health_status, health_color = format_account_balance_with_health(account['balance'])
+                    
+                    # Streamlined account display
+                    account_col1, account_col2, account_col3 = st.columns([4, 2, 1])
+                    
+                    with account_col1:
+                        st.markdown(f"**{type_icon} {account['name']}**")
+                        st.caption(f"{account['account_type'].replace('_', ' ').title()} • {health_status}")
+                    
+                    with account_col2:
+                        st.markdown(f"**{balance_text}**")
+                    
+                    with account_col3:
+                        # Action buttons in a row
+                        if st.button("📊 View", help="View Details", key=f"view_tracked_{account['id']}"):
+                            st.session_state.selected_account_id = account['id']
+                            st.session_state.selected_account_name = account['name']
+                            st.rerun()
                         
-                        with account_col1:
-                            st.write(f"**{account['name']}** ({account['account_type']})")
+                        if st.button("✏️ Edit", help="Edit Account", key=f"edit_tracked_{account['id']}"):
+                            st.session_state[f'edit_account_{account["id"]}'] = True
+                            st.rerun()
                         
-                        with account_col2:
-                            st.write(format_sats(account['balance']))
-                        
-                        with account_col3:
-                            if st.button("🗑️", key=f"delete_tracked_{account['id']}", help="Delete account"):
-                                if delete_account(account['id']):
-                                    st.success(f"Deleted {account['name']}")
-                                    st.rerun()
-                                else:
-                                    st.error("Cannot delete account with transactions")
-                        
-                        st.markdown("---")
+                        if st.button("🗑️ Delete", help="Delete Account", key=f"delete_tracked_{account['id']}"):
+                            if delete_account(account['id']):
+                                st.success(f"Deleted {account['name']}")
+                                st.rerun()
+                            else:
+                                st.error("Cannot delete account with transactions")
+                    
+
             else:
                 st.info("No tracked accounts yet. Add one above!")
         
         with col2:
             st.markdown("#### 🔵 Untracked Accounts (Off-Budget)")
             if untracked_accounts:
-                for account in untracked_accounts:
-                    with st.container():
-                        account_col1, account_col2, account_col3 = st.columns([3, 2, 1])
+                for i, account in enumerate(untracked_accounts):
+                    # Get visual indicators
+                    type_icon = get_account_type_icon(account['account_type'])
+                    balance_text, health_status, health_color = format_account_balance_with_health(account['balance'])
+                    
+                    # Streamlined account display
+                    account_col1, account_col2, account_col3 = st.columns([4, 2, 1])
+                    
+                    with account_col1:
+                        st.markdown(f"**{type_icon} {account['name']}**")
+                        st.caption(f"{account['account_type'].replace('_', ' ').title()} • {health_status}")
+                    
+                    with account_col2:
+                        st.markdown(f"**{balance_text}**")
+                    
+                    with account_col3:
+                        # Action buttons in a row
+                        if st.button("📊 View", help="View Details", key=f"view_untracked_{account['id']}"):
+                            st.session_state.selected_account_id = account['id']
+                            st.session_state.selected_account_name = account['name']
+                            st.rerun()
                         
-                        with account_col1:
-                            st.write(f"**{account['name']}** ({account['account_type']})")
+                        if st.button("✏️ Edit", help="Edit Account", key=f"edit_untracked_{account['id']}"):
+                            st.session_state[f'edit_account_{account["id"]}'] = True
+                            st.rerun()
                         
-                        with account_col2:
-                            st.write(format_sats(account['balance']))
-                        
-                        with account_col3:
-                            if st.button("🗑️", key=f"delete_untracked_{account['id']}", help="Delete account"):
-                                if delete_account(account['id']):
-                                    st.success(f"Deleted {account['name']}")
-                                    st.rerun()
-                                else:
-                                    st.error("Cannot delete account with transactions")
-                        
-                        st.markdown("---")
+                        if st.button("🗑️ Delete", help="Delete Account", key=f"delete_untracked_{account['id']}"):
+                            if delete_account(account['id']):
+                                st.success(f"Deleted {account['name']}")
+                                st.rerun()
+                            else:
+                                st.error("Cannot delete account with transactions")
+                    
+
             else:
                 st.info("No untracked accounts yet. Add one above!")
         
-        # Account Transfers
+        # Edit Account Forms (Full Width)
+        all_accounts = get_accounts()
+        for account in all_accounts:
+            if st.session_state.get(f'edit_account_{account["id"]}', False):
+                st.markdown("---")
+                current_icon = get_account_type_icon(account['account_type'])
+                st.markdown(f"### ✏️ Edit Account: {current_icon} {account['name']}")
+                
+                with st.form(f"edit_account_form_{account['id']}"):
+                    # Enhanced layout with account type selection
+                    col1, col2, col3 = st.columns([2, 2, 2])
+                    
+                    with col1:
+                        st.markdown("**💰 Balance**")
+                        new_balance = st.text_input(
+                            "New Balance (satoshis)",
+                            value=str(account['balance']),
+                            help="Enter new account balance in satoshis"
+                        )
+                        
+                        # Real-time balance validation
+                        if new_balance:
+                            is_valid, message, preview = validate_amount_input(new_balance)
+                            if is_valid:
+                                st.success(f"{message}: {preview}")
+                            else:
+                                st.error(message)
+                        
+                        st.caption(f"Current: {format_sats(account['balance'])}")
+                    
+                    with col2:
+                        st.markdown("**🏷️ Account Type**")
+                        account_types = [
+                            ('checking', '🏦 Checking'),
+                            ('savings', '💰 Savings'),
+                            ('investment', '📈 Investment'),
+                            ('credit', '💳 Credit'),
+                            ('loan', '🏠 Loan'),
+                            ('cold_storage', '🧊 Cold Storage'),
+                            ('lightning_node', '⚡ Lightning Node'),
+                            ('hot_wallet', '🔥 Hot Wallet'),
+                            ('other', '📱 Other')
+                        ]
+                        
+                        # Find current selection index
+                        current_index = 0
+                        for i, (type_key, _) in enumerate(account_types):
+                            if type_key == account['account_type']:
+                                current_index = i
+                                break
+                        
+                        new_type = st.selectbox(
+                            "Account Type",
+                            options=[type_key for type_key, _ in account_types],
+                            format_func=lambda x: next(display for type_key, display in account_types if type_key == x),
+                            index=current_index,
+                            help="Select the type of account"
+                        )
+                        
+                        current_type_display = next(display for type_key, display in account_types if type_key == account['account_type'])
+                        st.caption(f"Current: {current_type_display}")
+                    
+                    with col3:
+                        st.markdown("**🎯 Actions**")
+                        
+                        # Show what will change
+                        changes = []
+                        if new_balance and new_balance != str(account['balance']):
+                            try:
+                                new_sats = parse_amount_input(new_balance)
+                                if new_sats != account['balance']:
+                                    changes.append("Balance")
+                            except:
+                                pass
+                        
+                        if new_type != account['account_type']:
+                            changes.append("Type")
+                        
+                        if changes:
+                            st.info(f"Will update: {', '.join(changes)}")
+                        else:
+                            st.info("No changes detected")
+                        
+                        if st.form_submit_button("💾 Save Changes", use_container_width=True):
+                            try:
+                                balance_sats = parse_amount_input(new_balance)
+                                if update_account(account['id'], 
+                                                new_balance=balance_sats, 
+                                                new_type=new_type):
+                                    updates = []
+                                    if balance_sats != account['balance']:
+                                        updates.append(f"balance to {format_sats(balance_sats)}")
+                                    if new_type != account['account_type']:
+                                        new_type_display = next(display for type_key, display in account_types if type_key == new_type)
+                                        updates.append(f"type to {new_type_display}")
+                                    
+                                    if updates:
+                                        st.success(f"✅ Updated {', '.join(updates)}!")
+                                    else:
+                                        st.info("No changes were made")
+                                    
+                                    del st.session_state[f'edit_account_{account["id"]}']
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Failed to update account")
+                            except ValueError as e:
+                                st.error(f"❌ {str(e)}")
+                        
+                        if st.form_submit_button("❌ Cancel", use_container_width=True):
+                            del st.session_state[f'edit_account_{account["id"]}']
+                            st.rerun()
+        
+        # Enhanced Account Transfers
         st.markdown("#### 💸 Transfer Between Accounts")
         all_accounts = get_accounts()
         if len(all_accounts) >= 2:
@@ -1976,22 +2730,50 @@ def main_page():
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
-                    from_account = st.selectbox(
+                    # Enhanced account selection with icons and balances
+                    from_account_options = []
+                    for acc in all_accounts:
+                        icon = get_account_type_icon(acc['account_type'])
+                        balance_display = format_sats(acc['balance'])
+                        from_account_options.append(f"{icon} {acc['name']} ({balance_display})")
+                    
+                    selected_from = st.selectbox(
                         "From Account",
-                        [acc['name'] for acc in all_accounts]
+                        from_account_options
                     )
+                    
+                    # Extract account name
+                    from_account = selected_from.split(" ", 1)[1].split(" (")[0]
                 
                 with col2:
-                    to_account = st.selectbox(
+                    # Enhanced account selection with icons and balances
+                    to_account_options = []
+                    for acc in all_accounts:
+                        icon = get_account_type_icon(acc['account_type'])
+                        balance_display = format_sats(acc['balance'])
+                        to_account_options.append(f"{icon} {acc['name']} ({balance_display})")
+                    
+                    selected_to = st.selectbox(
                         "To Account",
-                        [acc['name'] for acc in all_accounts]
+                        to_account_options
                     )
+                    
+                    # Extract account name
+                    to_account = selected_to.split(" ", 1)[1].split(" (")[0]
                 
                 with col3:
                     transfer_amount = st.text_input(
                         "Amount",
-                        placeholder="25000 or 0.00025 BTC"
+                        placeholder="25000"
                     )
+                    
+                    # Real-time transfer amount validation
+                    if transfer_amount:
+                        is_valid, message, preview = validate_amount_input(transfer_amount)
+                        if is_valid:
+                            st.success(f"{message}: {preview}")
+                        else:
+                            st.error(message)
                 
                 if st.form_submit_button("Transfer"):
                     if from_account != to_account and transfer_amount:
@@ -2007,12 +2789,66 @@ def main_page():
                                 st.rerun()
                             else:
                                 st.error("❌ Transfer failed - insufficient funds")
-                        except ValueError:
-                            st.error("❌ Invalid amount format")
+                        except ValueError as e:
+                            st.error(f"❌ {str(e)}")
                     else:
                         st.error("❌ Please select different accounts and enter amount")
         else:
             st.info("Add at least 2 accounts to enable transfers")
+        
+        # Account Transaction View
+        if hasattr(st.session_state, 'selected_account_id') and st.session_state.selected_account_id:
+            st.markdown("---")
+            st.markdown(f"### 📊 Transactions for {st.session_state.selected_account_name}")
+            
+            # Get all transactions for this account
+            account_transactions = []
+            for trans in st.session_state.user_data['transactions']:
+                if trans.get('account_id') == st.session_state.selected_account_id:
+                    category_name = None
+                    if trans['category_id']:
+                        for cat in st.session_state.user_data['categories']:
+                            if cat['id'] == trans['category_id']:
+                                category_name = cat['name']
+                                break
+                    
+                    account_transactions.append({
+                        'Date': trans['date'],
+                        'Description': trans['description'],
+                        'Amount': f"+{format_sats(trans['amount'])}" if trans['type'] == 'income' else f"-{format_sats(trans['amount'])}",
+                        'Category': category_name if trans['type'] == 'expense' else 'Income',
+                        'Type': trans['type'].title()
+                    })
+            
+            if account_transactions:
+                # Sort by date (newest first)
+                account_transactions.sort(key=lambda x: x['Date'], reverse=True)
+                
+                df_account = pd.DataFrame(account_transactions)
+                st.dataframe(df_account, use_container_width=True, hide_index=True)
+                
+                # Account transaction summary
+                income_total = sum(trans['amount'] for trans in st.session_state.user_data['transactions'] 
+                                 if trans.get('account_id') == st.session_state.selected_account_id and trans['type'] == 'income')
+                expense_total = sum(trans['amount'] for trans in st.session_state.user_data['transactions'] 
+                                  if trans.get('account_id') == st.session_state.selected_account_id and trans['type'] == 'expense')
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Income", format_sats(income_total))
+                with col2:
+                    st.metric("Total Expenses", format_sats(expense_total))
+                with col3:
+                    st.metric("Net Activity", format_sats(income_total - expense_total))
+            else:
+                st.info(f"No transactions found for {st.session_state.selected_account_name}")
+            
+            if st.button("← Back to Accounts", key="back_to_accounts"):
+                if hasattr(st.session_state, 'selected_account_id'):
+                    delattr(st.session_state, 'selected_account_id')
+                if hasattr(st.session_state, 'selected_account_name'):
+                    delattr(st.session_state, 'selected_account_name')
+                st.rerun()
 
     # === TAB 3: TRANSACTIONS (Combined transaction entry + recent transactions) ===
     with tab3:
@@ -2039,9 +2875,17 @@ def main_page():
                     
                     transaction_amount = st.text_input(
                         "Amount",
-                        placeholder="1000000 or 0.01 BTC",
-                        help="Enter amount in sats or BTC"
+                        placeholder="1000000",
+                        help="Enter amount in satoshis"
                     )
+                    
+                    # Real-time amount validation
+                    if transaction_amount:
+                        is_valid, message, preview = validate_amount_input(transaction_amount)
+                        if is_valid:
+                            st.success(f"{message}: {preview}")
+                        else:
+                            st.error(message)
                 
                 with col2:
                     transaction_description = st.text_input(
@@ -2080,8 +2924,8 @@ def main_page():
                                 st.rerun()
                             else:
                                 st.error("❌ Failed to add income")
-                        except ValueError:
-                            st.error("❌ Invalid amount format")
+                        except ValueError as e:
+                            st.error(f"❌ {str(e)}")
                     else:
                         st.error("❌ Please fill in all required fields")
         
@@ -2107,9 +2951,17 @@ def main_page():
                     with col2:
                         transaction_amount = st.text_input(
                             "Amount",
-                            placeholder="50000 or 0.0005 BTC",
-                            help="Enter amount in sats or BTC"
+                            placeholder="50000",
+                            help="Enter amount in satoshis"
                         )
+                        
+                        # Real-time amount validation
+                        if transaction_amount:
+                            is_valid, message, preview = validate_amount_input(transaction_amount)
+                            if is_valid:
+                                st.success(f"{message}: {preview}")
+                            else:
+                                st.error(message)
                         
                         transaction_description = st.text_input(
                             "Description",
@@ -2155,8 +3007,8 @@ def main_page():
                                         st.rerun()
                                     else:
                                         st.error("❌ Failed to add expense")
-                            except ValueError:
-                                st.error("❌ Invalid amount format")
+                            except ValueError as e:
+                                st.error(f"❌ {str(e)}")
                         else:
                             st.error("❌ Please fill in all required fields")
             else:
@@ -2166,10 +3018,10 @@ def main_page():
         # Add separator between transaction entry and recent transactions
         st.markdown("---")
         
-        # Recent transactions section (moved below transaction entry)
-        st.markdown("### 📋 Recent Transactions")
+        # All transactions section (moved below transaction entry)
+        st.markdown("### 📋 All Transactions")
         
-        transactions = get_recent_transactions(50)  # Get more transactions for editing
+        transactions = get_all_transactions()  # Get ALL transactions for editing
         
         if transactions:
             # Get all categories for dropdown options
@@ -2178,6 +3030,8 @@ def main_page():
             
             # Convert to dataframe with proper data types for editing
             trans_data = []
+            all_accounts = get_accounts()
+            
             for trans in transactions:
                 trans_id, date_str, desc, amount, trans_type, category = trans
                 
@@ -2187,12 +3041,21 @@ def main_page():
                 else:
                     category_display = category or "Unknown"
                 
+                # Find account name for this transaction
+                account_name = "No Account"
+                transaction_data = next((t for t in st.session_state.user_data['transactions'] if t['id'] == trans_id), None)
+                if transaction_data and transaction_data.get('account_id'):
+                    account = next((acc for acc in all_accounts if acc['id'] == transaction_data['account_id']), None)
+                    if account:
+                        account_name = account['name']
+                
                 trans_data.append({
                     'ID': trans_id,
                     'Date': datetime.strptime(date_str, '%Y-%m-%d').date(),
                     'Description': desc,
                     'Amount': amount,  # Store as raw number for editing
                     'Category': category_display,
+                    'Account': account_name,
                     'Type': trans_type,  # Keep track of original type
                     'Original_Category_ID': trans[0] if trans_type == 'expense' else None  # For reference
                 })
@@ -2200,6 +3063,8 @@ def main_page():
             df = pd.DataFrame(trans_data)
             
             # Display editable transactions table
+            account_options = ['No Account'] + [acc['name'] for acc in all_accounts]
+            
             edited_df = st.data_editor(
                 df,
                 use_container_width=True,
@@ -2229,6 +3094,11 @@ def main_page():
                         "Category",
                         help="Click to change transaction category",
                         options=category_options
+                    ),
+                    "Account": st.column_config.SelectboxColumn(
+                        "Account",
+                        help="Click to change transaction account",
+                        options=account_options
                     )
                 },
                 key="transactions_editor"
@@ -2246,17 +3116,27 @@ def main_page():
                     desc_changed = row['Description'] != original_row['Description']
                     amount_changed = row['Amount'] != original_row['Amount']
                     category_changed = row['Category'] != original_row['Category']
+                    account_changed = row['Account'] != original_row['Account']
                     
-                    if date_changed or desc_changed or amount_changed or category_changed:
+                    if date_changed or desc_changed or amount_changed or category_changed or account_changed:
                         # Determine if this is income or expense based on category
                         new_category = row['Category']
                         new_date = str(row['Date'])
                         new_description = row['Description']
                         new_amount = int(row['Amount'])
+                        new_account = row['Account']
+                        
+                        # Find account ID
+                        account_id = None
+                        if new_account != 'No Account':
+                            for acc in all_accounts:
+                                if acc['name'] == new_account:
+                                    account_id = acc['id']
+                                    break
                         
                         if new_category == 'Income':
                             # Income transaction
-                            if update_transaction(transaction_id, new_date, new_description, new_amount):
+                            if update_transaction(transaction_id, new_date, new_description, new_amount, account_id=account_id):
                                 st.success(f"✅ Updated income: {new_description}")
                                 changes_made = True
                             else:
@@ -2270,7 +3150,7 @@ def main_page():
                                     break
                             
                             if category_id:
-                                if update_transaction(transaction_id, new_date, new_description, new_amount, category_id):
+                                if update_transaction(transaction_id, new_date, new_description, new_amount, category_id, account_id):
                                     st.success(f"✅ Updated expense: {new_description}")
                                     changes_made = True
                                 else:
@@ -2368,20 +3248,40 @@ def sidebar_navigation():
 
         st.markdown("---")
         
-        # Navigation
+        # Navigation with helpful descriptions
         st.markdown("### 🚀 Navigation")
         
-        if st.button("📖 How to Use", use_container_width=True):
+        if st.button("📖 Tutorial & Examples", use_container_width=True, help="See examples and learn how Bitcoin budgeting works"):
             st.session_state.page = 'landing'
             st.rerun()
         
-        if st.button("🏠 Main Budget", use_container_width=True):
+        if st.button("🏠 Main Budget", use_container_width=True, help="Manage income, expenses, categories, and accounts"):
             st.session_state.page = 'main'
             st.rerun()
         
-        if st.button("📊 Reports", use_container_width=True):
+        if st.button("📊 Analytics & Reports", use_container_width=True, help="View spending patterns, net worth projections, and opportunity cost analysis"):
             st.session_state.page = 'reports'
             st.rerun()
+        
+        # Simple contextual tip for first-time users
+        if st.session_state.get('first_visit', True):
+            st.markdown("---")
+            st.markdown("### 💡 Next Step")
+            
+            # Simple, clear guidance
+            accounts = get_accounts()
+            categories = get_categories()
+            transactions = st.session_state.user_data['transactions']
+            has_income = any(t['type'] == 'income' for t in transactions)
+            
+            if len(accounts) == 0:
+                st.info("**Start:** Go to Tutorial & Examples to learn the basics")
+            elif len(categories) == 0:
+                st.info("**Create:** Add spending categories in the main app")
+            elif not has_income:
+                st.info("**Add Income:** Record Bitcoin income to begin budgeting")
+            else:
+                st.info("**Allocate:** Assign your income to spending categories")
         
         st.markdown("---")
         

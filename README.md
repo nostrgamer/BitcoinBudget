@@ -70,20 +70,40 @@ The application will open at `http://localhost:8501`
 ## Features
 
 ### 🏦 **Core Envelope Budgeting**
-- ✅ **Account Management**: Tracked accounts (on-budget) and untracked accounts (savings/long-term)
-- ✅ **Smart Income Entry**: Add Bitcoin income with flexible sats/BTC input and account selection
-- ✅ **Category Management**: Create master categories (Fixed, Variable, Savings) and subcategories
+- ✅ **Enhanced Account Management**: Tracked accounts (on-budget) and untracked accounts (savings/long-term)
+  - **9 Account Types**: 🏦 Checking, 💰 Savings, 📈 Investment, 💳 Credit, 🏠 Loan, 🧊 Cold Storage, ⚡ Lightning Node, 🔥 Hot Wallet, 📱 Other
+  - **Full-Width Edit Forms**: Professional account editing with balance and type changes
+  - **Streamlined Actions**: Clean button layout with 📊 View, ✏️ Edit, 🗑️ Delete options
+  - **Real-time Validation**: Enhanced input validation with immediate feedback
+- ✅ **Smart Transaction Entry**: Enhanced forms with real-time validation and sats-only standard (rejecting BIP 178)
+  - **Live Amount Preview**: See formatted satoshi amounts as you type
+  - **Enhanced Validation**: Clear error messages and positive feedback for valid amounts
+  - **Account Integration**: All transactions linked to specific Bitcoin accounts
+- ✅ **Category Management**: Create master categories (Fixed, Variable, Savings) and subcategories with visual hierarchy
+- ✅ **Professional Category Display**: Tree-style visual hierarchy with 📂 master categories and ├─ subcategories
 - ✅ **Intelligent Allocation**: Allocate income with availability checking and rollover
-- ✅ **Real-time Balances**: Live category balances with overspending alerts and account tracking
+- ✅ **Budget Health Dashboard**: Visual progress bars, color-coded status, and allocation percentage tracking
+- ✅ **Quick Action Buttons**: Context-aware automation (Auto-Fix over-allocation, Distribute Evenly, To Bitcoin Stack)
+- ✅ **Real-time Balances**: Live category balances with 🟢🔴⚪ status indicators and account tracking
 - ✅ **Month Navigation**: Navigate between months with preserved data
 - ✅ **Transaction Management**: Edit, delete, and categorize all transactions with account tracking
 - ✅ **Account Transfers**: Move funds between different Bitcoin accounts
 
 ### ₿ **Bitcoin-Native Features**
 - ✅ **Satoshi Precision**: All calculations in satoshis (no floating point errors)
-- ✅ **Flexible Input**: Support "1000000", "1,000,000", or "0.01 BTC" formats
+- ✅ **Sats-Only Standard**: Enhanced validation that formally rejects BIP 178 (no BTC input)
 - ✅ **Clear Display**: Shows as "1,000,000 sats" with comma formatting
+- ✅ **Bitcoin-Specific Account Types**: Cold storage, lightning nodes, hot wallets designed for Bitcoin users
 - ✅ **Bitcoin Power Law**: Built-in fair value calculations for projections
+
+### 🎨 **Modern UI/UX Features**
+- ✅ **Visual Category Hierarchy**: Professional tree-style display with 📂 master categories and ├─ └─ subcategories
+- ✅ **Interactive Sorting**: Maintains parent-child relationships even when sorting by different columns
+- ✅ **Budget Health Summary**: Progress bars showing allocation percentage with color-coded status
+- ✅ **Smart Status Indicators**: 🟢 Good, ⚪ Empty/Zero, 🔴 Overspent visual feedback
+- ✅ **Context-Aware Actions**: Quick buttons that adapt based on budget situation
+- ✅ **One-Click Automation**: Auto-fix over-allocation, distribute evenly, allocate to Bitcoin stack
+- ✅ **Professional Design**: Clean layout with proper spacing and visual hierarchy
 
 ### 📊 **Advanced Analytics & Reports**
 

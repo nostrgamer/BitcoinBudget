@@ -99,16 +99,23 @@ if __name__ == "__main__":
 ### Streamlit UI Guidelines
 - **Built-in components**: Use st.form, st.columns, st.tabs, st.sidebar
 - **Interactive widgets**: Date inputs, selectboxes, sliders with validation
-- **Data display**: st.dataframe, st.metric, st.plotly_chart
+- **Data display**: st.dataframe, st.metric, st.plotly_chart with hierarchical sorting
+- **Visual hierarchy**: Tree-style indicators (📂, ├─, └─) for category parent-child relationships
+- **Status indicators**: Color-coded status (🟢 Good, ⚪ Empty/Zero, 🔴 Overspent)
+- **Enhanced form patterns**: Real-time validation with immediate user feedback
+- **Account management**: Full-width edit forms outside column constraints for better UX
+- **Action buttons**: Clean, individual action buttons rather than dropdown menus
+- **Context-aware UI**: Quick action buttons that adapt to budget situation
 - **Layout**: Wide layout with responsive columns
 - **Navigation**: Sidebar with session state management
 - **Error handling**: Use st.error, st.warning, st.success for user feedback
 
 ### Bitcoin-Specific Rules
 - **Satoshis everywhere**: Always work in satoshis (integers)
-- **Display formatting**: Show as "1,000,000 sats" or "0.01000000 BTC"
+- **Sats-only standard**: Formally reject BIP 178, only accept satoshi input
+- **Display formatting**: Show as "1,000,000 sats" with comma formatting
 - **No decimals**: Avoid floating point for Bitcoin amounts
-- **Input validation**: Ensure positive integers for amounts
+- **Input validation**: Ensure positive integers for amounts with real-time feedback
 
 ### Simplicity Rules
 ❌ **NO** complex state management beyond st.session_state
@@ -211,6 +218,25 @@ fig = make_subplots(rows=2, cols=2, subplot_titles=(...))
 # Bitcoin price growth, stack value, purchasing power, multipliers
 st.plotly_chart(fig, use_container_width=True)
 
+# Hierarchical data display with interactive sorting
+df['master_group'] = df['category_id'].apply(get_master_group_order)
+df['sort_within_group'] = df['category_id'].apply(get_sort_within_group)
+df = df.sort_values(['master_group', 'sort_within_group'])
+st.data_editor(df, column_config={
+    'master_group': None,  # Hide sorting columns
+    'sort_within_group': None
+})
+
+# Context-aware quick actions
+if available_to_assign > 0:
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🚀 To Bitcoin Stack"):
+            allocate_to_bitcoin_category(available_to_assign)
+    with col2:
+        if st.button("⚖️ Distribute Evenly"):
+            distribute_evenly_across_categories(available_to_assign)
+
 # Navigation with multiple report types
 with st.sidebar:
     if st.button("🚀 Net Worth Future Value"):
@@ -231,6 +257,9 @@ with st.sidebar:
 - ✅ **Works in browser**: Accessible via web interface
 - ✅ **Mobile friendly**: Responsive design works on phones/tablets
 - ✅ **Interactive charts**: Plotly visualizations with hover details
+- ✅ **Professional UI**: Tree-style hierarchy with visual indicators
+- ✅ **Smart automation**: Context-aware quick action buttons
+- ✅ **Visual feedback**: Progress bars and color-coded status indicators
 - ✅ **Fast development**: Build and test quickly with hot reload
 - ✅ **Easy deployment**: Auto-deploy to Streamlit Cloud from GitHub
 - ✅ **Account-based budgeting**: Tracked and untracked accounts with transfers
@@ -303,8 +332,9 @@ def import_budget_data(json_data):
 ```
 
 ### 🎯 **Development Philosophy**
-- **Keep It Simple**: Focus on core budgeting functionality
+- **Keep It Simple**: Focus on core budgeting functionality with modern UI
 - **User Ownership**: Users control their own data files
 - **Privacy by Design**: No server storage, no tracking, no accounts
 - **Self-Custody**: Following Bitcoin ethos of personal responsibility
-- **Cross-Device**: Export/import enables device portability without complexity 
+- **Cross-Device**: Export/import enables device portability without complexity
+- **Professional Experience**: Visual hierarchy and smart automation for better UX 
