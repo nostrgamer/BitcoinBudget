@@ -257,10 +257,10 @@ README.md                # This documentation
 - **Demo Friendly**: Perfect for trying the app without commitment
 
 ### ⚠️ **Considerations**
-- **Session Only**: Data lost when browser/tab closes (by design for privacy)
-- **Demo Purpose**: Best for exploring features and short-term budgeting
-- **No Backup**: Users responsible for any data they want to preserve
-- **Fresh Start**: Each visit starts clean (good for privacy, neutral for persistence)
+- **Session-Based**: Data persists during your browser session but is cleared when you close the tab
+- **Export for Backup**: Use JSON export feature to save your budget data to a file
+- **Import to Restore**: Upload your JSON file to restore your budget on any device
+- **Privacy-First**: No server storage means maximum privacy and security
 
 ## Technical Details
 
@@ -297,50 +297,28 @@ def calculate_future_purchasing_power(sats, years, inflation=0.08):
     return future_value / current_value  # Purchasing power multiplier
 ```
 
-## Database Integration Roadmap
+## Data Management
 
-### 🗄️ **Current Limitation**: Session-Only Storage
-The current app uses session-based storage which provides maximum privacy but doesn't persist data between browser sessions. We're implementing a hybrid solution that maintains privacy while adding data persistence and portability.
+### 📁 **JSON Export/Import**
+The app includes simple file-based data management for users who want to backup or move their budget data:
 
-### 🎯 **Hybrid Storage Solution**: localStorage + File Import/Export
+- **📥 Export**: Download your complete budget as a timestamped JSON file
+- **📤 Import**: Upload a previously exported JSON file to restore your data
+- **🔄 Reset**: Clear all data and start fresh with demo data
+- **🔒 Privacy**: All operations happen locally in your browser
 
-#### **Phase 1: localStorage Persistence** 
-- ✅ Replace SQLite with browser localStorage for automatic session persistence
-- ✅ Data automatically saves as user works (no data loss during sessions)
-- ✅ Browser restart recovery - budgets persist until user clears browser data
-- ✅ Same privacy benefits - data never leaves user's device
+### 💾 **How to Use**
+1. **During Session**: Your data is automatically saved and available while your browser tab is open
+2. **Export for Backup**: Click "💾 Download Budget" in the sidebar to save your data as a file
+3. **Import to Restore**: Use "📥 Import Budget" to upload a previously exported file
+4. **Cross-Device**: Export from one device, import on another to continue your budget
 
-#### **Phase 2: JSON Export/Import**
-- ✅ Export budget data as JSON file for backup/sharing
-- ✅ Import previously exported budgets on any device/browser
-- ✅ Move data between devices while maintaining complete user control
-- ✅ True self-custody of financial data (Bitcoin ethos)
-
-#### **Phase 3: YNAB CSV Import** 
-- ✅ Import YNAB budget exports (CSV format) for easy migration
-- ✅ Automatic mapping: YNAB accounts → Bitcoin accounts, categories → categories
-- ✅ Convert USD amounts to satoshis using user-specified or current BTC rate
-- ✅ Massive user acquisition opportunity (millions of existing YNAB users)
-
-#### **Phase 4: Enhanced Export Formats**
-- ✅ CSV export for analysis/spreadsheets
-- ✅ YNAB-compatible CSV export (for users who want to go back)
-- ✅ Multiple format support for different use cases
-
-### 💡 **Benefits of New Storage System**
-- **Seamless UX**: No data loss, works like native app
-- **Data Ownership**: Users control their own budget files
-- **Privacy-First**: No server-side storage, encryption options
-- **YNAB Migration**: Easy path from YNAB subscription to Bitcoin budgeting
-- **Backup Strategy**: Users choose their own data redundancy approach
-- **Device Portability**: Use budget on multiple devices with file sync
-
-### 🔄 **Implementation Status**
-- **Current Branch**: `1-database-integration-that-allows-local-and-csv-formats`
-- **Phase 1**: 🚧 In Progress - localStorage integration
-- **Phase 2**: ⏳ Planned - JSON import/export
-- **Phase 3**: ⏳ Planned - YNAB CSV import  
-- **Phase 4**: ⏳ Planned - Additional export formats
+### 🛡️ **Data Ownership**
+Following Bitcoin's self-custody principles:
+- **You Own Your Data**: Complete control over your financial information
+- **No Server Storage**: Your data never leaves your device
+- **File-Based Backup**: Simple, transparent backup using standard JSON format
+- **Privacy by Design**: No accounts, no tracking, no data sharing
 
 ## Contributing
 
