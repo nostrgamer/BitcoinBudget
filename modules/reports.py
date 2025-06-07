@@ -1128,5 +1128,4 @@ def calculate_minimum_btc_for_retirement(retirement_year, annual_expenses, infla
         else:
             max_btc = test_btc  # This amount works, try less
     
-    return max_btc 
-        """) 
+    return max_btc
