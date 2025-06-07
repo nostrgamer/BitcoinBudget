@@ -436,10 +436,8 @@ def future_purchasing_power_analysis():
             step=1
         )
     
-    # Prepare data for charts and analysis
+    # Analyze recent expenses
     expense_analysis = []
-    chart_data = []
-    
     for expense in recent_expenses[:10]:  # Top 10 recent expenses
         current_amount = expense[4]  # amount in sats
         future_cost, reduction_percentage = calculate_future_purchasing_power(current_amount, years_ahead, inflation_rate)
@@ -452,63 +450,48 @@ def future_purchasing_power_analysis():
             'Future Equivalent': format_sats(int(future_cost)),
             'Inflation Impact': f"{((future_cost/current_amount - 1) * 100):.1f}%"
         })
-        
-        # Data for charts
-        chart_data.append({
-            'description': expense[2][:15] + '...' if len(expense[2]) > 15 else expense[2],
-            'current': current_amount / 100_000_000,  # Convert to BTC equivalent for USD
-            'future': future_cost / 100_000_000,
-            'category': expense[5] or 'Unknown'
-        })
     
-    # CHARTS FIRST - Main visualization
-    st.markdown("### 📊 Future Cost Impact Visualization")
+    # Create comparison pie charts
+    st.markdown("### 📊 Current vs Future Spending Comparison")
     
-    if chart_data:
-        col_chart1, col_chart2 = st.columns(2)
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Current spending by category
+        current_category_totals = {}
+        for expense in recent_expenses[:10]:
+            category = expense[5] or 'Unknown'
+            amount = expense[4]
+            if category in current_category_totals:
+                current_category_totals[category] += amount
+            else:
+                current_category_totals[category] = amount
         
-        with col_chart1:
-            # Current vs Future Cost Comparison (Bar Chart)
-            descriptions = [item['description'] for item in chart_data]
-            current_values = [item['current'] for item in chart_data]
-            future_values = [item['future'] for item in chart_data]
-            
-            fig_bar = go.Figure(data=[
-                go.Bar(name='Current Cost', x=descriptions, y=current_values, marker_color='lightblue'),
-                go.Bar(name=f'Cost in {years_ahead} Years', x=descriptions, y=future_values, marker_color='orange')
-            ])
-            
-            fig_bar.update_layout(
-                title='Current vs Future Purchasing Power',
-                xaxis_title='Recent Purchases',
-                yaxis_title='Cost (USD Equivalent)',
-                barmode='group',
-                height=400,
-                xaxis_tickangle=-45
-            )
-            
-            st.plotly_chart(fig_bar, use_container_width=True)
+        fig_current = px.pie(
+            values=list(current_category_totals.values()),
+            names=list(current_category_totals.keys()),
+            title='Current Spending by Category'
+        )
+        st.plotly_chart(fig_current, use_container_width=True)
+    
+    with col2:
+        # Future equivalent spending by category
+        future_category_totals = {}
+        for expense in recent_expenses[:10]:
+            category = expense[5] or 'Unknown'
+            current_amount = expense[4]
+            future_cost, _ = calculate_future_purchasing_power(current_amount, years_ahead, inflation_rate)
+            if category in future_category_totals:
+                future_category_totals[category] += future_cost
+            else:
+                future_category_totals[category] = future_cost
         
-        with col_chart2:
-            # Category Impact Pie Chart
-            category_impact = {}
-            for item in chart_data:
-                category = item['category']
-                impact = item['future'] - item['current']
-                if category in category_impact:
-                    category_impact[category] += impact
-                else:
-                    category_impact[category] = impact
-            
-            fig_pie = px.pie(
-                values=list(category_impact.values()),
-                names=list(category_impact.keys()),
-                title=f'Future Cost Impact by Category ({years_ahead} Years)',
-                color_discrete_sequence=px.colors.qualitative.Set3
-            )
-            
-            fig_pie.update_layout(height=400)
-            st.plotly_chart(fig_pie, use_container_width=True)
+        fig_future = px.pie(
+            values=list(future_category_totals.values()),
+            names=list(future_category_totals.keys()),
+            title=f'Future Equivalent Cost ({years_ahead} Years)'
+        )
+        st.plotly_chart(fig_future, use_container_width=True)
     
     # Summary insights
     total_current = sum(expense[4] for expense in recent_expenses[:10])
@@ -830,9 +813,9 @@ def net_worth_future_value_analysis():
         chart_usd_value.append(future_usd_value)
         chart_btc_price.append(future_btc_price)
     
-    # THE 4 BEAUTIFUL CHARTS - MAIN STARS
+    # Future Value Charts
     st.markdown("---")
-    st.markdown("### 📈 Future Value Analysis - The Beautiful Charts")
+    st.markdown("### 📈 Future Value Analysis")
     
     # Create 2x2 subplot layout
     fig = make_subplots(
@@ -1154,10 +1137,6 @@ def lifecycle_cost_report():
         tx_amount_usd = (tx_amount / 100_000_000) * tx_btc_price  # Convert sats to USD at purchase time
         btc_could_have_bought = tx_amount_usd / tx_btc_price  # USD amount divided by BTC price
         
-        st.metric("Bitcoin Equivalent at Purchase", f"{btc_could_have_bought:.6f} BTC")
-        st.metric("Bitcoin Price at Purchase", f"${tx_btc_price:,.0f}")
-        st.metric("USD Amount at Purchase", f"${tx_amount_usd:,.2f}")
-        
         # Calculate future values
         opportunity_data = []
         
@@ -1223,20 +1202,22 @@ def lifecycle_cost_report():
         
         st.plotly_chart(fig, use_container_width=True)
         
-        # Key insights
-        if opportunity_data:
-            max_opportunity = max(opportunity_data, key=lambda x: float(x['Opportunity Cost'].replace('$', '').replace(',', '')))
-            
-            st.markdown("### 💡 Key Insights")
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
+        # Purchase details and key insights
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("Bitcoin Equivalent at Purchase", f"{btc_could_have_bought:.6f} BTC")
+            st.metric("Bitcoin Price at Purchase", f"${tx_btc_price:,.0f}")
+        
+        with col2:
+            st.metric("USD Amount at Purchase", f"${tx_amount_usd:,.2f}")
+            if opportunity_data:
+                max_opportunity = max(opportunity_data, key=lambda x: float(x['Opportunity Cost'].replace('$', '').replace(',', '')))
                 st.metric("Biggest Opportunity Cost", max_opportunity['Opportunity Cost'])
-            
-            with col2:
-                st.metric("Time Horizon", f"{max_opportunity['Years']} years")
-            
-            with col3:
+        
+        with col3:
+            if opportunity_data:
+                st.metric("Best Time Horizon", f"{max_opportunity['Years']} years")
                 st.metric("Value Multiple", max_opportunity['Multiple'])
         
         # TABLE AS SUPPORTING CAST - moved here after the chart
