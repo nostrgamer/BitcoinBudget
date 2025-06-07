@@ -498,17 +498,17 @@ def future_purchasing_power_analysis():
             else:
                 future_category_totals[category] = future_cost
         
-        # Add Bitcoin vibes as a category
+        # Add Bitcoin vibes as a category (naturally orange!)
         if total_bitcoin_savings > 0:
-            future_category_totals['Bitcoin Vibes'] = total_bitcoin_savings
+            future_category_totals['🟠 Bitcoin Vibes'] = total_bitcoin_savings
         
         # Create custom colors with orange for Bitcoin Vibes
         colors = px.colors.qualitative.Set3
         category_names = list(future_category_totals.keys())
         custom_colors = []
         for name in category_names:
-            if name == 'Bitcoin Vibes':
-                custom_colors.append('#FF8C00')  # Orange for Bitcoin vibes
+            if 'Bitcoin Vibes' in name:
+                custom_colors.append('#FF8C00')  # Orange for Bitcoin vibes, naturally!
             else:
                 custom_colors.append(colors[len(custom_colors) % len(colors)])
         
@@ -518,6 +518,24 @@ def future_purchasing_power_analysis():
             title=f'Future Cost with Bitcoin Appreciation ({years_ahead} Years)',
             color_discrete_sequence=custom_colors
         )
+        
+        # Configure to show text through title for small slices
+        fig_future.update_traces(
+            textposition='inside', 
+            textinfo='percent+label',
+            textfont_size=10
+        )
+        fig_future.update_layout(
+            showlegend=True,
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=1,
+                xanchor="left",
+                x=1.01
+            )
+        )
+        
         st.plotly_chart(fig_future, use_container_width=True)
     
     # Chart summary metrics
@@ -533,22 +551,33 @@ def future_purchasing_power_analysis():
     bitcoin_savings = total_with_inflation - total_future
     
     st.markdown("---")
-    st.markdown("#### 📊 Chart Summary")
+    st.markdown("#### 📊 Chart Comparison & Bitcoin Power")
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.metric("📈 Current Total (Left Chart)", format_sats(total_current))
+        reduction_percentage = ((total_current - total_future) / total_current * 100) if total_current > 0 else 0
+        st.metric(
+            "🔥 Cost Reduction", 
+            f"{reduction_percentage:.1f}%",
+            delta=f"From {format_sats(total_current)} to {format_sats(int(total_future))}"
+        )
     
     with col2:
-        st.metric("💰 Future Cost (Right Chart)", format_sats(int(total_future)))
+        st.metric(
+            "🚀 Bitcoin Vibes Savings", 
+            format_sats(int(bitcoin_savings)),
+            delta="vs inflation-only scenario"
+        )
     
     with col3:
-        st.metric("🟠 Bitcoin Vibes Savings", format_sats(int(bitcoin_savings)))
-    
-    with col4:
-        savings_percentage = (bitcoin_savings / total_with_inflation * 100) if total_with_inflation > 0 else 0
-        st.metric("🚀 Savings Rate", f"{savings_percentage:.1f}%")
+        if total_current > 0:
+            bitcoin_multiplier = bitcoin_savings / total_current
+            st.metric(
+                "💪 Bitcoin Multiplier", 
+                f"{bitcoin_multiplier:.1f}x",
+                delta="your original spending power"
+            )
     
     # TABLE AS SUPPORTING CAST
     st.markdown("### 📋 Detailed Analysis")
