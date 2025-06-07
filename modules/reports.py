@@ -777,6 +777,251 @@ def net_worth_future_value_report():
     df_projections = pd.DataFrame(display_data)
     st.dataframe(df_projections, use_container_width=True, hide_index=True)
     
+    # === BITCOIN RETIREMENT ANALYSIS ===
+    st.markdown("---")
+    st.markdown("### 🏖️ Bitcoin Retirement Analysis")
+    st.markdown("*When could you retire on a Bitcoin standard based on your current stack and stacking rate?*")
+    
+    # Retirement settings
+    ret_col1, ret_col2, ret_col3 = st.columns(3)
+    
+    with ret_col1:
+        annual_expenses_retirement = st.number_input(
+            "Annual Retirement Expenses (USD):",
+            min_value=30000,
+            max_value=500000,
+            value=100000,
+            step=5000,
+            help="How much do you need per year in retirement?",
+            key="retirement_expenses"
+        )
+    
+    with ret_col2:
+        retirement_inflation = st.slider(
+            "Retirement Inflation Rate:",
+            min_value=0.0,
+            max_value=12.0,
+            value=8.0,
+            step=0.5,
+            format="%.1f%%",
+            help="Expected annual inflation during retirement",
+            key="retirement_inflation"
+        ) / 100.0
+        
+    with ret_col3:
+        use_conservative_model = st.checkbox(
+            "Use Conservative Floor Price",
+            value=False,
+            help="Use 42% of Power Law price for extra safety margin",
+            key="conservative_retirement"
+        )
+    
+    # Calculate retirement scenarios
+    current_btc = current_net_worth_sats / 100_000_000  # Convert to BTC
+    
+    # Scenario 1: Current stack only (no additional stacking)
+    retirement_scenarios = []
+    for retire_year in range(2025, 2041):
+        min_btc_needed = calculate_minimum_btc_for_retirement(
+            retire_year, annual_expenses_retirement, retirement_inflation, 50, use_conservative_model
+        )
+        
+        # Calculate total BTC by retirement year (current + DCA)
+        years_to_retirement = retire_year - 2025
+        total_dca_btc = (monthly_dca_sats * 12 * years_to_retirement) / 100_000_000
+        total_btc_by_year = current_btc + total_dca_btc
+        
+        can_retire = total_btc_by_year >= min_btc_needed
+        
+        retirement_scenarios.append({
+            'year': retire_year,
+            'total_btc': total_btc_by_year,
+            'min_btc_needed': min_btc_needed,
+            'can_retire': can_retire,
+            'surplus_btc': total_btc_by_year - min_btc_needed if can_retire else None
+        })
+    
+    # Find earliest retirement year
+    earliest_retirement = next((s for s in retirement_scenarios if s['can_retire']), None)
+    
+    # Create retirement readiness chart
+    fig_retirement = go.Figure()
+    
+    years = [s['year'] for s in retirement_scenarios]
+    total_btc_by_year = [s['total_btc'] for s in retirement_scenarios]
+    min_btc_needed = [s['min_btc_needed'] for s in retirement_scenarios]
+    
+    # Your projected Bitcoin stack
+    fig_retirement.add_trace(go.Scatter(
+        x=years,
+        y=total_btc_by_year,
+        mode='lines+markers',
+        name=f'Your Bitcoin Stack (Current: {current_btc:.2f} BTC + {monthly_dca_sats:,} sats/month)',
+        line=dict(color='#FF8C00', width=3),
+        marker=dict(size=6),
+        fill='tonexty'
+    ))
+    
+    # Minimum BTC needed for retirement
+    fig_retirement.add_trace(go.Scatter(
+        x=years,
+        y=min_btc_needed,
+        mode='lines+markers',
+        name=f'Min BTC for Retirement (${annual_expenses_retirement:,}/year)',
+        line=dict(color='#FF0000', width=3, dash='dash'),
+        marker=dict(size=6)
+    ))
+    
+    # Highlight retirement readiness
+    if earliest_retirement:
+        fig_retirement.add_vline(
+            x=earliest_retirement['year'],
+            line_dash="dot",
+            line_color="green",
+            annotation_text=f"🎉 Retirement Ready: {earliest_retirement['year']}",
+            annotation_position="top"
+        )
+    
+    model_name = "Conservative Floor Price" if use_conservative_model else "Fair Price Power Law"
+    fig_retirement.update_layout(
+        title=f'Bitcoin Retirement Readiness Timeline - {model_name} Model',
+        xaxis_title='Year',
+        yaxis_title='Bitcoin (BTC)',
+        height=500,
+        hovermode='x unified'
+    )
+    
+    st.plotly_chart(fig_retirement, use_container_width=True)
+    
+    # Retirement insights
+    ret_insight_col1, ret_insight_col2, ret_insight_col3, ret_insight_col4 = st.columns(4)
+    
+    with ret_insight_col1:
+        if earliest_retirement:
+            years_to_retirement = earliest_retirement['year'] - 2025
+            st.metric(
+                "🎯 Can Retire In",
+                f"{earliest_retirement['year']} ({years_to_retirement} years)",
+                delta=f"+{earliest_retirement['surplus_btc']:.2f} BTC surplus"
+            )
+        else:
+            st.metric(
+                "❌ Retirement Status", 
+                "Need More Bitcoin",
+                delta="Increase stacking rate"
+            )
+    
+    with ret_insight_col2:
+        current_btc_value = current_btc * current_btc_price
+        st.metric(
+            "💎 Current Bitcoin Stack",
+            f"{current_btc:.2f} BTC",
+            delta=f"${current_btc_value:,.0f} value"
+        )
+    
+    with ret_insight_col3:
+        # Calculate required stacking for 2030 retirement based on current scenario
+        btc_needed_2030 = calculate_minimum_btc_for_retirement(2030, annual_expenses_retirement, retirement_inflation, 50, use_conservative_model)
+        btc_gap_2030 = btc_needed_2030 - current_btc
+        monthly_needed_2030 = (btc_gap_2030 * 100_000_000) / (12 * 5) if btc_gap_2030 > 0 else 0
+        
+        # Check if current stacking rate achieves 2030 retirement
+        current_monthly_btc = monthly_dca_sats / 100_000_000
+        btc_by_2030_current_rate = current_btc + (current_monthly_btc * 12 * 5)  # 5 years to 2030
+        
+        if btc_by_2030_current_rate >= btc_needed_2030:
+            st.metric(
+                "✅ 2030 Retirement",
+                "On Track!",
+                delta=f"{btc_by_2030_current_rate - btc_needed_2030:.2f} BTC surplus"
+            )
+        else:
+            st.metric(
+                "🎯 2030 Retirement Goal",
+                f"{monthly_needed_2030:,.0f} sats/month",
+                delta=f"Need {btc_gap_2030:.2f} more BTC"
+            )
+    
+    with ret_insight_col4:
+        # Show current stacking rate results (or 500k if no stacking)
+        display_rate = monthly_dca_sats if monthly_dca_sats > 0 else 500000
+        
+        # Find when this rate achieves retirement
+        retirement_year_for_rate = None
+        for scenario in retirement_scenarios:
+            if scenario['can_retire']:
+                retirement_year_for_rate = scenario['year']
+                break
+        
+        if monthly_dca_sats > 0:
+            # Show results for current stacking rate
+            if retirement_year_for_rate:
+                st.metric(
+                    f"📈 {monthly_dca_sats:,} Sats/Month",
+                    f"Retire by {retirement_year_for_rate}",
+                    delta=f"Current stacking rate"
+                )
+            else:
+                st.metric(
+                    f"📈 {monthly_dca_sats:,} Sats/Month", 
+                    "After 2040",
+                    delta="Increase stacking rate"
+                )
+        else:
+            # Show what 500k sats/month would achieve
+            scenarios_500k = []
+            for retire_year in range(2025, 2041):
+                min_btc_needed = calculate_minimum_btc_for_retirement(
+                    retire_year, annual_expenses_retirement, retirement_inflation, 50, use_conservative_model
+                )
+                years_to_retirement = retire_year - 2025
+                total_btc_500k = current_btc + (500000 * 12 * years_to_retirement) / 100_000_000
+                
+                if total_btc_500k >= min_btc_needed:
+                    retirement_year_500k = retire_year
+                    break
+            else:
+                retirement_year_500k = "After 2040"
+            
+            st.metric(
+                "📈 500k Sats/Month",
+                f"Retire by {retirement_year_500k}",
+                delta="Example stacking rate"
+            )
+    
+    # Add explanation connecting to Retire on Bitcoin Standard report
+    with st.expander("🔗 Understanding Bitcoin Retirement Planning", expanded=False):
+        st.markdown(f"""
+        **🎯 How This Analysis Works:**
+        
+        This retirement analysis uses the same methodology as the **"Retire on a Bitcoin Standard"** report, 
+        but customized for YOUR current Bitcoin stack and stacking rate.
+        
+        **📊 Your Current Situation:**
+        - **Current Stack:** {current_btc:.2f} BTC ({format_sats(current_net_worth_sats)})
+        - **Monthly Stacking:** {monthly_dca_sats:,} sats/month
+        - **Retirement Goal:** ${annual_expenses_retirement:,}/year
+        
+        **🧮 Calculation Method:**
+        1. **Spend-Down Strategy:** Start with X BTC at retirement, sell only what's needed each year
+        2. **Bitcoin Price Growth:** Uses Power Law projections for future Bitcoin prices
+        3. **Inflation Adjusted:** Accounts for {retirement_inflation*100:.1f}% annual inflation
+        4. **50-Year Duration:** Assumes maximum 50-year retirement period
+        
+        **🚀 Key Insights:**
+        - **Early Retirement Advantage:** Retiring in 2025-2030 needs LESS Bitcoin due to missing Bitcoin's explosive growth
+        - **Power Law Magic:** Each year you need to sell progressively LESS Bitcoin as price appreciates faster than inflation
+        - **Conservative Option:** Floor Price model uses 42% of fair value for ultra-conservative planning
+        
+        💡 **Want more details?** Check out the **"Retire on a Bitcoin Standard"** report for interactive 
+        scenarios and detailed spend-down simulations!
+        """)
+        
+        # Quick link to the other report
+        if st.button("🏖️ Go to Retire on Bitcoin Standard Report", use_container_width=True):
+            st.session_state.report_type = 'retire_on_bitcoin_standard'
+            st.rerun()
+
     # === MOTIVATIONAL INSIGHTS ===
     st.markdown("---")
     st.markdown("### 💡 Key Insights")
