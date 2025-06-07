@@ -1146,9 +1146,9 @@ def landing_page():
     try:
         from datetime import datetime, timedelta
         
-        # Calculate example: 1M sats + 250k/month for 20 years
-        initial_sats = 1_000_000
-        monthly_dca_sats = 250_000
+        # Calculate example: 10M sats + 1M/month for 20 years (realistic retirement scenario)
+        initial_sats = 10_000_000
+        monthly_dca_sats = 1_000_000
         years = 20
         inflation_rate = 0.08
         
@@ -1178,13 +1178,13 @@ def landing_page():
         calculations_ready = True
     except Exception:
         # Fallback values for preview/error cases
-        initial_sats = 1_000_000
-        monthly_dca_sats = 250_000
-        total_sats = 61_000_000
-        current_usd_value = 1000
-        total_invested_usd = 150000
-        inflation_adjusted_purchasing_power = 780000
-        purchasing_power_multiplier = 7.8
+        initial_sats = 10_000_000
+        monthly_dca_sats = 1_000_000
+        total_sats = 250_000_000
+        current_usd_value = 10000
+        total_invested_usd = 2400000
+        inflation_adjusted_purchasing_power = 3200000
+        purchasing_power_multiplier = 12.5
         calculations_ready = False
     
     # Show Net Worth Future Value example with custom styling
@@ -1192,7 +1192,7 @@ def landing_page():
         <div style="background: linear-gradient(135deg, #f7931a 0%, #ff6b35 100%); 
              padding: 1rem 2rem; border-radius: 10px; margin: 1rem 0 1.5rem 0;">
             <h3 style="color: white; text-align: center; margin: 0; font-size: 1.3rem;">
-                🚀 Example: Net Worth Future Value - DCA'ing 250k sats/month for 20 Years
+                🚀 Example: Net Worth Future Value - DCA'ing 1M sats/month for 20 Years
             </h3>
         </div>
     """, unsafe_allow_html=True)
@@ -1236,47 +1236,92 @@ def landing_page():
             </div>
         """, unsafe_allow_html=True)
     
-    # Create side-by-side charts for Net Worth example (only if calculations are ready)
+    # Create side-by-side charts for Bitcoin Retirement Analysis (updated with current data)
     if calculations_ready:
         nw_chart_col1, nw_chart_col2 = st.columns(2)
         
-        # Left column: Stack Growth Over Time
+        # Left column: Bitcoin Retirement Readiness Chart
         with nw_chart_col1:
-            st.markdown("#### 📊 Stack Growth Over 20 Years")
+            st.markdown("#### 📊 Bitcoin Retirement Readiness")
             
             try:
-                # Calculate milestone data points
-                milestones = [0, 5, 10, 15, 20]
-                stack_values = []
-                for year in milestones:
-                    milestone_sats = initial_sats + (monthly_dca_sats * 12 * year)
-                    milestone_days = current_days + (year * 365.25)
-                    milestone_btc_price = 1.0117e-17 * (milestone_days ** 5.82)
-                    milestone_value = (milestone_sats / 100_000_000) * milestone_btc_price
-                    stack_values.append(milestone_value)
+                # Calculate retirement readiness data (similar to our reports module)
+                from datetime import datetime, timedelta
                 
-                fig_growth = go.Figure(data=[
-                    go.Scatter(
-                        x=milestones,
-                        y=stack_values,
-                        mode='lines+markers',
-                        line=dict(color='#f7931a', width=4),
-                        marker=dict(size=10, color='#ff6b35'),
-                        fill='tonexty' if len(milestones) > 1 else None,
-                        fillcolor='rgba(247, 147, 26, 0.1)'
+                current_year = datetime.now().year
+                years_range = list(range(current_year, current_year + 16))  # 15 year projection
+                
+                # Your growing Bitcoin stack projection
+                your_stack_btc = []
+                min_btc_needed = []
+                
+                for year in years_range:
+                    # Your projected stack for this year
+                    years_from_now = year - current_year
+                    months_stacking = years_from_now * 12
+                    future_sats = initial_sats + (monthly_dca_sats * months_stacking)
+                    future_btc = future_sats / 100_000_000
+                    your_stack_btc.append(future_btc)
+                    
+                    # Minimum BTC needed for retirement (simplified calculation)
+                    # Assumes $100k annual retirement expenses with 8% inflation
+                    annual_expenses = 100000 * ((1.08) ** years_from_now)
+                    target_date = datetime(year, 1, 1)
+                    days_since_genesis = (target_date - datetime(2009, 1, 3)).days
+                    btc_fair_price = 1.0117e-17 * (days_since_genesis ** 5.82)
+                    min_btc_for_year = (annual_expenses * 25) / btc_fair_price  # 25x annual expenses rule
+                    min_btc_needed.append(min_btc_for_year)
+                
+                # Find retirement year (where your stack exceeds minimum needed)
+                retirement_year = None
+                for i, (your_btc, min_btc) in enumerate(zip(your_stack_btc, min_btc_needed)):
+                    if your_btc >= min_btc:
+                        retirement_year = years_range[i]
+                        break
+                
+                fig_retirement = go.Figure()
+                
+                # Your Bitcoin stack projection (orange line)
+                fig_retirement.add_trace(go.Scatter(
+                    x=years_range,
+                    y=your_stack_btc,
+                    mode='lines+markers',
+                    name='Your Bitcoin Stack',
+                    line=dict(color='#f7931a', width=4),
+                    marker=dict(size=8, color='#ff6b35')
+                ))
+                
+                # Minimum BTC needed for retirement (red dashed line)
+                fig_retirement.add_trace(go.Scatter(
+                    x=years_range,
+                    y=min_btc_needed,
+                    mode='lines+markers',
+                    name='Min BTC for Retirement',
+                    line=dict(color='#ef4444', width=3, dash='dash'),
+                    marker=dict(size=6, color='#dc2626')
+                ))
+                
+                # Add retirement year marker if found
+                if retirement_year:
+                    fig_retirement.add_vline(
+                        x=retirement_year,
+                        line_width=3,
+                        line_dash="dash",
+                        line_color="#10b981",
+                        annotation_text=f"Can Retire: {retirement_year}",
+                        annotation_position="top right"
                     )
-                ])
                 
-                fig_growth.update_layout(
+                fig_retirement.update_layout(
                     title='',
                     xaxis=dict(
-                        title='Years',
+                        title='Year',
                         tickfont=dict(color='white', size=9),
                         gridcolor='rgba(255,255,255,0.1)',
                         title_font=dict(color='white', size=10)
                     ),
                     yaxis=dict(
-                        title='Stack Value (USD)',
+                        title='Bitcoin (BTC)',
                         tickfont=dict(color='white', size=9),
                         gridcolor='rgba(255,255,255,0.1)',
                         title_font=dict(color='white', size=10)
@@ -1286,14 +1331,22 @@ def landing_page():
                     font=dict(color='white'),
                     margin=dict(t=10, b=10, l=10, r=10),
                     height=280,
-                    showlegend=False
+                    showlegend=True,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="center",
+                        x=0.5,
+                        font=dict(color='white', size=8)
+                    )
                 )
                 
-                st.plotly_chart(fig_growth, use_container_width=True)
+                st.plotly_chart(fig_retirement, use_container_width=True)
             except Exception:
-                st.markdown("📊 *Chart loading...*")
+                st.markdown("📊 *Bitcoin retirement chart loading...*")
         
-        # Right column: Stack Size Visualization
+        # Right column: DCA Accumulation Visualization  
         with nw_chart_col2:
             st.markdown("#### 💎 Final Stack Composition")
             
@@ -1307,8 +1360,8 @@ def landing_page():
                 
                 fig_composition.update_traces(
                     textposition='inside', 
-                    textinfo='percent+label',
-                    textfont_size=10,
+                    textinfo='percent',
+                    textfont_size=12,
                     marker=dict(line=dict(color='#000000', width=2))
                 )
                 
@@ -1336,21 +1389,21 @@ def landing_page():
         # Simplified view when calculations aren't ready (for preview)
         st.markdown("""
             <div style="text-align: center; padding: 2rem; background: #1f2937; border-radius: 10px; margin: 1rem 0;">
-                <h4 style="color: #f7931a; margin-bottom: 1rem;">📊 Interactive Charts Available</h4>
+                <h4 style="color: #f7931a; margin-bottom: 1rem;">📊 Bitcoin Retirement Analysis Available</h4>
                 <p style="color: #e2e8f0; margin: 0;">
-                    View stack growth projections and composition charts when you enter the app
+                    View Bitcoin retirement readiness charts and DCA projections when you enter the app
                 </p>
             </div>
         """, unsafe_allow_html=True)
     
-    # Add inspirational message for Net Worth example
+    # Add inspirational message for Bitcoin Retirement Analysis
     st.markdown(f"""
         <div style="background: #0f172a; padding: 1.5rem; border-radius: 10px; margin: 1rem 0; border-left: 4px solid #f7931a;">
-            <h4 style="color: #f7931a; margin: 0 0 0.5rem 0;">🎯 The Power of Consistent Stacking</h4>
+            <h4 style="color: #f7931a; margin: 0 0 0.5rem 0;">🏖️ Your Path to Bitcoin Retirement</h4>
             <p style="color: #e2e8f0; margin: 0; font-size: 1rem;">
-                Starting with just <strong>{format_sats(initial_sats)}</strong> and consistently adding <strong>{format_sats(monthly_dca_sats)}</strong> per month, 
-                your Bitcoin stack could grow to <strong>{format_sats(total_sats)}</strong> with <strong>{purchasing_power_multiplier:.1f}x</strong> the purchasing power in 20 years. 
-                That's the magic of time, scarcity, and disciplined accumulation! 🚀
+                With a solid starting stack and consistent DCA of <strong>{format_sats(monthly_dca_sats)}</strong> per month, you could potentially retire on Bitcoin in <strong>15-20 years</strong>! 
+                The chart above shows exactly when your growing Bitcoin stack intersects with retirement needs. 
+                Time + Consistency + Bitcoin's power law growth = Financial Freedom! 🚀
             </p>
         </div>
     """, unsafe_allow_html=True)
