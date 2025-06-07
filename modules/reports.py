@@ -475,40 +475,80 @@ def future_purchasing_power_analysis():
         st.plotly_chart(fig_current, use_container_width=True)
     
     with col2:
-        # Future equivalent spending by category
+        # Future spending with Bitcoin appreciation effect
         future_category_totals = {}
+        total_bitcoin_savings = 0
+        
         for expense in recent_expenses[:10]:
             category = expense[5] or 'Unknown'
             current_amount = expense[4]
+            
+            # What it would cost with just inflation
+            inflated_cost = current_amount * ((1 + inflation_rate) ** years_ahead)
+            
+            # What it actually costs with Bitcoin appreciation
             future_cost, _ = calculate_future_purchasing_power(current_amount, years_ahead, inflation_rate)
+            
+            # Bitcoin savings (the difference)
+            bitcoin_savings = inflated_cost - future_cost
+            total_bitcoin_savings += bitcoin_savings
+            
             if category in future_category_totals:
                 future_category_totals[category] += future_cost
             else:
                 future_category_totals[category] = future_cost
         
+        # Add Bitcoin vibes as a category
+        if total_bitcoin_savings > 0:
+            future_category_totals['Bitcoin Vibes'] = total_bitcoin_savings
+        
+        # Create custom colors with orange for Bitcoin Vibes
+        colors = px.colors.qualitative.Set3
+        category_names = list(future_category_totals.keys())
+        custom_colors = []
+        for name in category_names:
+            if name == 'Bitcoin Vibes':
+                custom_colors.append('#FF8C00')  # Orange for Bitcoin vibes
+            else:
+                custom_colors.append(colors[len(custom_colors) % len(colors)])
+        
         fig_future = px.pie(
             values=list(future_category_totals.values()),
-            names=list(future_category_totals.keys()),
-            title=f'Future Equivalent Cost ({years_ahead} Years)'
+            names=category_names,
+            title=f'Future Cost with Bitcoin Appreciation ({years_ahead} Years)',
+            color_discrete_sequence=custom_colors
         )
         st.plotly_chart(fig_future, use_container_width=True)
     
-    # Summary insights
+    # Chart summary metrics
     total_current = sum(expense[4] for expense in recent_expenses[:10])
     total_future = sum(calculate_future_purchasing_power(expense[4], years_ahead, inflation_rate)[0] 
                       for expense in recent_expenses[:10])
     
-    col1, col2, col3 = st.columns(3)
+    # Calculate what it would cost with just inflation
+    total_with_inflation = sum(expense[4] * ((1 + inflation_rate) ** years_ahead) 
+                              for expense in recent_expenses[:10])
+    
+    # Bitcoin savings
+    bitcoin_savings = total_with_inflation - total_future
+    
+    st.markdown("---")
+    st.markdown("#### 📊 Chart Summary")
+    
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("Current Total", format_sats(total_current))
+        st.metric("📈 Current Total (Left Chart)", format_sats(total_current))
     
     with col2:
-        st.metric("Future Equivalent", format_sats(int(total_future)))
+        st.metric("💰 Future Cost (Right Chart)", format_sats(int(total_future)))
     
     with col3:
-        impact = ((total_future/total_current - 1) * 100) if total_current > 0 else 0
-        st.metric("Inflation Impact", f"+{impact:.1f}%")
+        st.metric("🟠 Bitcoin Vibes Savings", format_sats(int(bitcoin_savings)))
+    
+    with col4:
+        savings_percentage = (bitcoin_savings / total_with_inflation * 100) if total_with_inflation > 0 else 0
+        st.metric("🚀 Savings Rate", f"{savings_percentage:.1f}%")
     
     # TABLE AS SUPPORTING CAST
     st.markdown("### 📋 Detailed Analysis")
@@ -1123,11 +1163,7 @@ def lifecycle_cost_report():
         selected_transaction = transaction_options[selected_idx][2]
         tx_amount = selected_transaction[4]
         tx_date = selected_transaction[1]
-        
-        # Calculate opportunity cost
-        st.markdown("---")
-        st.markdown("### 💰 Opportunity Cost Analysis")
-        
+              
         # Get Bitcoin price at transaction date
         tx_datetime = datetime.strptime(tx_date, '%Y-%m-%d')
         tx_days = get_days_since_genesis(tx_datetime)
