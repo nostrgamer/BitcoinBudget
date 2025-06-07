@@ -138,7 +138,7 @@ def get_demo_data():
             'id': 1,
             'date': current_month + '-01',
             'description': 'Salary',
-            'amount': 300000000,  # 3M sats (about $2k at current prices)
+            'amount': 11400000,  # 11.4M sats (~$8,000)
             'type': 'income',
             'category_id': None,
             'account_id': 1
@@ -147,7 +147,7 @@ def get_demo_data():
             'id': 2,
             'date': current_month + '-15',
             'description': 'Freelance Work',
-            'amount': 75000000,  # 750k sats
+            'amount': 2860000,  # 2.86M sats (~$2,000)
             'type': 'income',
             'category_id': None,
             'account_id': 1
@@ -158,7 +158,7 @@ def get_demo_data():
             'id': 3,
             'date': current_month + '-01',
             'description': 'Rent Payment',
-            'amount': 120000000,  # 1.2M sats
+            'amount': 4285000,  # 4.29M sats (~$3,000)
             'type': 'expense',
             'category_id': 1,
             'account_id': 1
@@ -167,7 +167,7 @@ def get_demo_data():
             'id': 4,
             'date': current_month + '-05',
             'description': 'Phone & Internet Bill',
-            'amount': 8000000,  # 80k sats
+            'amount': 143000,  # 143k sats (~$100)
             'type': 'expense',
             'category_id': 2,
             'account_id': 1
@@ -176,7 +176,7 @@ def get_demo_data():
             'id': 5,
             'date': current_month + '-10',
             'description': 'Car Insurance',
-            'amount': 15000000,  # 150k sats
+            'amount': 428000,  # 428k sats (~$300)
             'type': 'expense',
             'category_id': 3,
             'account_id': 1
@@ -185,7 +185,7 @@ def get_demo_data():
             'id': 6,
             'date': current_month + '-12',
             'description': 'Electric Bill',
-            'amount': 12000000,  # 120k sats
+            'amount': 286000,  # 286k sats (~$200)
             'type': 'expense',
             'category_id': 4,
             'account_id': 1
@@ -196,7 +196,7 @@ def get_demo_data():
             'id': 7,
             'date': current_month + '-03',
             'description': 'Grocery Shopping',
-            'amount': 25000000,  # 250k sats
+            'amount': 214000,  # 214k sats (~$150)
             'type': 'expense',
             'category_id': 5,
             'account_id': 1
@@ -205,7 +205,7 @@ def get_demo_data():
             'id': 8,
             'date': current_month + '-07',
             'description': 'Gas Station',
-            'amount': 7000000,  # 70k sats
+            'amount': 71000,  # 71k sats (~$50)
             'type': 'expense',
             'category_id': 6,
             'account_id': 1
@@ -214,7 +214,7 @@ def get_demo_data():
             'id': 9,
             'date': current_month + '-14',
             'description': 'Restaurant Dinner',
-            'amount': 6000000,  # 60k sats
+            'amount': 86000,  # 86k sats (~$60)
             'type': 'expense',
             'category_id': 7,
             'account_id': 1
@@ -223,7 +223,7 @@ def get_demo_data():
             'id': 10,
             'date': current_month + '-08',
             'description': 'Haircut',
-            'amount': 4000000,  # 40k sats
+            'amount': 57000,  # 57k sats (~$40)
             'type': 'expense',
             'category_id': 8,
             'account_id': 1
@@ -232,7 +232,7 @@ def get_demo_data():
             'id': 11,
             'date': current_month + '-16',
             'description': 'Grocery Shopping',
-            'amount': 28000000,  # 280k sats
+            'amount': 286000,  # 286k sats (~$200)
             'type': 'expense',
             'category_id': 5,
             'account_id': 1
@@ -243,7 +243,7 @@ def get_demo_data():
             'id': 12,
             'date': current_month + '-09',
             'description': 'Movie Tickets',
-            'amount': 3000000,  # 30k sats
+            'amount': 43000,  # 43k sats (~$30)
             'type': 'expense',
             'category_id': 13,
             'account_id': 1
@@ -252,7 +252,7 @@ def get_demo_data():
             'id': 13,
             'date': current_month + '-18',
             'description': 'Book Purchase',
-            'amount': 2500000,  # 25k sats
+            'amount': 36000,  # 36k sats (~$25)
             'type': 'expense',
             'category_id': 14,
             'account_id': 1
@@ -261,47 +261,47 @@ def get_demo_data():
     
     demo_allocations = [
         # Fixed Expenses - allocated for full amounts
-        {'id': 1, 'category_id': 1, 'month': current_month, 'amount': 120000000},  # Rent
-        {'id': 2, 'category_id': 2, 'month': current_month, 'amount': 10000000},   # Phone
-        {'id': 3, 'category_id': 3, 'month': current_month, 'amount': 20000000},   # Insurance
-        {'id': 4, 'category_id': 4, 'month': current_month, 'amount': 15000000},   # Utilities
+        {'id': 1, 'category_id': 1, 'month': current_month, 'amount': 4300000},   # Rent (~$3,000)
+        {'id': 2, 'category_id': 2, 'month': current_month, 'amount': 150000},    # Phone (~$100)
+        {'id': 3, 'category_id': 3, 'month': current_month, 'amount': 430000},    # Insurance (~$300)
+        {'id': 4, 'category_id': 4, 'month': current_month, 'amount': 290000},    # Utilities (~$200)
         
         # Variable Expenses - allocated for expected amounts
-        {'id': 5, 'category_id': 5, 'month': current_month, 'amount': 60000000},   # Groceries
-        {'id': 6, 'category_id': 6, 'month': current_month, 'amount': 20000000},   # Gas
-        {'id': 7, 'category_id': 7, 'month': current_month, 'amount': 15000000},   # Restaurants
-        {'id': 8, 'category_id': 8, 'month': current_month, 'amount': 8000000},    # Personal Care
-        {'id': 9, 'category_id': 9, 'month': current_month, 'amount': 12000000},   # Clothing
+        {'id': 5, 'category_id': 5, 'month': current_month, 'amount': 1070000},   # Groceries (~$750)
+        {'id': 6, 'category_id': 6, 'month': current_month, 'amount': 290000},    # Gas (~$200)
+        {'id': 7, 'category_id': 7, 'month': current_month, 'amount': 430000},    # Restaurants (~$300)
+        {'id': 8, 'category_id': 8, 'month': current_month, 'amount': 140000},    # Personal Care (~$100)
+        {'id': 9, 'category_id': 9, 'month': current_month, 'amount': 290000},    # Clothing (~$200)
         
         # Savings & Goals  
-        {'id': 10, 'category_id': 10, 'month': current_month, 'amount': 50000000}, # Bitcoin Stack
-        {'id': 11, 'category_id': 11, 'month': current_month, 'amount': 20000000}, # Emergency Fund
-        {'id': 12, 'category_id': 12, 'month': current_month, 'amount': 5000000},  # Vacation Fund
+        {'id': 10, 'category_id': 10, 'month': current_month, 'amount': 4300000}, # Bitcoin Stack (~$3,000)
+        {'id': 11, 'category_id': 11, 'month': current_month, 'amount': 1430000}, # Emergency Fund (~$1,000)
+        {'id': 12, 'category_id': 12, 'month': current_month, 'amount': 570000},  # Vacation Fund (~$400)
         
         # Fun & Entertainment
-        {'id': 13, 'category_id': 13, 'month': current_month, 'amount': 10000000}, # Entertainment
-        {'id': 14, 'category_id': 14, 'month': current_month, 'amount': 5000000}   # Hobbies
+        {'id': 13, 'category_id': 13, 'month': current_month, 'amount': 290000},  # Entertainment (~$200)
+        {'id': 14, 'category_id': 14, 'month': current_month, 'amount': 140000}   # Hobbies (~$100)
     ]
     
     demo_accounts = [
         {
             'id': 1,
             'name': 'Checking Account',
-            'balance': 144500000,  # Reflects income minus expenses
+            'balance': 8740000,  # Reflects income minus expenses (~$6,100)
             'is_tracked': True,
             'account_type': 'checking'
         },
         {
             'id': 2,
             'name': 'Bitcoin Cold Storage',
-            'balance': 1000000000,  # 10M sats long-term savings
+            'balance': 71400000,  # 71.4M sats long-term savings (~$50k)
             'is_tracked': False,
             'account_type': 'savings'
         },
         {
             'id': 3,
             'name': 'Emergency Cash',
-            'balance': 200000000,  # 2M sats emergency fund
+            'balance': 14300000,  # 14.3M sats emergency fund (~$10k)
             'is_tracked': False,
             'account_type': 'savings'
         }
