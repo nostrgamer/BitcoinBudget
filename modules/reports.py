@@ -773,7 +773,7 @@ def retire_on_bitcoin_analysis():
 
 def net_worth_future_value_analysis():
     """Net worth future value analysis component"""
-    st.markdown("### 💰 Future Value of Your Bitcoin Stack")
+    st.markdown("#### 💰 Future Value of Your Bitcoin Stack")
     
     user_data = get_user_data()
     
@@ -792,7 +792,7 @@ def net_worth_future_value_analysis():
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("### ⚙️ Analysis Settings")
+        st.markdown("#### ⚙️ Analysis Settings")
         
         # Monthly stacking rate
         monthly_stacking_sats = st.number_input(
@@ -819,25 +819,51 @@ def net_worth_future_value_analysis():
             value=False,
             help="Use 42% of Power Law Fair Price for conservative estimates"
         )
+        
+        # Custom stack amount toggle
+        use_custom_stack = st.checkbox(
+            "Use Custom Stack Amount",
+            value=False,
+            help="Override your current net worth with a custom Bitcoin amount for analysis"
+        )
+        
+        if use_custom_stack:
+            custom_btc_amount = st.number_input(
+                "Custom Bitcoin Amount (BTC):",
+                min_value=0.0,
+                max_value=1000.0,
+                value=1.0,
+                step=0.01,
+                format="%.4f",
+                help="Enter a custom Bitcoin amount to analyze different scenarios"
+            )
+            # Override the calculated amount
+            current_btc = custom_btc_amount
+            total_bitcoin_sats = int(custom_btc_amount * 100_000_000)
     
     with col2:
-        st.markdown("### 📊 Current Holdings")
+        st.markdown("#### 📊 Current Holdings")
         
         # Current Bitcoin price
         today = datetime.now()
         current_days = get_days_since_genesis(today)
         current_btc_price = calculate_btc_fair_value(current_days)
         
+        # Recalculate USD value based on potentially overridden BTC amount
         current_usd_value = current_btc * current_btc_price
         
-        st.metric("Current Bitcoin Stack", f"{current_btc:.4f} BTC")
-        st.metric("Current USD Value", f"${current_usd_value:,.0f}")
-        st.metric("Monthly Stacking", format_sats(monthly_stacking_sats))
+        # Compact display without large metrics
+        stack_label = "Analysis Stack" if use_custom_stack else "Current Bitcoin Stack"
+        st.markdown(f"**{stack_label}:** {current_btc:.4f} BTC")
+        st.markdown(f"**USD Value:** ${current_usd_value:,.0f}")
+        st.markdown(f"**Monthly Stacking:** {format_sats(monthly_stacking_sats)}")
         
-        # Show tracked vs total
-        if tracked_bitcoin_sats != total_bitcoin_sats:
+        # Show tracked vs total (only if using actual net worth)
+        if not use_custom_stack and tracked_bitcoin_sats != total_bitcoin_sats:
             tracked_btc = tracked_bitcoin_sats / 100_000_000
-            st.metric("Tracked Accounts Only", f"{tracked_btc:.4f} BTC")
+            st.markdown(f"**Tracked Accounts Only:** {tracked_btc:.4f} BTC")
+        elif use_custom_stack:
+            st.markdown(f"*Using custom amount for analysis*")
     
     # Calculate future projections
     projections = []
@@ -882,70 +908,9 @@ def net_worth_future_value_analysis():
         chart_usd_value.append(future_usd_value)
         chart_btc_price.append(future_btc_price)
     
-    # Future Value Charts
+        # === BITCOIN RETIREMENT ANALYSIS ===
     st.markdown("---")
-    st.markdown("### 📈 Future Value Analysis")
-    
-    # Create 2x2 subplot layout
-    fig = make_subplots(
-        rows=2, cols=2,
-        subplot_titles=('Bitcoin Stack Growth', 'USD Value Growth', 'Bitcoin Price Projection', 'Stack Value Multipliers'),
-        specs=[[{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}]]
-    )
-    
-    # Chart 1: Bitcoin Stack Growth
-    fig.add_trace(
-        go.Scatter(x=chart_years, y=chart_btc_stack, mode='lines+markers',
-                  name='Bitcoin Stack', line=dict(color='#FF8C00', width=3)),
-        row=1, col=1
-    )
-    
-    # Chart 2: USD Value Growth
-    fig.add_trace(
-        go.Scatter(x=chart_years, y=chart_usd_value, mode='lines+markers',
-                  name='USD Value', line=dict(color='#32CD32', width=3)),
-        row=1, col=2
-    )
-    
-    # Chart 3: Bitcoin Price Projection
-    fig.add_trace(
-        go.Scatter(x=chart_years, y=chart_btc_price, mode='lines+markers',
-                  name='BTC Price', line=dict(color='#DC143C', width=3)),
-        row=2, col=1
-    )
-    
-    # Chart 4: Stack Value Multipliers
-    multipliers = [val / current_usd_value if current_usd_value > 0 else 1 for val in chart_usd_value]
-    fig.add_trace(
-        go.Scatter(x=chart_years, y=multipliers, mode='lines+markers',
-                  name='Value Multiplier', line=dict(color='#9370DB', width=3)),
-        row=2, col=2
-    )
-    
-    # Update layout
-    fig.update_layout(
-        title_text="Bitcoin Stack Future Value Analysis",
-        height=600,
-        showlegend=False
-    )
-    
-    # Update axes labels
-    fig.update_xaxes(title_text="Years", row=1, col=1)
-    fig.update_xaxes(title_text="Years", row=1, col=2)
-    fig.update_xaxes(title_text="Years", row=2, col=1)
-    fig.update_xaxes(title_text="Years", row=2, col=2)
-    
-    fig.update_yaxes(title_text="Bitcoin (BTC)", row=1, col=1)
-    fig.update_yaxes(title_text="USD Value", row=1, col=2)
-    fig.update_yaxes(title_text="Price (USD)", row=2, col=1)
-    fig.update_yaxes(title_text="Multiplier", row=2, col=2)
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # === BITCOIN RETIREMENT ANALYSIS ===
-    st.markdown("---")
-    st.markdown("### 🏖️ Bitcoin Retirement Analysis")
+    st.markdown("#### 🏖️ Bitcoin Retirement Analysis")
     
     # Retirement parameters
     col1, col2 = st.columns(2)
@@ -1046,7 +1011,7 @@ def net_worth_future_value_analysis():
     st.plotly_chart(fig, use_container_width=True)
     
     # Key retirement metrics
-    st.markdown("### 💡 Retirement Readiness Metrics")
+    st.markdown("##### 💡 Retirement Readiness Metrics")
     
     col1, col2, col3, col4 = st.columns(4)
     
@@ -1120,9 +1085,91 @@ def net_worth_future_value_analysis():
     - Supporting charts for price projections and inflation impact
     """)
     
+    # === FUTURE VALUE CHARTS - moved here after retirement analysis ===
+    st.markdown("---")
+    st.markdown("##### 🚀 Future Value Projections")
+    
+    # Create 2x2 subplot layout
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=('🚀 Bitcoin Price Growth (Power Law)', '💰 Your Stack Value Growth', 
+                       '💎 Real Purchasing Power Growth', '🚀 Purchasing Power Multiplier'),
+        specs=[[{"secondary_y": False}, {"secondary_y": False}],
+               [{"secondary_y": False}, {"secondary_y": False}]]
+    )
+    
+    # Chart 1: Bitcoin Price Growth (Power Law) - Line chart
+    current_btc_price_today = calculate_btc_fair_value(get_days_since_genesis(datetime.now()))
+    fig.add_trace(
+        go.Scatter(x=[0] + chart_years, 
+                  y=[current_btc_price_today] + chart_btc_price, 
+                  mode='lines+markers',
+                  name='Future Price', 
+                  line=dict(color='#FF8C00', width=3),
+                  marker=dict(size=6)),
+        row=1, col=1
+    )
+    # Add current price line
+    fig.add_hline(y=current_btc_price_today, line_width=2, line_dash="dash", 
+                  line_color="white", row=1, col=1)
+    
+    # Chart 2: Your Stack Value Growth - Bar chart with current and future values
+    current_values = [current_usd_value] * len(chart_years)
+    fig.add_trace(
+        go.Bar(x=chart_years, y=current_values, name='Current Value',
+               marker_color='rgba(128, 128, 128, 0.6)'),
+        row=1, col=2
+    )
+    fig.add_trace(
+        go.Bar(x=chart_years, y=chart_usd_value, name='Future Value',
+               marker_color='#32CD32'),
+        row=1, col=2
+    )
+    
+    # Chart 3: Real Purchasing Power Growth - Bar chart
+    purchasing_power_values = []
+    for year_idx, year in enumerate(chart_years):
+        # Calculate purchasing power (future value adjusted for inflation)
+        inflation_factor = (1.08) ** year  # 8% inflation
+        real_purchasing_power = chart_usd_value[year_idx] / inflation_factor
+        purchasing_power_values.append(real_purchasing_power)
+    
+    fig.add_trace(
+        go.Bar(x=chart_years, y=purchasing_power_values, name='Real Purchasing Power',
+               marker_color='#4169E1'),
+        row=2, col=1
+    )
+    
+    # Chart 4: Purchasing Power Multipliers - Bar chart
+    multipliers = [val / current_usd_value if current_usd_value > 0 else 1 for val in chart_usd_value]
+    fig.add_trace(
+        go.Bar(x=chart_years, y=multipliers, name='Purchasing Power Multiplier',
+               marker_color='#9370DB'),
+        row=2, col=2
+    )
+    
+    # Update layout
+    fig.update_layout(
+        height=600,
+        showlegend=False  # Remove legend since subtitles are clear
+    )
+    
+    # Update axes labels
+    fig.update_xaxes(title_text="Years", row=1, col=1)
+    fig.update_xaxes(title_text="Years", row=1, col=2)
+    fig.update_xaxes(title_text="Years", row=2, col=1)
+    fig.update_xaxes(title_text="Years", row=2, col=2)
+    
+    fig.update_yaxes(title_text="Bitcoin Price (USD)", row=1, col=1)
+    fig.update_yaxes(title_text="USD Value", row=1, col=2)
+    fig.update_yaxes(title_text="Real Purchasing Power (USD)", row=2, col=1)
+    fig.update_yaxes(title_text="Multiplier", row=2, col=2)
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
     # TABLE AS SUPPORTING CAST - moved here after the main charts and analysis
     st.markdown("---")
-    st.markdown("### 📊 Future Value Projections Table")
+    st.markdown("###### 📊 Future Value Projections Table")
     df = pd.DataFrame(projections)
     st.dataframe(df, use_container_width=True, hide_index=True)
 
@@ -1141,7 +1188,7 @@ def lifecycle_cost_report():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.markdown("### 🔍 Select Transaction to Analyze")
+        st.markdown("#### 🔍 Select Transaction to Analyze")
         
         # Create transaction options for selectbox
         transaction_options = []
@@ -1159,36 +1206,27 @@ def lifecycle_cost_report():
             
             selected_transaction = transaction_options[selected_idx][2]
             
-            # Transaction details
-            st.markdown("### 📋 Transaction Details")
+            # Transaction details (compact)
+            st.markdown("#### 📋 Transaction Details")
             tx_date, tx_desc, tx_category, tx_amount = selected_transaction[1], selected_transaction[2], selected_transaction[5], selected_transaction[4]
             
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.metric("Date", tx_date)
-                st.metric("Amount", format_sats(tx_amount))
-            with col_b:
-                st.metric("Description", tx_desc)
-                st.metric("Category", tx_category)
+            # Compact single-line display
+            st.markdown(f"**Date:** {tx_date} | **Amount:** {format_sats(tx_amount)} | **Category:** {tx_category}")
+            st.markdown(f"**Description:** {tx_desc}")
     
     with col2:
-        st.markdown("### ⚙️ Analysis Settings")
+        st.markdown("#### ⚙️ Analysis Settings")
         
-        # Time horizons for analysis
-        time_horizons = st.multiselect(
-            "Time Horizons (years):",
-            [1, 2, 5, 10, 15, 20],
-            default=[5, 10, 20]
-        )
-        
-        # Bitcoin price model
-        use_conservative_model = st.checkbox(
-            "Conservative Model",
-            value=False,
-            help="Use 42% of Power Law Fair Price"
+        # Single time horizon for cleaner analysis
+        years_ahead = st.slider(
+            "Years into Future:",
+            min_value=1,
+            max_value=20,
+            value=10,
+            step=1
         )
     
-    if transaction_options and time_horizons:
+    if transaction_options:
         selected_transaction = transaction_options[selected_idx][2]
         tx_amount = selected_transaction[4]
         tx_date = selected_transaction[1]
@@ -1202,93 +1240,89 @@ def lifecycle_cost_report():
         tx_amount_usd = (tx_amount / 100_000_000) * tx_btc_price  # Convert sats to USD at purchase time
         btc_could_have_bought = tx_amount_usd / tx_btc_price  # USD amount divided by BTC price
         
-        # Calculate future values
-        opportunity_data = []
+        # Calculate future values for selected time horizon
+        future_date = tx_datetime + timedelta(days=years_ahead * 365.25)
+        future_days = get_days_since_genesis(future_date)
+        future_btc_price = calculate_btc_fair_value(future_days)
         
-        for years in time_horizons:
-            # Future date
-            future_date = tx_datetime + timedelta(days=years * 365.25)
-            future_days = get_days_since_genesis(future_date)
-            future_btc_price = calculate_btc_fair_value(future_days)
+        # Future value if had bought Bitcoin instead
+        future_value = btc_could_have_bought * future_btc_price
+        
+        # Opportunity cost (future value minus original USD amount)
+        opportunity_cost = future_value - tx_amount_usd
+        
+        # Purchase value adjusted for inflation
+        inflation_factor = (1.08) ** years_ahead  # 8% inflation
+        purchase_value_inflated = tx_amount_usd * inflation_factor
+        
+        # Create side-by-side charts
+        col_left, col_right = st.columns(2)
+        
+        # Left: Pie chart showing opportunity cost breakdown
+        with col_left:
+            st.markdown("##### 💖 Opportunity Cost Analysis")
             
-            if use_conservative_model:
-                future_btc_price *= 0.42
+            pie_values = [tx_amount_usd, opportunity_cost]
+            pie_labels = ['Purchase Value', 'Opportunity Cost']
+            pie_colors = ['#32CD32', '#DC143C']  # Green for purchase, red for opportunity cost
             
-            # Future value if had bought Bitcoin instead
-            future_value = btc_could_have_bought * future_btc_price
+            fig_pie = go.Figure(data=[go.Pie(
+                labels=pie_labels, 
+                values=pie_values,
+                marker_colors=pie_colors,
+                hole=0.4,  # Donut chart
+                textinfo='label+percent',
+                textposition='inside'
+            )])
             
-            # Opportunity cost (future value minus original USD amount)
-            opportunity_cost = future_value - tx_amount_usd
+            fig_pie.update_layout(
+                height=300,
+                showlegend=True,
+                margin=dict(t=20, b=20, l=20, r=20)
+            )
             
-            opportunity_data.append({
-                'Years': years,
-                'Future BTC Price': f"${future_btc_price:,.0f}",
-                'Future Value': f"${future_value:,.0f}",
-                'Opportunity Cost': f"${opportunity_cost:,.0f}",
-                'Multiple': f"{future_value / tx_amount_usd:.1f}x" if tx_amount_usd > 0 else "N/A"
-            })
+            st.plotly_chart(fig_pie, use_container_width=True)
         
-        # CHART FIRST - Main visualization
-        st.markdown("### 📊 Opportunity Cost Visualization")
+        # Right: Bar chart showing value comparison
+        with col_right:
+            st.markdown("##### 📊 USD Value Comparison")
+            
+            categories = ['Purchase Value', 'Future BTC Value', 'Purchase + Inflation']
+            values = [tx_amount_usd, future_value, purchase_value_inflated]
+            colors = ['#DC143C', '#32CD32', '#FF8C00']  # Red, Green, Orange
+            
+            fig_bar = go.Figure([go.Bar(
+                x=categories,
+                y=values,
+                marker_color=colors,
+                text=[f'${v:,.0f}' for v in values],
+                textposition='inside'
+            )])
+            
+            fig_bar.update_layout(
+                height=300,
+                yaxis_title='USD Value',
+                showlegend=False,
+                margin=dict(t=20, b=20, l=20, r=20)
+            )
+            
+            st.plotly_chart(fig_bar, use_container_width=True)
         
-        years = [item['Years'] for item in opportunity_data]
-        future_values = [float(item['Future Value'].replace('$', '').replace(',', '')) for item in opportunity_data]
-        original_value = tx_amount_usd
-        
-        fig = go.Figure()
-        
-        # Future value line
-        fig.add_trace(go.Scatter(
-            x=years,
-            y=future_values,
-            mode='lines+markers',
-            name='Future Value if Bought Bitcoin',
-            line=dict(color='#FF8C00', width=3),
-            marker=dict(size=8)
-        ))
-        
-        # Original purchase line
-        fig.add_hline(
-            y=original_value,
-            line_width=2,
-            line_dash="dash",
-            line_color="red",
-            annotation_text=f"Original Purchase: ${original_value:,.0f}"
-        )
-        
-        model_name = "Conservative" if use_conservative_model else "Fair Price"
-        fig.update_layout(
-            title=f'Opportunity Cost Analysis - {model_name} Model',
-            xaxis_title='Years After Purchase',
-            yaxis_title='Value (USD)',
-            height=400,
-            hovermode='x unified'
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Purchase details and key insights
-        col1, col2, col3 = st.columns(3)
+        # Key metrics below charts
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric("Bitcoin Equivalent at Purchase", f"{btc_could_have_bought:.6f} BTC")
-            st.metric("Bitcoin Price at Purchase", f"${tx_btc_price:,.0f}")
+            st.metric("Bitcoin at Purchase", f"{btc_could_have_bought:.6f} BTC")
         
         with col2:
-            st.metric("USD Amount at Purchase", f"${tx_amount_usd:,.2f}")
-            if opportunity_data:
-                max_opportunity = max(opportunity_data, key=lambda x: float(x['Opportunity Cost'].replace('$', '').replace(',', '')))
-                st.metric("Biggest Opportunity Cost", max_opportunity['Opportunity Cost'])
+            st.metric("BTC Price Then", f"${tx_btc_price:,.0f}")
         
         with col3:
-            if opportunity_data:
-                st.metric("Best Time Horizon", f"{max_opportunity['Years']} years")
-                st.metric("Value Multiple", max_opportunity['Multiple'])
+            st.metric("BTC Price Future", f"${future_btc_price:,.0f}")
         
-        # TABLE AS SUPPORTING CAST - moved here after the chart
-        st.markdown("### 📋 Detailed Opportunity Cost Analysis")
-        df_opportunity = pd.DataFrame(opportunity_data)
-        st.dataframe(df_opportunity, use_container_width=True, hide_index=True)
+        with col4:
+            multiple = future_value / tx_amount_usd if tx_amount_usd > 0 else 0
+            st.metric("Value Multiple", f"{multiple:.1f}x")
 
 def calculate_minimum_btc_for_retirement(retirement_year, annual_expenses, inflation_rate, retirement_years, use_floor_price=False):
     """Calculate minimum BTC needed for retirement using binary search"""
