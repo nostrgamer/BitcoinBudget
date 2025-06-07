@@ -442,14 +442,14 @@ def future_purchasing_power_analysis():
     expense_analysis = []
     for expense in recent_expenses[:10]:  # Top 10 recent expenses
         current_amount = expense[4]  # amount in sats
-        future_cost = calculate_future_purchasing_power(current_amount, years_ahead, inflation_rate)
+        future_cost, reduction_percentage = calculate_future_purchasing_power(current_amount, years_ahead, inflation_rate)
         
         expense_analysis.append({
             'Date': expense[1],
             'Description': expense[2],
             'Category': expense[5] or 'Unknown',
             'Current Cost': format_sats(current_amount),
-            'Future Equivalent': format_sats(future_cost),
+            'Future Equivalent': format_sats(int(future_cost)),
             'Inflation Impact': f"{((future_cost/current_amount - 1) * 100):.1f}%"
         })
     
@@ -459,7 +459,7 @@ def future_purchasing_power_analysis():
     
     # Summary insights
     total_current = sum(expense[4] for expense in recent_expenses[:10])
-    total_future = sum(calculate_future_purchasing_power(expense[4], years_ahead, inflation_rate) 
+    total_future = sum(calculate_future_purchasing_power(expense[4], years_ahead, inflation_rate)[0] 
                       for expense in recent_expenses[:10])
     
     col1, col2, col3 = st.columns(3)
@@ -468,7 +468,7 @@ def future_purchasing_power_analysis():
         st.metric("Current Total", format_sats(total_current))
     
     with col2:
-        st.metric("Future Equivalent", format_sats(total_future))
+        st.metric("Future Equivalent", format_sats(int(total_future)))
     
     with col3:
         impact = ((total_future/total_current - 1) * 100) if total_current > 0 else 0
@@ -842,7 +842,7 @@ def net_worth_future_value_analysis():
     # Key retirement metrics
     st.markdown("### 💡 Retirement Readiness Metrics")
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         if user_can_retire_year:
