@@ -1,48 +1,48 @@
 # Bitcoin Budget - Streamlit Web Application
 
-A modern, privacy-focused envelope budgeting application for Bitcoin users with advanced opportunity cost analysis.
+A modern, privacy-focused envelope budgeting application for Bitcoin users with advanced opportunity cost analysis and Bitcoin retirement planning.
 
 🌐 **Live Demo**: [https://bitcoinbudget.streamlit.app/](https://bitcoinbudget.streamlit.app/)
 
 ## What It Does
 
-- Track Bitcoin income and expenses in satoshis
-- Create spending categories with master category organization
-- Allocate income to categories monthly with rollover tracking
-- View transaction history with editing capabilities
-- **Privacy-First Design**: Each user has isolated session data
-- **Professional Web Interface**: Modern, responsive design with interactive charts
-- **Advanced Analytics**: Visual reports with Plotly charts and opportunity cost analysis
-- **Bitcoin Economics**: Built-in power law projections and inflation comparisons
+- Track Bitcoin income and expenses in satoshis with account-based budgeting
+- Create spending categories with master category organization and visual hierarchy
+- Allocate income to categories monthly with rollover tracking and smart automation
+- View transaction history with full editing capabilities
+- **Privacy-First Design**: Each user has isolated session data with JSON export/import
+- **Professional Web Interface**: Modern, responsive design with interactive Plotly charts
+- **Bitcoin Retirement Planning**: Advanced analytics with Power Law projections and retirement scenarios
+- **Bitcoin Economics**: Built-in opportunity cost analysis showing the true cost of spending decisions
 
 ## Why This Architecture?
 
 ### 🔒 **Privacy & Security**
-- **Session-Based Storage**: Each user's data is completely isolated
+- **Session-Based Storage**: Each user's data is completely isolated in browser memory
 - **No Shared Database**: Your financial data is never mixed with other users
-- **Browser-Only Persistence**: Data exists only during your session
+- **JSON Export/Import**: Full data ownership with file-based backup system
 - **Zero Installation**: No downloads, accounts, or personal information required
+- **Self-Custody**: Following Bitcoin principles of personal data ownership
 
 ### 🌐 **Modern Web Experience**
-- **Instant Access**: Works immediately in any browser
-- **Mobile Friendly**: Responsive design for phones and tablets
-- **Interactive Charts**: Professional Plotly visualizations with hover details
-- **Real-time Updates**: Instant feedback and form validation
-- **Professional Dashboard**: Tabbed interface with metric cards and data tables
+- **Instant Access**: Works immediately in any browser, mobile-friendly
+- **Interactive Charts**: Professional Plotly visualizations with proper visual hierarchy
+- **Real-time Updates**: Instant feedback, form validation, and smart automation
+- **Professional Dashboard**: Tabbed interface with account management and consolidated reports
+- **Bitcoin-Native UI**: Satoshi-only input, tree-style category hierarchy, context-aware actions
 
 ### ⚡ **Performance & Reliability**
-- **Streamlit Cloud Hosting**: Fast, reliable infrastructure
+- **Streamlit Cloud Hosting**: Fast, reliable infrastructure with auto-deploy
 - **No Database Setup**: Session state eliminates database complexity
-- **Auto-Deploy**: Updates pushed automatically from GitHub
-- **Global CDN**: Fast loading worldwide
+- **Global CDN**: Fast loading worldwide with 99.9% uptime
 
 ## Technology Stack
 
 - **Frontend**: Streamlit (Python web framework)
-- **Charts**: Plotly (interactive visualizations)
-- **Data**: Pandas + Session State (no database required)
-- **Hosting**: Streamlit Cloud
-- **Deployment**: GitHub integration with auto-deploy
+- **Charts**: Plotly (interactive visualizations with proper chart-first hierarchy)
+- **Data**: Pandas + Session State (privacy-focused, no database)
+- **Hosting**: Streamlit Cloud with GitHub auto-deploy
+- **Storage**: Session-based with JSON export/import for data portability
 
 ## Quick Start
 
@@ -91,80 +91,60 @@ The application will open at `http://localhost:8501`
 
 ### ₿ **Bitcoin-Native Features**
 - ✅ **Satoshi Precision**: All calculations in satoshis (no floating point errors)
-- ✅ **Sats-Only Standard**: Enhanced validation that formally rejects BIP 178 (no BTC input)
-- ✅ **Clear Display**: Shows as "1,000,000 sats" with comma formatting
-- ✅ **Bitcoin-Specific Account Types**: Cold storage, lightning nodes, hot wallets designed for Bitcoin users
-- ✅ **Bitcoin Power Law**: Built-in fair value calculations for projections
+- ✅ **Sats-Only Standard**: Enhanced validation that formally rejects BIP 178 (no BTC decimal input)
+- ✅ **Professional Display**: Shows as "1,000,000 sats" with comma formatting
+- ✅ **Bitcoin-Specific Account Types**: Cold storage, lightning nodes, hot wallets
+- ✅ **Bitcoin Power Law Integration**: Fair value calculations for all projections
+- ✅ **Opportunity Cost Focus**: Shows true cost of spending in Bitcoin appreciation terms
 
-### 🎨 **Modern UI/UX Features**
-- ✅ **Visual Category Hierarchy**: Professional tree-style display with 📂 master categories and ├─ └─ subcategories
-- ✅ **Interactive Sorting**: Maintains parent-child relationships even when sorting by different columns
-- ✅ **Budget Health Summary**: Progress bars showing allocation percentage with color-coded status
-- ✅ **Smart Status Indicators**: 🟢 Good, ⚪ Empty/Zero, 🔴 Overspent visual feedback
-- ✅ **Context-Aware Actions**: Quick buttons that adapt based on budget situation
-- ✅ **One-Click Automation**: Auto-fix over-allocation, distribute evenly, allocate to Bitcoin stack
-- ✅ **Professional Design**: Clean layout with proper spacing and visual hierarchy
+### 🎨 **Enhanced UI/UX Features** - **VISUAL HIERARCHY PERFECTED**
+- ✅ **Charts-First Design**: Interactive visualizations prominently displayed, tables as supporting information
+- ✅ **Professional Visual Hierarchy**: Proper text sizing with charts as the stars
+- ✅ **Tree-Style Category Display**: 📂 master categories with ├─ └─ subcategory indicators
+- ✅ **Smart Status Indicators**: 🟢 Good, ⚪ Empty/Zero, 🔴 Overspent with color coding
+- ✅ **Context-Aware Actions**: Quick buttons that adapt to budget situation
+- ✅ **Bitcoin Vibes Emphasis**: Orange visualization showing Bitcoin's purchasing power dominance
+- ✅ **Custom Analysis Toggle**: Override net worth for scenario planning
+- ✅ **Streamlined Navigation**: Consolidated reports with logical flow
 
-### 📊 **Advanced Analytics & Reports**
+### 📊 **Advanced Analytics & Reports** - **CONSOLIDATED TO 3 POWERFUL REPORTS**
 
-#### 📊 Spending Breakdown
-- **Interactive Pie Charts**: Category spending with hover details and percentages
-- **Time Period Selection**: Current month, 3/6/12 months back
-- **Category Tables**: Detailed breakdowns with amounts and percentages
-- **Summary Metrics**: Total spending, category count, top spending category
+The app now features **3 comprehensive reports** with proper visual hierarchy (charts first, tables supporting):
 
-#### 📈 Net Worth Analysis
-- **Account-Based Net Worth**: Real net worth using actual account balances
-- **Dual Chart Display**: Income vs expenses + cumulative net worth progression
-- **Account Breakdown**: Detailed view of tracked vs untracked accounts
-- **Interactive Plotly Charts**: Zoom, pan, hover for detailed information
-- **Financial Metrics**: Current net worth, income, expenses, monthly averages
-- **Trend Analysis**: Track financial progress across multiple months
+#### 1. 📊 **Spending Analysis & Future Purchasing Power**
+- **Bitcoin Vibes Visualization**: Side-by-side pie charts showing current spending vs future cost with Bitcoin appreciation
+- **Massive Orange "Bitcoin Vibes" Slice**: Shows the 93.7% savings from Bitcoin outpacing inflation (feature, not bug!)
+- **Time Period Selection**: Current month, 3/6/12 months analysis
+- **Interactive Charts**: Category spending with hover details and proper chart prominence
+- **Summary Metrics**: Total spending, top categories, Bitcoin appreciation effects
 
-#### 🚀 Net Worth Future Value
-- **Personal Stack Projections**: Show future value of your actual Bitcoin holdings
-- **DCA Modeling**: Optional Dollar Cost Averaging scenario analysis
-- **20-Year Horizons**: Project 5, 10, 15, 20-year growth scenarios
-- **4-Panel Dashboard**: Bitcoin price growth, stack value, purchasing power, multipliers
-- **Motivational Insights**: Encouraging analysis to incentivize HODLing and stacking
-- **Account Integration**: Uses your real account balances for projections
+#### 2. 🚀 **Net Worth & Bitcoin Retirement Planning**
+- **4 Beautiful Charts**: Bitcoin stack growth, USD value, price projections, multipliers in 2x2 layout
+- **Comprehensive Bitcoin Retirement Analysis**: 
+  - Calculate minimum BTC needed for retirement using realistic spend-down strategy
+  - Two price models: Fair Price (Power Law) and Super Conservative Floor Price (42% of fair price)
+  - Interactive parameters: annual expenses, inflation rate, retirement duration
+  - Early retirement insight: Starting in 2025 needs significantly less BTC than waiting
+- **Custom Stack Analysis**: Toggle to override current net worth for scenario planning
+- **Real Account Integration**: Uses actual tracked account balances for projections
+- **Motivational Insights**: Encouraging analysis to incentivize Bitcoin accumulation
+- **20-Year Projections**: Complete lifecycle analysis with retirement timeline
 
-#### 🔮 Future Purchasing Power
-- **Bitcoin Power Law Modeling**: Project future Bitcoin prices using historical data
-- **Inflation Comparison**: Compare Bitcoin appreciation vs traditional inflation
-- **Budget Projections**: Show how spending power increases over time
-- **Visual Analysis**: Side-by-side current vs future budget comparisons
-- **Multiple Horizons**: 1, 2, 5, 10-year purchasing power projections
-- **Runway Analysis**: Shows months of financial runway with current spending
+#### 3. 💰 **Lifecycle Cost Analysis**
+- **Visual-First Layout**: Charts prominently displayed above supporting text
+- **Dual Chart System**: 
+  - Left: Donut chart showing Purchase Value vs Opportunity Cost
+  - Right: Bar chart with Purchase Value, Future BTC Value, and Purchase + Inflation comparison
+- **Transaction Selection**: Analyze any historical expense for opportunity cost
+- **Time Horizon Control**: 1-10 year analysis with single slider (simplified from conservative model)
+- **4-Column Metrics**: Clean layout showing key financial impact numbers
+- **Bitcoin Power Law Integration**: Realistic price projections with mathematical accuracy
 
-#### ⏳ Lifecycle Cost Analysis
-- **Transaction Selection**: Analyze any historical expense transaction
-- **Configurable Settings**: Adjust time horizon (1-10 years) and inflation rate
-- **4-Chart Dashboard**:
-  - Bitcoin Amount Comparison (amounts remain constant)
-  - USD Value Analysis (purchase vs future value vs inflation)
-  - Bitcoin Price Projection (power law trend with markers)
-  - Opportunity Cost Breakdown (visual impact analysis)
-- **Comprehensive Analysis**: Detailed explanations with bottom-line impact
-- **Key Insights**: Amount spent, future value, opportunity cost, purchasing power multiplier
-
-#### 🏖️ Retire on a Bitcoin Standard
-- **Retirement Planning Calculator**: Determine minimum BTC stack needed for retirement
-- **Spend-Down Strategy**: Calculate BTC needed using realistic spend-down approach over time
-- **Two Price Models**:
-  - **Fair Price Model**: Standard Bitcoin Power Law projections
-  - **Super Conservative Floor Price**: 42% of Fair Price for extra safety margin
-- **Configurable Parameters**:
-  - Annual retirement expenses (default $100,000)
-  - Inflation rate (default 8%)
-  - Retirement duration (10-50 years, default 50)
-- **Interactive Analysis**:
-  - Main chart: BTC needed vs retirement start year (2025-2040)
-  - Bitcoin price projections using Power Law
-  - Expense inflation comparison
-  - Spend-down simulation showing BTC balance over time
-- **Key Insights**: Early retirement needs significantly less BTC due to Bitcoin's price appreciation
-- **Conservative Planning**: Floor Price model requires ~2.4x more BTC for ultra-safe retirement planning
+#### 📚 **Tutorial & Examples** - **UPDATED WITH REALISTIC DATA**
+- **Honest Bitcoin Retirement Scenarios**: 10M sats starting stack, 1M sats monthly DCA
+- **Realistic Timeline**: 15-20 year retirement planning with proper mathematical intersection
+- **Visual Retirement Analysis**: Charts showing where Bitcoin accumulation meets retirement needs
+- **Clean Pie Charts**: Removed hard-to-read text, maintained percentages and legend clarity
 
 ## How It Works
 
@@ -228,28 +208,27 @@ def analyze_lifecycle_cost(amount_sats, years_ahead):
 
 ### 🚀 **First Time User**
 1. Visit [bitcoinbudget.streamlit.app](https://bitcoinbudget.streamlit.app/)
-2. See compelling examples on landing page:
-   - **Net Worth Future Value**: 1M sats + 250k/month DCA over 20 years
-   - **Opportunity Cost Analysis**: $250 dinner becomes $3,914 opportunity cost
-3. Click "🚀 Get Started" to see the app with demo data
-4. App loads with demo accounts (Checking + Bitcoin Savings) and sample allocations
-5. Try adding your own transactions and explore the different tabs
+2. See realistic Bitcoin retirement examples on landing page:
+   - **Net Worth Future Value**: 10M sats + 1M/month DCA showing honest 15-20 year timeline
+   - **Opportunity Cost Analysis**: Purchases showing true Bitcoin opportunity cost
+3. Click "🚀 Get Started" to see the app with enhanced demo data
+4. App loads with realistic demo accounts and sample transactions
+5. Explore the 3 consolidated reports to understand Bitcoin's purchasing power advantage
 
 ### 📊 **Daily Budget Management**
-1. **Manage Accounts**: Set up your tracked (on-budget) and untracked (savings) accounts
-2. **Add Income**: Use the Income tab with date picker, amount validation, and account selection
-3. **Allocate Budget**: Assign income to categories with smart availability checking
-4. **Track Expenses**: Record spending with category and account selection
-5. **Monitor Balances**: Real-time category and account balances with overspending warnings
-6. **Transfer Funds**: Move money between accounts as needed
-7. **View Reports**: Analyze spending patterns, net worth, and future projections
+1. **Account Management**: Set up tracked (on-budget) and untracked (savings) Bitcoin accounts
+2. **Smart Income Entry**: Enhanced forms with real-time validation and account selection
+3. **Category Allocation**: Assign income with visual hierarchy and availability checking
+4. **Expense Tracking**: Record spending with professional category tree display
+5. **Real-time Monitoring**: Live balances with color-coded status and smart automation
+6. **Data Ownership**: Export your budget as JSON before closing browser
 
-### 🔍 **Advanced Analysis**
-1. **Spending Breakdown**: See which categories consume the most Bitcoin
-2. **Net Worth Tracking**: Monitor account balances and income vs expenses over time
-3. **Net Worth Future Value**: Visualize your Bitcoin stack growth over 5-20 years with DCA modeling
-4. **Future Purchasing Power**: Understand how current spending affects future wealth
-5. **Lifecycle Analysis**: Analyze specific purchases' long-term opportunity cost
+### 🔍 **Advanced Bitcoin Analysis**
+1. **Spending Analysis**: See your "Bitcoin Vibes" - how Bitcoin appreciation dwarfs traditional costs
+2. **Retirement Planning**: Calculate minimum BTC needed for retirement with realistic timelines
+3. **Opportunity Cost**: Analyze specific purchases to understand their true Bitcoin cost
+4. **Future Projections**: Visualize your Bitcoin stack growth over 5-20 years
+5. **Custom Scenarios**: Toggle different stack amounts to explore retirement possibilities
 
 ## Deployment & Architecture
 
@@ -271,12 +250,12 @@ streamlit run streamlit_app.py
 
 ### 📁 **File Structure**
 ```
-streamlit_app.py           # Main application (1,750 lines)
+streamlit_app.py           # Main application (~2400 lines)
 modules/
-  ├── __init__.py         # Package initialization
-  └── reports.py          # All reports functionality (1,650+ lines)
+  ├── __init__.py         # Package initialization  
+  └── reports.py          # 3 consolidated reports (~1000 lines)
 requirements.txt          # Production dependencies
-README.md                # This documentation
+README.md                # Complete documentation
 ```
 
 ### 🔄 **Development Workflow**
@@ -379,4 +358,4 @@ MIT License - Use freely for personal or commercial purposes.
 
 **🌐 Try it now**: [https://bitcoinbudget.streamlit.app/](https://bitcoinbudget.streamlit.app/)
 
-**Built for Bitcoiners who want to understand the true cost of their spending decisions in a Bitcoin world.**
+**Built for Bitcoiners who want to understand the true opportunity cost of spending decisions and plan realistic Bitcoin retirement scenarios.**
