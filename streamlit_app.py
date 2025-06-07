@@ -98,51 +98,210 @@ def import_budget_data(json_data):
         return False, f"Error importing data: {e}"
 
 def get_demo_data():
-    """Get default demo data structure"""
+    """Get default demo data structure with realistic budget"""
     current_month = get_current_month()
     
     default_master_cats = [
         {'id': 1, 'name': 'Fixed Expenses'},
         {'id': 2, 'name': 'Variable Expenses'},
-        {'id': 3, 'name': 'Savings'}
+        {'id': 3, 'name': 'Savings & Goals'},
+        {'id': 4, 'name': 'Fun & Entertainment'}
     ]
     
     default_categories = [
-        {'id': 1, 'name': 'Rent', 'master_category_id': 1},
-        {'id': 2, 'name': 'Food', 'master_category_id': 2},
-        {'id': 3, 'name': 'Bitcoin Stack', 'master_category_id': 3}
+        # Fixed Expenses
+        {'id': 1, 'name': 'Rent/Mortgage', 'master_category_id': 1},
+        {'id': 2, 'name': 'Phone & Internet', 'master_category_id': 1},
+        {'id': 3, 'name': 'Insurance', 'master_category_id': 1},
+        {'id': 4, 'name': 'Utilities', 'master_category_id': 1},
+        
+        # Variable Expenses
+        {'id': 5, 'name': 'Groceries', 'master_category_id': 2},
+        {'id': 6, 'name': 'Gas & Transportation', 'master_category_id': 2},
+        {'id': 7, 'name': 'Restaurants', 'master_category_id': 2},
+        {'id': 8, 'name': 'Personal Care', 'master_category_id': 2},
+        {'id': 9, 'name': 'Clothing', 'master_category_id': 2},
+        
+        # Savings & Goals
+        {'id': 10, 'name': 'Bitcoin Stack', 'master_category_id': 3},
+        {'id': 11, 'name': 'Emergency Fund', 'master_category_id': 3},
+        {'id': 12, 'name': 'Vacation Fund', 'master_category_id': 3},
+        
+        # Fun & Entertainment
+        {'id': 13, 'name': 'Entertainment', 'master_category_id': 4},
+        {'id': 14, 'name': 'Hobbies', 'master_category_id': 4}
     ]
     
     demo_transactions = [
+        # Income
         {
             'id': 1,
             'date': current_month + '-01',
-            'description': 'Monthly Salary',
-            'amount': 100000,  # 100k sats
+            'description': 'Salary',
+            'amount': 11400000,  # 11.4M sats (~$8,000)
             'type': 'income',
             'category_id': None,
+            'account_id': 1
+        },
+        {
+            'id': 2,
+            'date': current_month + '-15',
+            'description': 'Freelance Work',
+            'amount': 2860000,  # 2.86M sats (~$2,000)
+            'type': 'income',
+            'category_id': None,
+            'account_id': 1
+        },
+        
+        # Fixed Expenses
+        {
+            'id': 3,
+            'date': current_month + '-01',
+            'description': 'Rent Payment',
+            'amount': 4285000,  # 4.29M sats (~$3,000)
+            'type': 'expense',
+            'category_id': 1,
+            'account_id': 1
+        },
+        {
+            'id': 4,
+            'date': current_month + '-05',
+            'description': 'Phone & Internet Bill',
+            'amount': 143000,  # 143k sats (~$100)
+            'type': 'expense',
+            'category_id': 2,
+            'account_id': 1
+        },
+        {
+            'id': 5,
+            'date': current_month + '-10',
+            'description': 'Car Insurance',
+            'amount': 428000,  # 428k sats (~$300)
+            'type': 'expense',
+            'category_id': 3,
+            'account_id': 1
+        },
+        {
+            'id': 6,
+            'date': current_month + '-12',
+            'description': 'Electric Bill',
+            'amount': 286000,  # 286k sats (~$200)
+            'type': 'expense',
+            'category_id': 4,
+            'account_id': 1
+        },
+        
+        # Variable Expenses
+        {
+            'id': 7,
+            'date': current_month + '-03',
+            'description': 'Grocery Shopping',
+            'amount': 214000,  # 214k sats (~$150)
+            'type': 'expense',
+            'category_id': 5,
+            'account_id': 1
+        },
+        {
+            'id': 8,
+            'date': current_month + '-07',
+            'description': 'Gas Station',
+            'amount': 71000,  # 71k sats (~$50)
+            'type': 'expense',
+            'category_id': 6,
+            'account_id': 1
+        },
+        {
+            'id': 9,
+            'date': current_month + '-14',
+            'description': 'Restaurant Dinner',
+            'amount': 86000,  # 86k sats (~$60)
+            'type': 'expense',
+            'category_id': 7,
+            'account_id': 1
+        },
+        {
+            'id': 10,
+            'date': current_month + '-08',
+            'description': 'Haircut',
+            'amount': 57000,  # 57k sats (~$40)
+            'type': 'expense',
+            'category_id': 8,
+            'account_id': 1
+        },
+        {
+            'id': 11,
+            'date': current_month + '-16',
+            'description': 'Grocery Shopping',
+            'amount': 286000,  # 286k sats (~$200)
+            'type': 'expense',
+            'category_id': 5,
+            'account_id': 1
+        },
+        
+        # Fun & Entertainment
+        {
+            'id': 12,
+            'date': current_month + '-09',
+            'description': 'Movie Tickets',
+            'amount': 43000,  # 43k sats (~$30)
+            'type': 'expense',
+            'category_id': 13,
+            'account_id': 1
+        },
+        {
+            'id': 13,
+            'date': current_month + '-18',
+            'description': 'Book Purchase',
+            'amount': 36000,  # 36k sats (~$25)
+            'type': 'expense',
+            'category_id': 14,
             'account_id': 1
         }
     ]
     
     demo_allocations = [
-        {'id': 1, 'category_id': 1, 'month': current_month, 'amount': 50000},
-        {'id': 2, 'category_id': 2, 'month': current_month, 'amount': 30000},
-        {'id': 3, 'category_id': 3, 'month': current_month, 'amount': 20000}
+        # Fixed Expenses - allocated for full amounts
+        {'id': 1, 'category_id': 1, 'month': current_month, 'amount': 4300000},   # Rent (~$3,000)
+        {'id': 2, 'category_id': 2, 'month': current_month, 'amount': 150000},    # Phone (~$100)
+        {'id': 3, 'category_id': 3, 'month': current_month, 'amount': 430000},    # Insurance (~$300)
+        {'id': 4, 'category_id': 4, 'month': current_month, 'amount': 290000},    # Utilities (~$200)
+        
+        # Variable Expenses - allocated for expected amounts
+        {'id': 5, 'category_id': 5, 'month': current_month, 'amount': 1070000},   # Groceries (~$750)
+        {'id': 6, 'category_id': 6, 'month': current_month, 'amount': 290000},    # Gas (~$200)
+        {'id': 7, 'category_id': 7, 'month': current_month, 'amount': 430000},    # Restaurants (~$300)
+        {'id': 8, 'category_id': 8, 'month': current_month, 'amount': 140000},    # Personal Care (~$100)
+        {'id': 9, 'category_id': 9, 'month': current_month, 'amount': 290000},    # Clothing (~$200)
+        
+        # Savings & Goals  
+        {'id': 10, 'category_id': 10, 'month': current_month, 'amount': 4300000}, # Bitcoin Stack (~$3,000)
+        {'id': 11, 'category_id': 11, 'month': current_month, 'amount': 1430000}, # Emergency Fund (~$1,000)
+        {'id': 12, 'category_id': 12, 'month': current_month, 'amount': 570000},  # Vacation Fund (~$400)
+        
+        # Fun & Entertainment
+        {'id': 13, 'category_id': 13, 'month': current_month, 'amount': 290000},  # Entertainment (~$200)
+        {'id': 14, 'category_id': 14, 'month': current_month, 'amount': 140000}   # Hobbies (~$100)
     ]
     
     demo_accounts = [
         {
             'id': 1,
             'name': 'Checking Account',
-            'balance': 100000,
+            'balance': 8740000,  # Reflects income minus expenses (~$6,100)
             'is_tracked': True,
             'account_type': 'checking'
         },
         {
             'id': 2,
-            'name': 'Bitcoin Savings',
-            'balance': 500000,
+            'name': 'Bitcoin Cold Storage',
+            'balance': 71400000,  # 71.4M sats long-term savings (~$50k)
+            'is_tracked': False,
+            'account_type': 'savings'
+        },
+        {
+            'id': 3,
+            'name': 'Emergency Cash',
+            'balance': 14300000,  # 14.3M sats emergency fund (~$10k)
             'is_tracked': False,
             'account_type': 'savings'
         }
@@ -154,11 +313,28 @@ def get_demo_data():
         'master_categories': default_master_cats,
         'allocations': demo_allocations,
         'accounts': demo_accounts,
-        'next_transaction_id': 2,
-        'next_category_id': 4,
-        'next_master_category_id': 4,
-        'next_allocation_id': 4,
-        'next_account_id': 3
+        'next_transaction_id': 14,
+        'next_category_id': 15,
+        'next_master_category_id': 5,
+        'next_allocation_id': 15,
+        'next_account_id': 4
+    }
+
+def get_fresh_data():
+    """Get empty data structure for fresh start"""
+    current_month = get_current_month()
+    
+    return {
+        'transactions': [],
+        'categories': [],
+        'master_categories': [],
+        'allocations': [],
+        'accounts': [],
+        'next_transaction_id': 1,
+        'next_category_id': 1,
+        'next_master_category_id': 1,
+        'next_allocation_id': 1,
+        'next_account_id': 1
     }
 
 # === DATA FUNCTIONS (NO CHANGES NEEDED - ALREADY SESSION-BASED) ===
@@ -970,9 +1146,9 @@ def landing_page():
     try:
         from datetime import datetime, timedelta
         
-        # Calculate example: 1M sats + 250k/month for 20 years
-        initial_sats = 1_000_000
-        monthly_dca_sats = 250_000
+        # Calculate example: 10M sats + 1M/month for 20 years (realistic retirement scenario)
+        initial_sats = 10_000_000
+        monthly_dca_sats = 1_000_000
         years = 20
         inflation_rate = 0.08
         
@@ -1002,13 +1178,13 @@ def landing_page():
         calculations_ready = True
     except Exception:
         # Fallback values for preview/error cases
-        initial_sats = 1_000_000
-        monthly_dca_sats = 250_000
-        total_sats = 61_000_000
-        current_usd_value = 1000
-        total_invested_usd = 150000
-        inflation_adjusted_purchasing_power = 780000
-        purchasing_power_multiplier = 7.8
+        initial_sats = 10_000_000
+        monthly_dca_sats = 1_000_000
+        total_sats = 250_000_000
+        current_usd_value = 10000
+        total_invested_usd = 2400000
+        inflation_adjusted_purchasing_power = 3200000
+        purchasing_power_multiplier = 12.5
         calculations_ready = False
     
     # Show Net Worth Future Value example with custom styling
@@ -1016,7 +1192,7 @@ def landing_page():
         <div style="background: linear-gradient(135deg, #f7931a 0%, #ff6b35 100%); 
              padding: 1rem 2rem; border-radius: 10px; margin: 1rem 0 1.5rem 0;">
             <h3 style="color: white; text-align: center; margin: 0; font-size: 1.3rem;">
-                🚀 Example: Net Worth Future Value - DCA'ing 250k sats/month for 20 Years
+                🚀 Example: Net Worth Future Value - DCA'ing 1M sats/month for 20 Years
             </h3>
         </div>
     """, unsafe_allow_html=True)
@@ -1060,47 +1236,92 @@ def landing_page():
             </div>
         """, unsafe_allow_html=True)
     
-    # Create side-by-side charts for Net Worth example (only if calculations are ready)
+    # Create side-by-side charts for Bitcoin Retirement Analysis (updated with current data)
     if calculations_ready:
         nw_chart_col1, nw_chart_col2 = st.columns(2)
         
-        # Left column: Stack Growth Over Time
+        # Left column: Bitcoin Retirement Readiness Chart
         with nw_chart_col1:
-            st.markdown("#### 📊 Stack Growth Over 20 Years")
+            st.markdown("#### 📊 Bitcoin Retirement Readiness")
             
             try:
-                # Calculate milestone data points
-                milestones = [0, 5, 10, 15, 20]
-                stack_values = []
-                for year in milestones:
-                    milestone_sats = initial_sats + (monthly_dca_sats * 12 * year)
-                    milestone_days = current_days + (year * 365.25)
-                    milestone_btc_price = 1.0117e-17 * (milestone_days ** 5.82)
-                    milestone_value = (milestone_sats / 100_000_000) * milestone_btc_price
-                    stack_values.append(milestone_value)
+                # Calculate retirement readiness data (similar to our reports module)
+                from datetime import datetime, timedelta
                 
-                fig_growth = go.Figure(data=[
-                    go.Scatter(
-                        x=milestones,
-                        y=stack_values,
-                        mode='lines+markers',
-                        line=dict(color='#f7931a', width=4),
-                        marker=dict(size=10, color='#ff6b35'),
-                        fill='tonexty' if len(milestones) > 1 else None,
-                        fillcolor='rgba(247, 147, 26, 0.1)'
+                current_year = datetime.now().year
+                years_range = list(range(current_year, current_year + 16))  # 15 year projection
+                
+                # Your growing Bitcoin stack projection
+                your_stack_btc = []
+                min_btc_needed = []
+                
+                for year in years_range:
+                    # Your projected stack for this year
+                    years_from_now = year - current_year
+                    months_stacking = years_from_now * 12
+                    future_sats = initial_sats + (monthly_dca_sats * months_stacking)
+                    future_btc = future_sats / 100_000_000
+                    your_stack_btc.append(future_btc)
+                    
+                    # Minimum BTC needed for retirement (simplified calculation)
+                    # Assumes $100k annual retirement expenses with 8% inflation
+                    annual_expenses = 100000 * ((1.08) ** years_from_now)
+                    target_date = datetime(year, 1, 1)
+                    days_since_genesis = (target_date - datetime(2009, 1, 3)).days
+                    btc_fair_price = 1.0117e-17 * (days_since_genesis ** 5.82)
+                    min_btc_for_year = (annual_expenses * 25) / btc_fair_price  # 25x annual expenses rule
+                    min_btc_needed.append(min_btc_for_year)
+                
+                # Find retirement year (where your stack exceeds minimum needed)
+                retirement_year = None
+                for i, (your_btc, min_btc) in enumerate(zip(your_stack_btc, min_btc_needed)):
+                    if your_btc >= min_btc:
+                        retirement_year = years_range[i]
+                        break
+                
+                fig_retirement = go.Figure()
+                
+                # Your Bitcoin stack projection (orange line)
+                fig_retirement.add_trace(go.Scatter(
+                    x=years_range,
+                    y=your_stack_btc,
+                    mode='lines+markers',
+                    name='Your Bitcoin Stack',
+                    line=dict(color='#f7931a', width=4),
+                    marker=dict(size=8, color='#ff6b35')
+                ))
+                
+                # Minimum BTC needed for retirement (red dashed line)
+                fig_retirement.add_trace(go.Scatter(
+                    x=years_range,
+                    y=min_btc_needed,
+                    mode='lines+markers',
+                    name='Min BTC for Retirement',
+                    line=dict(color='#ef4444', width=3, dash='dash'),
+                    marker=dict(size=6, color='#dc2626')
+                ))
+                
+                # Add retirement year marker if found
+                if retirement_year:
+                    fig_retirement.add_vline(
+                        x=retirement_year,
+                        line_width=3,
+                        line_dash="dash",
+                        line_color="#10b981",
+                        annotation_text=f"Can Retire: {retirement_year}",
+                        annotation_position="top right"
                     )
-                ])
                 
-                fig_growth.update_layout(
+                fig_retirement.update_layout(
                     title='',
                     xaxis=dict(
-                        title='Years',
+                        title='Year',
                         tickfont=dict(color='white', size=9),
                         gridcolor='rgba(255,255,255,0.1)',
                         title_font=dict(color='white', size=10)
                     ),
                     yaxis=dict(
-                        title='Stack Value (USD)',
+                        title='Bitcoin (BTC)',
                         tickfont=dict(color='white', size=9),
                         gridcolor='rgba(255,255,255,0.1)',
                         title_font=dict(color='white', size=10)
@@ -1110,14 +1331,22 @@ def landing_page():
                     font=dict(color='white'),
                     margin=dict(t=10, b=10, l=10, r=10),
                     height=280,
-                    showlegend=False
+                    showlegend=True,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="center",
+                        x=0.5,
+                        font=dict(color='white', size=8)
+                    )
                 )
                 
-                st.plotly_chart(fig_growth, use_container_width=True)
+                st.plotly_chart(fig_retirement, use_container_width=True)
             except Exception:
-                st.markdown("📊 *Chart loading...*")
+                st.markdown("📊 *Bitcoin retirement chart loading...*")
         
-        # Right column: Stack Size Visualization
+        # Right column: DCA Accumulation Visualization  
         with nw_chart_col2:
             st.markdown("#### 💎 Final Stack Composition")
             
@@ -1131,8 +1360,8 @@ def landing_page():
                 
                 fig_composition.update_traces(
                     textposition='inside', 
-                    textinfo='percent+label',
-                    textfont_size=10,
+                    textinfo='percent',
+                    textfont_size=12,
                     marker=dict(line=dict(color='#000000', width=2))
                 )
                 
@@ -1160,21 +1389,21 @@ def landing_page():
         # Simplified view when calculations aren't ready (for preview)
         st.markdown("""
             <div style="text-align: center; padding: 2rem; background: #1f2937; border-radius: 10px; margin: 1rem 0;">
-                <h4 style="color: #f7931a; margin-bottom: 1rem;">📊 Interactive Charts Available</h4>
+                <h4 style="color: #f7931a; margin-bottom: 1rem;">📊 Bitcoin Retirement Analysis Available</h4>
                 <p style="color: #e2e8f0; margin: 0;">
-                    View stack growth projections and composition charts when you enter the app
+                    View Bitcoin retirement readiness charts and DCA projections when you enter the app
                 </p>
             </div>
         """, unsafe_allow_html=True)
     
-    # Add inspirational message for Net Worth example
+    # Add inspirational message for Bitcoin Retirement Analysis
     st.markdown(f"""
         <div style="background: #0f172a; padding: 1.5rem; border-radius: 10px; margin: 1rem 0; border-left: 4px solid #f7931a;">
-            <h4 style="color: #f7931a; margin: 0 0 0.5rem 0;">🎯 The Power of Consistent Stacking</h4>
+            <h4 style="color: #f7931a; margin: 0 0 0.5rem 0;">🏖️ Your Path to Bitcoin Retirement</h4>
             <p style="color: #e2e8f0; margin: 0; font-size: 1rem;">
-                Starting with just <strong>{format_sats(initial_sats)}</strong> and consistently adding <strong>{format_sats(monthly_dca_sats)}</strong> per month, 
-                your Bitcoin stack could grow to <strong>{format_sats(total_sats)}</strong> with <strong>{purchasing_power_multiplier:.1f}x</strong> the purchasing power in 20 years. 
-                That's the magic of time, scarcity, and disciplined accumulation! 🚀
+                With a solid starting stack and consistent DCA of <strong>{format_sats(monthly_dca_sats)}</strong> per month, you could potentially retire on Bitcoin in <strong>15-20 years</strong>! 
+                The chart above shows exactly when your growing Bitcoin stack intersects with retirement needs. 
+                Time + Consistency + Bitcoin's power law growth = Financial Freedom! 🚀
             </p>
         </div>
     """, unsafe_allow_html=True)
@@ -3331,18 +3560,20 @@ def sidebar_navigation():
             except Exception as e:
                 st.error(f"Error reading file: {e}")
         
-        # Reset to demo data
+        # Reset data options
         st.markdown("#### 🔄 Reset Data")
-        if st.button("🗑️ Reset to Demo", use_container_width=True, type="secondary"):
-            if st.session_state.get('confirm_reset', False):
-                st.session_state.user_data = get_demo_data()
-                st.session_state.confirm_reset = False
-                st.success("✅ Reset to demo data")
-                st.rerun()
-            else:
-                st.session_state.confirm_reset = True
-                st.warning("⚠️ Click again to confirm reset")
-                st.rerun()
+        
+        # Reset to demo data
+        if st.button("🔄 Reset to Demo Budget", use_container_width=True, type="secondary", help="Load realistic example budget with income, expenses, and categories"):
+            st.session_state.user_data = get_demo_data()
+            st.success("✅ Reset to demo data")
+            st.rerun()
+        
+        # Fresh start
+        if st.button("🆕 Fresh Start (Empty)", use_container_width=True, type="secondary", help="Start completely fresh with no data"):
+            st.session_state.user_data = get_fresh_data()
+            st.success("✅ Fresh start - all data cleared")
+            st.rerun()
 
 def main():
     """Main application entry point"""
