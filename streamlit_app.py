@@ -21,8 +21,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Add meta tags for better social media previews
+# Add mobile-optimized CSS and meta tags
 st.markdown("""
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Modern envelope budgeting app for Bitcoin users. Track your sats, manage spending categories, and visualize your Bitcoin stack's future value with inflation-adjusted projections.">
 <meta name="keywords" content="bitcoin, budget, envelope budgeting, sats, cryptocurrency, financial planning, DCA, hodl">
 <meta property="og:title" content="Bitcoin Budget - Modern envelope budgeting for Bitcoin users">
@@ -33,6 +34,57 @@ st.markdown("""
 <meta name="twitter:title" content="Bitcoin Budget - Modern envelope budgeting for Bitcoin users">
 <meta name="twitter:description" content="Track your sats, manage spending categories, and visualize your Bitcoin stack's future value with inflation-adjusted projections.">
 """, unsafe_allow_html=True)
+
+# === MOBILE RESPONSIVENESS UTILITIES ===
+
+def is_mobile_layout():
+    """Detect if mobile layout should be used (based on user preference)"""
+    # Initialize mobile preference in session state
+    if 'mobile_mode' not in st.session_state:
+        st.session_state.mobile_mode = False
+    return st.session_state.mobile_mode
+
+def get_responsive_columns(desktop_cols, mobile_cols=None):
+    """Get responsive column layout based on mobile detection"""
+    if mobile_cols is None:
+        # Default mobile behavior: halve the columns (minimum 1)
+        mobile_cols = max(1, desktop_cols // 2)
+    
+    if is_mobile_layout():
+        return mobile_cols
+    else:
+        return desktop_cols
+
+def mobile_friendly_metrics(metrics_data, mobile_stack=True):
+    """Display metrics in mobile-friendly layout"""
+    if is_mobile_layout() and mobile_stack and len(metrics_data) > 2:
+        # Stack metrics in pairs for mobile
+        for i in range(0, len(metrics_data), 2):
+            cols = st.columns(2)
+            for j, col in enumerate(cols):
+                if i + j < len(metrics_data):
+                    metric = metrics_data[i + j]
+                    with col:
+                        st.metric(**metric)
+    else:
+        # Regular column layout
+        num_cols = get_responsive_columns(len(metrics_data))
+        cols = st.columns(num_cols)
+        for i, (col, metric) in enumerate(zip(cols, metrics_data)):
+            with col:
+                st.metric(**metric)
+
+def mobile_responsive_header(text, level=3):
+    """Display headers that are smaller on mobile devices"""
+    if is_mobile_layout():
+        # Mobile: One level smaller (### becomes ####, ## becomes ###, etc.)
+        mobile_level = min(level + 1, 6)  # Cap at h6
+        mobile_prefix = "#" * mobile_level
+        st.markdown(f"{mobile_prefix} {text}")
+    else:
+        # Desktop: Use original level
+        desktop_prefix = "#" * level
+        st.markdown(f"{desktop_prefix} {text}")
 
 # === PHASE 1: ENHANCED SESSION PERSISTENCE + EXPORT/IMPORT ===
 
@@ -2022,7 +2074,7 @@ def main_page():
     show_quick_setup_modals()
     
     # === BUDGET SUMMARY METRICS ===
-    st.markdown("### 💰 Budget Summary")
+    mobile_responsive_header("💰 Budget Summary", 3)
     
     # Simple Bitcoin unit explanation for first-time users
     if st.session_state.get('first_visit', True):
@@ -2042,57 +2094,55 @@ def main_page():
     # Show current month allocations for reference (use viewing month for this)
     current_month_allocated = get_total_allocated(current_month)
     
-    col1, col2, col3 = st.columns(3)
+    # Mobile-responsive metrics layout
+    if available_to_assign > 0:
+        help_text = f"You have {format_sats(available_to_assign)} ready to allocate to spending categories. This is the core of envelope budgeting!"
+    elif available_to_assign == 0:
+        help_text = "Perfect! All your money is allocated to categories. This means you have a complete budget plan."
+    else:
+        help_text = f"You're over-allocated by {format_sats(abs(available_to_assign))}. Either reduce allocations or add more income."
     
-    with col1:
-        # Enhanced available to assign with contextual help
-        if available_to_assign > 0:
-            help_text = f"You have {format_sats(available_to_assign)} ready to allocate to spending categories. This is the core of envelope budgeting!"
-        elif available_to_assign == 0:
-            help_text = "Perfect! All your money is allocated to categories. This means you have a complete budget plan."
-        else:
-            help_text = f"You're over-allocated by {format_sats(abs(available_to_assign))}. Either reduce allocations or add more income."
-        
-        st.metric(
-            label="🎯 Available to Assign",
-            value=format_sats(available_to_assign),
-            delta=None,
-            help=help_text
-        )
+    # Prepare metrics data
+    metrics_data = [
+        {
+            "label": "🎯 Available to Assign",
+            "value": format_sats(available_to_assign),
+            "delta": None,
+            "help": help_text
+        },
+        {
+            "label": "📋 In Categories",
+            "value": format_sats(total_category_balances),
+            "delta": "⚠️ Over Budget" if total_category_balances > tracked_balance else f"Viewing {current_month}: {format_sats(current_month_allocated)}",
+            "delta_color": "inverse" if total_category_balances > tracked_balance else "normal",
+            "help": "Current total money in category envelopes" + (" (exceeds account balance)" if total_category_balances > tracked_balance else " (consistent across all months)")
+        },
+        {
+            "label": "🏦 Account Balance",
+            "value": format_sats(tracked_balance),
+            "delta": f"Total: {format_sats(total_balance)}",
+            "help": "Balance in tracked accounts (affects budget)"
+        }
+    ]
     
-    with col2:
-        # Check if over budget (category balances > tracked balance)
-        if total_category_balances > tracked_balance:
-            st.metric(
-                label="📋 In Categories",
-                value=format_sats(total_category_balances),
-                delta="⚠️ Over Budget",
-                delta_color="inverse",
-                help="Current total money in category envelopes (exceeds account balance)"
-            )
-        else:
-            st.metric(
-                label="📋 In Categories",
-                value=format_sats(total_category_balances),
-                delta=f"Viewing {current_month}: {format_sats(current_month_allocated)}",
-                help="Current total money in category envelopes (consistent across all months)"
-            )
-    
-    with col3:
-        st.metric(
-            label="🏦 Account Balance",
-            value=format_sats(tracked_balance),
-            delta=f"Total: {format_sats(total_balance)}",
-            help="Balance in tracked accounts (affects budget)"
-        )
+    # Use mobile-friendly metrics display
+    mobile_friendly_metrics(metrics_data)
     
     # === BUDGET HEALTH SUMMARY ===
-    st.markdown("### 📊 Budget Health")
+    mobile_responsive_header("📊 Budget Health", 3)
     
     # Calculate budget health metrics
     allocated_percentage = (total_category_balances / tracked_balance * 100) if tracked_balance > 0 else 0
     
-    col1, col2 = st.columns(2)
+    # Responsive columns for budget health
+    num_cols = get_responsive_columns(2)
+    if num_cols == 1:
+        # Mobile: Stack vertically
+        cols = [st.container(), st.container()]
+        col1, col2 = cols[0], cols[1]
+    else:
+        # Desktop: Side by side
+        col1, col2 = st.columns(2)
     
     with col1:
         # Budget allocation progress
@@ -2124,10 +2174,10 @@ def main_page():
         if available_to_assign > 0:
             st.success(f"💰 **{format_sats(available_to_assign)}** ready to allocate")
             
-            # Quick allocation buttons
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if st.button("🚀 To Bitcoin Stack", help="Allocate all remaining funds to Bitcoin Stack"):
+            # Quick allocation buttons (mobile-responsive)
+            if is_mobile_layout():
+                # Mobile: Stack vertically for larger touch targets
+                if st.button("🚀 To Bitcoin Stack", help="Allocate all remaining funds to Bitcoin Stack", use_container_width=True):
                     # Find Bitcoin Stack category
                     bitcoin_category = None
                     for cat in get_categories():
@@ -2143,9 +2193,8 @@ def main_page():
                             st.rerun()
                     else:
                         st.error("❌ No Bitcoin/Stack category found")
-            
-            with col_b:
-                if st.button("⚖️ Distribute Evenly", help="Distribute remaining funds evenly across all categories"):
+                
+                if st.button("⚖️ Distribute Evenly", help="Distribute remaining funds evenly across all categories", use_container_width=True):
                     categories = get_categories()
                     if categories:
                         amount_per_category = available_to_assign // len(categories)
@@ -2160,16 +2209,53 @@ def main_page():
                             st.warning("❌ Amount too small to distribute")
                     else:
                         st.error("❌ No categories found")
+            else:
+                # Desktop: Side by side
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    if st.button("🚀 To Bitcoin Stack", help="Allocate all remaining funds to Bitcoin Stack"):
+                        # Find Bitcoin Stack category
+                        bitcoin_category = None
+                        for cat in get_categories():
+                            if 'bitcoin' in cat['name'].lower() or 'stack' in cat['name'].lower():
+                                bitcoin_category = cat
+                                break
+                        
+                        if bitcoin_category:
+                            current_allocation = get_category_allocated(bitcoin_category['id'], current_month)
+                            new_allocation = current_allocation + available_to_assign
+                            if allocate_to_category(bitcoin_category['id'], current_month, new_allocation):
+                                st.success(f"✅ Allocated {format_sats(available_to_assign)} to {bitcoin_category['name']}")
+                                st.rerun()
+                        else:
+                            st.error("❌ No Bitcoin/Stack category found")
+                
+                with col_b:
+                    if st.button("⚖️ Distribute Evenly", help="Distribute remaining funds evenly across all categories"):
+                        categories = get_categories()
+                        if categories:
+                            amount_per_category = available_to_assign // len(categories)
+                            if amount_per_category > 0:
+                                for cat in categories:
+                                    current_allocation = get_category_allocated(cat['id'], current_month)
+                                    new_allocation = current_allocation + amount_per_category
+                                    allocate_to_category(cat['id'], current_month, new_allocation)
+                                st.success(f"✅ Distributed {format_sats(amount_per_category)} to each category")
+                                st.rerun()
+                            else:
+                                st.warning("❌ Amount too small to distribute")
+                        else:
+                            st.error("❌ No categories found")
                         
         elif available_to_assign == 0:
             st.info("✅ **Perfect balance** - all funds allocated")
         else:
             st.error(f"⚠️ **{format_sats(abs(available_to_assign))}** over-allocated")
             
-            # Quick fix buttons for over-allocation
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if st.button("🔧 Auto-Fix", help="Automatically reduce allocations to balance budget"):
+            # Quick fix buttons for over-allocation (mobile-responsive)
+            if is_mobile_layout():
+                # Mobile: Stack vertically for larger touch targets
+                if st.button("🔧 Auto-Fix", help="Automatically reduce allocations to balance budget", use_container_width=True):
                     # Find categories with allocations and reduce proportionally
                     categories = get_categories()
                     categories_with_allocations = []
@@ -2194,9 +2280,8 @@ def main_page():
                         st.rerun()
                     else:
                         st.error("❌ No allocations to reduce")
-            
-            with col_b:
-                if st.button("📥 Clear All", help="Remove all allocations for this month"):
+                
+                if st.button("📥 Clear All", help="Remove all allocations for this month", use_container_width=True):
                     categories = get_categories()
                     cleared_count = 0
                     for cat in categories:
@@ -2208,6 +2293,49 @@ def main_page():
                         st.rerun()
                     else:
                         st.error("❌ No allocations to clear")
+            else:
+                # Desktop: Side by side
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    if st.button("🔧 Auto-Fix", help="Automatically reduce allocations to balance budget"):
+                        # Find categories with allocations and reduce proportionally
+                        categories = get_categories()
+                        categories_with_allocations = []
+                        total_allocated = 0
+                        
+                        for cat in categories:
+                            allocation = get_category_allocated(cat['id'], current_month)
+                            if allocation > 0:
+                                categories_with_allocations.append((cat, allocation))
+                                total_allocated += allocation
+                        
+                        if categories_with_allocations and total_allocated > 0:
+                            reduction_needed = abs(available_to_assign)
+                            
+                            for cat, allocation in categories_with_allocations:
+                                # Reduce proportionally
+                                reduction = int((allocation / total_allocated) * reduction_needed)
+                                new_allocation = max(0, allocation - reduction)
+                                allocate_to_category(cat['id'], current_month, new_allocation)
+                            
+                            st.success(f"✅ Reduced allocations by {format_sats(reduction_needed)}")
+                            st.rerun()
+                        else:
+                            st.error("❌ No allocations to reduce")
+                
+                with col_b:
+                    if st.button("📥 Clear All", help="Remove all allocations for this month"):
+                        categories = get_categories()
+                        cleared_count = 0
+                        for cat in categories:
+                            if allocate_to_category(cat['id'], current_month, 0):
+                                cleared_count += 1
+                        
+                        if cleared_count > 0:
+                            st.success(f"✅ Cleared allocations for {cleared_count} categories")
+                            st.rerun()
+                        else:
+                            st.error("❌ No allocations to clear")
 
     st.markdown("---")
 
@@ -2216,10 +2344,64 @@ def main_page():
     
     # === TAB 1: CATEGORIES (Now the primary/default tab) ===
     with tab1:
-        st.markdown("### 📁 Category Management")
+        mobile_responsive_header("📁 Category Management", 3)
         
-        # Add new master category and category sections
-        col1, col2 = st.columns(2)
+        # Add new master category and category sections (mobile-responsive)
+        if is_mobile_layout():
+            # Mobile: Stack vertically for better form usability
+            with st.expander("➕ Add Master Category", expanded=False):
+                with st.form("mobile_add_master_category_form"):
+                    new_master_category = st.text_input("Master Category Name", placeholder="e.g., Fixed Expenses, Variable Expenses, Savings")
+                    if st.form_submit_button("Add Master Category", use_container_width=True):
+                        if new_master_category:
+                            if add_master_category(new_master_category):
+                                st.success(f"✅ Added master category: {new_master_category}")
+                                st.rerun()
+                            else:
+                                st.error("❌ Master category name already exists")
+                        else:
+                            st.error("❌ Please enter a master category name")
+            
+            with st.expander("➕ Add Category", expanded=False):
+                with st.form("mobile_add_category_form"):
+                    new_category = st.text_input("Category Name", placeholder="e.g., Transportation")
+                    
+                    # Master category selection
+                    master_categories = get_master_categories()
+                    master_options = ['None'] + [mc['name'] for mc in master_categories]
+                    selected_master = st.selectbox("Assign to Master Category", master_options)
+                    
+                    if st.form_submit_button("Add Category", use_container_width=True):
+                        if new_category:
+                            if add_category(new_category):
+                                # Assign to master category if selected
+                                if selected_master != 'None':
+                                    master_id = None
+                                    for mc in master_categories:
+                                        if mc['name'] == selected_master:
+                                            master_id = mc['id']
+                                            break
+                                    
+                                    if master_id:
+                                        # Get the newly created category ID
+                                        category_id = None
+                                        for cat in st.session_state.user_data['categories']:
+                                            if cat['name'] == new_category:
+                                                category_id = cat['id']
+                                                break
+                                        
+                                        if category_id:
+                                            assign_category_to_master(category_id, master_id)
+                                
+                                st.success(f"✅ Added category: {new_category}")
+                                st.rerun()
+                            else:
+                                st.error("❌ Category name already exists")
+                        else:
+                            st.error("❌ Please enter a category name")
+        else:
+            # Desktop: Side by side
+            col1, col2 = st.columns(2)
         
         with col1:
             with st.expander("➕ Add Master Category", expanded=False):
@@ -2290,28 +2472,42 @@ def main_page():
             master_names = [mc['name'] for mc in master_categories_sorted]
             master_names.append('Uncategorized')  # Add "Uncategorized" for categories without master category
             
-            # Clean control panel
+            # Clean control panel (mobile-responsive)
             with st.expander("🛠️ Category Controls", expanded=False):
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    if st.button("📊 Sort Master A-Z", help="Sort master categories alphabetically"):
-                        master_categories.sort(key=lambda x: x['name'])
-                        st.rerun()
-                with col2:
-                    if st.button("📋 Sort Categories A-Z", help="Sort categories within each master category"):
-                        # Sort categories within their master categories
-                        for mc in master_categories:
-                            mc_categories = [cat for cat in all_categories if cat['master_category_id'] == mc['id']]
-                            mc_categories.sort(key=lambda x: x['name'])
-                        st.rerun()
-                with col3:
-                    if st.button("📂 Expand All", help="Expand all master categories"):
-                        st.session_state.collapsed_master_categories.clear()
-                        st.rerun()
-                with col4:
-                    if st.button("📁 Collapse All", help="Collapse all master categories"):
-                        st.session_state.collapsed_master_categories = set(master_names)
-                        st.rerun()
+                # Mobile-responsive columns
+                num_cols = get_responsive_columns(4, 2)
+                cols = st.columns(num_cols)
+                
+                # Distribute buttons across available columns
+                button_configs = [
+                    ("📊 Sort Master A-Z", "Sort master categories alphabetically"),
+                    ("📋 Sort Categories A-Z", "Sort categories within each master category"),
+                    ("📂 Expand All", "Expand all master categories"),
+                    ("📁 Collapse All", "Collapse all master categories")
+                ]
+                
+                for i, (label, help_text) in enumerate(button_configs):
+                    col_index = i % num_cols
+                    with cols[col_index]:
+                        if label == "📊 Sort Master A-Z":
+                            if st.button(label, help=help_text, use_container_width=True):
+                                master_categories.sort(key=lambda x: x['name'])
+                                st.rerun()
+                        elif label == "📋 Sort Categories A-Z":
+                            if st.button(label, help=help_text, use_container_width=True):
+                                # Sort categories within their master categories
+                                for mc in master_categories:
+                                    mc_categories = [cat for cat in all_categories if cat['master_category_id'] == mc['id']]
+                                    mc_categories.sort(key=lambda x: x['name'])
+                                st.rerun()
+                        elif label == "📂 Expand All":
+                            if st.button(label, help=help_text, use_container_width=True):
+                                st.session_state.collapsed_master_categories.clear()
+                                st.rerun()
+                        elif label == "📁 Collapse All":
+                            if st.button(label, help=help_text, use_container_width=True):
+                                st.session_state.collapsed_master_categories = set(master_names)
+                                st.rerun()
             
             # Build unified table data with proper grouping
             table_data = []
@@ -2477,11 +2673,42 @@ def main_page():
             
             # Remove debug output and use data_editor with proper column config
             refresh_count = st.session_state.get('data_editor_refresh_count', 0)
-            edited_df = st.data_editor(
-                display_df,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
+            # Mobile-responsive column configuration
+            if is_mobile_layout():
+                # Mobile: Tighten columns, hide master category assignment to save space
+                column_config = {
+                    "master_group": None,  # Hide grouping column
+                    "sort_within_group": None,  # Hide sorting column
+                    "Category": st.column_config.TextColumn(
+                        "Category", 
+                        help="Category hierarchy",
+                        width="medium"  # Smaller width for mobile
+                    ),
+                    "Master_Category_Assignment": None,  # Hide on mobile to save space
+                    "Current_Balance": st.column_config.NumberColumn(
+                        "Balance",  # Shorter label
+                        help="Current balance in sats",
+                        format="%d",
+                        width="small"
+                    ),
+                    "This_Month_Allocation": st.column_config.NumberColumn(
+                        "This Month",  # Shorter label
+                        help="Monthly allocation (editable)",
+                        min_value=0,
+                        step=1,
+                        format="%d",
+                        width="small"
+                    ),
+                    "Spent": st.column_config.NumberColumn(
+                        "Spent", 
+                        format="%d",
+                        width="small"
+                    ),
+                    "Status": st.column_config.TextColumn("Status", width="small")
+                }
+            else:
+                # Desktop: Keep full layout
+                column_config = {
                     "master_group": None,  # Hide grouping column
                     "sort_within_group": None,  # Hide sorting column
                     "Category": st.column_config.TextColumn(
@@ -2511,7 +2738,13 @@ def main_page():
                         format="%d"
                     ),
                     "Status": st.column_config.TextColumn("Status")
-                },
+                }
+            
+            edited_df = st.data_editor(
+                display_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config=column_config,
                 key=f"unified_categories_{refresh_count}"
             )
             
@@ -2630,7 +2863,7 @@ def main_page():
 
     # === TAB 2: ACCOUNTS ===
     with tab2:
-        st.markdown("### 🏦 Account Management")
+        mobile_responsive_header("🏦 Account Management", 3)
         
         # Account Summary Metrics
         tracked_accounts = get_tracked_accounts()
@@ -2686,10 +2919,62 @@ def main_page():
                 else:
                     st.write("No unaccounted transactions this month.")
         
-        # Add New Account
+        # Add New Account (mobile-responsive)
         with st.expander("➕ Add New Account", expanded=False):
             with st.form("add_account_form"):
-                col1, col2 = st.columns(2)
+                if is_mobile_layout():
+                    # Mobile: Stack vertically for better form usability
+                    account_name = st.text_input("Account Name", placeholder="e.g., Checking, Bitcoin Savings")
+                    
+                    # Enhanced account type selection with icons
+                    account_type_options = [
+                        "checking",
+                        "savings", 
+                        "investment",
+                        "credit",
+                        "loan",
+                        "cold_storage",
+                        "lightning_node", 
+                        "hot_wallet",
+                        "other"
+                    ]
+                    
+                    # Create display options with icons
+                    account_type_display = []
+                    for acc_type in account_type_options:
+                        icon = get_account_type_icon(acc_type)
+                        account_type_display.append(f"{icon} {acc_type.title()}")
+                    
+                    selected_type_display = st.selectbox(
+                        "Account Type", 
+                        account_type_display
+                    )
+                    
+                    # Extract the actual type from selection
+                    account_type = selected_type_display.split(" ", 1)[1].lower()
+                    
+                    initial_balance = st.text_input(
+                        "Initial Balance", 
+                        placeholder="50000",
+                        help="Enter current account balance in satoshis"
+                    )
+                    
+                    # Real-time balance validation
+                    if initial_balance:
+                        is_valid, message, preview = validate_amount_input(initial_balance)
+                        if is_valid:
+                            st.success(f"{message}: {preview}")
+                        else:
+                            st.error(message)
+                    
+                    is_tracked = st.checkbox(
+                        "Tracked Account", 
+                        value=True,
+                        help="Tracked = affects budget planning | Untracked = long-term savings"
+                    )
+                else:
+                    # Desktop: Side by side
+                    col1, col2 = st.columns(2)
                 
                 with col1:
                     account_name = st.text_input("Account Name", placeholder="e.g., Checking, Bitcoin Savings")
@@ -2742,7 +3027,8 @@ def main_page():
                         help="Tracked = affects budget planning | Untracked = long-term savings"
                     )
                 
-                if st.form_submit_button("Add Account"):
+                submit_button_width = is_mobile_layout()
+                if st.form_submit_button("Add Account", use_container_width=submit_button_width):
                     if account_name and initial_balance:
                         try:
                             balance_sats = parse_amount_input(initial_balance)
@@ -2756,8 +3042,85 @@ def main_page():
                     else:
                         st.error("❌ Please fill in all required fields")
         
-        # Enhanced Account Lists with Visual Improvements
-        col1, col2 = st.columns(2)
+        # Enhanced Account Lists with Visual Improvements (mobile-responsive)
+        if is_mobile_layout():
+            # Mobile: Stack account lists vertically
+            st.markdown("#### 🟢 Tracked Accounts (On-Budget)")
+            if tracked_accounts:
+                for i, account in enumerate(tracked_accounts):
+                    # Get visual indicators
+                    type_icon = get_account_type_icon(account['account_type'])
+                    balance_text, health_status, health_color = format_account_balance_with_health(account['balance'])
+                    
+                    # Mobile-friendly account display
+                    account_info_col, balance_col = st.columns([3, 2])
+                    with account_info_col:
+                        st.markdown(f"**{type_icon} {account['name']}**")
+                        st.caption(f"{account['account_type'].replace('_', ' ').title()} • {health_status}")
+                    with balance_col:
+                        st.text(balance_text)  # Use st.text instead of markdown for normal sizing
+                    
+                    # Action buttons in 2x2 grid for mobile (more compact)
+                    btn_col1, btn_col2 = st.columns(2)
+                    with btn_col1:
+                        if st.button("📊 View", help="View Details", key=f"mobile_view_tracked_{account['id']}", use_container_width=True):
+                            st.session_state.selected_account_id = account['id']
+                            st.session_state.selected_account_name = account['name']
+                            st.rerun()
+                        if st.button("🗑️ Delete", help="Delete Account", key=f"mobile_delete_tracked_{account['id']}", use_container_width=True):
+                            if delete_account(account['id']):
+                                st.success(f"Deleted {account['name']}")
+                                st.rerun()
+                            else:
+                                st.error("Cannot delete account with transactions")
+                    with btn_col2:
+                        if st.button("✏️ Edit", help="Edit Account", key=f"mobile_edit_tracked_{account['id']}", use_container_width=True):
+                            st.session_state[f'edit_account_{account["id"]}'] = True
+                            st.rerun()
+                        st.write("")  # Empty space to align with delete button
+                    st.markdown("---")
+            else:
+                st.info("No tracked accounts yet. Add one above!")
+            
+            st.markdown("#### 🔵 Untracked Accounts (Off-Budget)")
+            if untracked_accounts:
+                for i, account in enumerate(untracked_accounts):
+                    # Get visual indicators
+                    type_icon = get_account_type_icon(account['account_type'])
+                    balance_text, health_status, health_color = format_account_balance_with_health(account['balance'])
+                    
+                    # Mobile-friendly account display
+                    account_info_col, balance_col = st.columns([3, 2])
+                    with account_info_col:
+                        st.markdown(f"**{type_icon} {account['name']}**")
+                        st.caption(f"{account['account_type'].replace('_', ' ').title()} • {health_status}")
+                    with balance_col:
+                        st.text(balance_text)  # Use st.text instead of markdown for normal sizing
+                    
+                    # Action buttons in 2x2 grid for mobile (more compact)
+                    btn_col1, btn_col2 = st.columns(2)
+                    with btn_col1:
+                        if st.button("📊 View", help="View Details", key=f"mobile_view_untracked_{account['id']}", use_container_width=True):
+                            st.session_state.selected_account_id = account['id']
+                            st.session_state.selected_account_name = account['name']
+                            st.rerun()
+                        if st.button("🗑️ Delete", help="Delete Account", key=f"mobile_delete_untracked_{account['id']}", use_container_width=True):
+                            if delete_account(account['id']):
+                                st.success(f"Deleted {account['name']}")
+                                st.rerun()
+                            else:
+                                st.error("Cannot delete account with transactions")
+                    with btn_col2:
+                        if st.button("✏️ Edit", help="Edit Account", key=f"mobile_edit_untracked_{account['id']}", use_container_width=True):
+                            st.session_state[f'edit_account_{account["id"]}'] = True
+                            st.rerun()
+                        st.write("")  # Empty space to align with delete button
+                    st.markdown("---")
+            else:
+                st.info("No untracked accounts yet. Add one above!")
+        else:
+            # Desktop: Side by side
+            col1, col2 = st.columns(2)
         
         with col1:
             st.markdown("#### 🟢 Tracked Accounts (On-Budget)")
@@ -3081,7 +3444,7 @@ def main_page():
 
     # === TAB 3: TRANSACTIONS (Combined transaction entry + recent transactions) ===
     with tab3:
-        st.markdown("### 💳 Enter Transaction")
+        mobile_responsive_header("💳 Enter Transaction", 3)
         
         # Transaction type selection outside the form so it updates dynamically
         transaction_type = st.selectbox(
@@ -3090,10 +3453,48 @@ def main_page():
             help="Select whether this is income or an expense"
         )
         
-        # Dynamic form based on transaction type
+        # Dynamic form based on transaction type (mobile-responsive)
         if transaction_type == "Income":
             with st.form("add_income_form"):
-                col1, col2 = st.columns(2)
+                if is_mobile_layout():
+                    # Mobile: Stack vertically
+                    transaction_date = st.date_input(
+                        "Date",
+                        value=datetime.now().date(),
+                        help="Date of transaction"
+                    )
+                    
+                    transaction_amount = st.text_input(
+                        "Amount",
+                        placeholder="1,000,000",
+                        help="Enter amount in satoshis"
+                    )
+                    
+                    # Real-time amount validation
+                    if transaction_amount:
+                        is_valid, message, preview = validate_amount_input(transaction_amount)
+                        if is_valid:
+                            st.success(f"{message}: {preview}")
+                        else:
+                            st.error(message)
+                    
+                    transaction_description = st.text_input(
+                        "Description",
+                        placeholder="Salary, freelance, etc.",
+                        help="Brief description of income source"
+                    )
+                    
+                    # Account selection for income
+                    accounts = get_accounts()
+                    account_options = ['None (no account)'] + [f"{acc['name']}" for acc in accounts]
+                    selected_account = st.selectbox(
+                        "Deposit to Account",
+                        options=account_options,
+                        help="Select which account receives this income"
+                    )
+                else:
+                    # Desktop: Side by side
+                    col1, col2 = st.columns(2)
                 
                 with col1:
                     transaction_date = st.date_input(
@@ -3162,7 +3563,51 @@ def main_page():
             categories = get_categories()
             if categories:
                 with st.form("add_expense_form"):
-                    col1, col2 = st.columns(2)
+                    if is_mobile_layout():
+                        # Mobile: Stack vertically
+                        transaction_date = st.date_input(
+                            "Date",
+                            value=datetime.now().date(),
+                            help="Date of transaction"
+                        )
+                        
+                        transaction_category = st.selectbox(
+                            "Category",
+                            options=[cat['name'] for cat in categories],
+                            help="Select spending category"
+                        )
+                        
+                        transaction_amount = st.text_input(
+                            "Amount",
+                            placeholder="50000",
+                            help="Enter amount in satoshis"
+                        )
+                        
+                        # Real-time amount validation
+                        if transaction_amount:
+                            is_valid, message, preview = validate_amount_input(transaction_amount)
+                            if is_valid:
+                                st.success(f"{message}: {preview}")
+                            else:
+                                st.error(message)
+                        
+                        transaction_description = st.text_input(
+                            "Description",
+                            placeholder="Coffee, groceries, etc.",
+                            help="Brief description of expense"
+                        )
+                        
+                        # Account selection for expense
+                        accounts = get_accounts()
+                        account_options = ['None (no account)'] + [f"{acc['name']}" for acc in accounts]
+                        selected_account = st.selectbox(
+                            "Pay from Account",
+                            options=account_options,
+                            help="Select which account this expense is paid from"
+                        )
+                    else:
+                        # Desktop: Side by side
+                        col1, col2 = st.columns(2)
                     
                     with col1:
                         transaction_date = st.date_input(
@@ -3248,7 +3693,7 @@ def main_page():
         st.markdown("---")
         
         # All transactions section (moved below transaction entry)
-        st.markdown("### 📋 All Transactions")
+        mobile_responsive_header("📋 All Transactions", 3)
         
         transactions = get_all_transactions()  # Get ALL transactions for editing
         
@@ -3294,11 +3739,48 @@ def main_page():
             # Display editable transactions table
             account_options = ['No Account'] + [acc['name'] for acc in all_accounts]
             
-            edited_df = st.data_editor(
-                df,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
+            # Mobile-responsive transaction table configuration
+            if is_mobile_layout():
+                # Mobile: Tighten description column, use shorter labels
+                transaction_column_config = {
+                    "ID": None,  # Hide ID column
+                    "Type": None,  # Hide type column
+                    "Original_Category_ID": None,  # Hide original category ID
+                    "Date": st.column_config.DateColumn(
+                        "Date",
+                        help="Edit date",
+                        format="MM-DD",  # Shorter date format for mobile
+                        width="small"
+                    ),
+                    "Description": st.column_config.TextColumn(
+                        "Description",
+                        help="Edit description",
+                        width="medium"  # Tighter width for mobile
+                    ),
+                    "Amount": st.column_config.NumberColumn(
+                        "Amount",  # Shorter label
+                        help="Edit amount in sats",
+                        min_value=1,
+                        step=1,
+                        format="%d",
+                        width="small"
+                    ),
+                    "Category": st.column_config.SelectboxColumn(
+                        "Category",
+                        help="Change category",
+                        options=category_options,
+                        width="small"
+                    ),
+                    "Account": st.column_config.SelectboxColumn(
+                        "Account",
+                        help="Change account",
+                        options=account_options,
+                        width="small"
+                    )
+                }
+            else:
+                # Desktop: Keep full layout
+                transaction_column_config = {
                     "ID": None,  # Hide ID column
                     "Type": None,  # Hide type column
                     "Original_Category_ID": None,  # Hide original category ID
@@ -3329,7 +3811,13 @@ def main_page():
                         help="Click to change transaction account",
                         options=account_options
                     )
-                },
+                }
+            
+            edited_df = st.data_editor(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                column_config=transaction_column_config,
                 key="transactions_editor"
             )
             
@@ -3475,6 +3963,23 @@ def sidebar_navigation():
                 st.session_state.current_month = f"{year:04d}-{month:02d}"
                 st.rerun()
 
+        st.markdown("---")
+        
+        # Mobile Layout Toggle
+        st.markdown("### 📱 Display Settings")
+        
+        current_mobile = st.session_state.get('mobile_mode', False)
+        mobile_toggle = st.toggle(
+            "📱 Mobile-Friendly Layout", 
+            value=current_mobile,
+            help="Optimize layout for mobile devices (stacks columns vertically)"
+        )
+        
+        # Update mobile mode if changed
+        if mobile_toggle != current_mobile:
+            st.session_state.mobile_mode = mobile_toggle
+            st.rerun()
+        
         st.markdown("---")
         
         # Navigation with helpful descriptions
