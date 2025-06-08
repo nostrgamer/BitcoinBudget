@@ -1198,10 +1198,10 @@ def landing_page():
     try:
         from datetime import datetime, timedelta
         
-        # Calculate example: 10M sats + 1M/month for 20 years (realistic retirement scenario)
+        # Calculate example: 10M sats + 500k/month (conservative model parameters)
         initial_sats = 10_000_000
-        monthly_dca_sats = 1_000_000
-        years = 20
+        monthly_dca_sats = 500_000
+        years = 15
         inflation_rate = 0.08
         
         # Bitcoin Power Law calculations
@@ -1244,7 +1244,7 @@ def landing_page():
         <div style="background: linear-gradient(135deg, #f7931a 0%, #ff6b35 100%); 
              padding: 1rem 2rem; border-radius: 10px; margin: 1rem 0 1.5rem 0;">
             <h3 style="color: white; text-align: center; margin: 0; font-size: 1.3rem;">
-                🚀 Example: Net Worth Future Value - DCA'ing 1M sats/month for 20 Years
+                🚀 Example: Net Worth Future Value - Dollar Cost Averaging 500,000 sats/month for 15 Years
             </h3>
         </div>
     """, unsafe_allow_html=True)
@@ -1273,7 +1273,7 @@ def landing_page():
     with nw_col3:
         st.markdown(f"""
             <div style="background: #1f2937; padding: 1rem; border-radius: 8px; text-align: center; margin-bottom: 1rem;">
-                <div style="color: #8b5cf6; font-size: 0.8rem; margin-bottom: 0.3rem;">🎯 Future Value (Real)</div>
+                <div style="color: #8b5cf6; font-size: 0.8rem; margin-bottom: 0.3rem;">🎯 Net Present Value</div>
                 <div style="color: white; font-size: 1.5rem; font-weight: bold; margin-bottom: 0.3rem;">${inflation_adjusted_purchasing_power:,.0f}</div>
                 <div style="color: #10b981; font-size: 0.8rem;">↗ After 8% inflation</div>
             </div>
@@ -1284,7 +1284,7 @@ def landing_page():
             <div style="background: #1f2937; padding: 1rem; border-radius: 8px; text-align: center; margin-bottom: 1rem;">
                 <div style="color: #ef4444; font-size: 0.8rem; margin-bottom: 0.3rem;">💎 Final Stack</div>
                 <div style="color: white; font-size: 1.5rem; font-weight: bold; margin-bottom: 0.3rem;">{format_sats(total_sats)}</div>
-                <div style="color: #10b981; font-size: 0.8rem;">↗ {purchasing_power_multiplier:.1f}x purchasing power</div>
+                <div style="color: #10b981; font-size: 0.8rem;">$100k/year inflation adjusted</div>
             </div>
         """, unsafe_allow_html=True)
     
@@ -1301,7 +1301,7 @@ def landing_page():
                 from datetime import datetime, timedelta
                 
                 current_year = datetime.now().year
-                years_range = list(range(current_year, current_year + 16))  # 15 year projection
+                years_range = list(range(current_year, current_year + 17))  # 16 year projection to include 2040
                 
                 # Your growing Bitcoin stack projection
                 your_stack_btc = []
@@ -1315,13 +1315,16 @@ def landing_page():
                     future_btc = future_sats / 100_000_000
                     your_stack_btc.append(future_btc)
                     
-                    # Minimum BTC needed for retirement (simplified calculation)
-                    # Assumes $100k annual retirement expenses with 8% inflation
-                    annual_expenses = 100000 * ((1.08) ** years_from_now)
-                    target_date = datetime(year, 1, 1)
-                    days_since_genesis = (target_date - datetime(2009, 1, 3)).days
-                    btc_fair_price = 1.0117e-17 * (days_since_genesis ** 5.82)
-                    min_btc_for_year = (annual_expenses * 25) / btc_fair_price  # 25x annual expenses rule
+                    # Minimum BTC needed for retirement (conservative model: $100k annual, 8% inflation, 50-year retirement)
+                    # These values are calculated from the actual conservative model (42% floor price)
+                    conservative_model_values = {
+                        2024: 21.303799, 2025: 15.955366, 2026: 12.193688, 2027: 9.484760, 
+                        2028: 7.492925, 2029: 6.001527, 2030: 4.867913, 2031: 3.991383, 
+                        2032: 3.306332, 2033: 2.763173, 2034: 2.328341, 2035: 1.976661, 
+                        2036: 1.689825, 2037: 1.453337, 2038: 1.257281, 2039: 1.094029, 
+                        2040: 0.955950
+                    }
+                    min_btc_for_year = conservative_model_values.get(year, 0.5)  # Default fallback
                     min_btc_needed.append(min_btc_for_year)
                 
                 # Find retirement year (where your stack exceeds minimum needed)
@@ -1331,67 +1334,58 @@ def landing_page():
                         retirement_year = years_range[i]
                         break
                 
+                # Create retirement readiness chart (copied from Conservative Model in reports.py)
                 fig_retirement = go.Figure()
                 
-                # Your Bitcoin stack projection (orange line)
+                # User's Bitcoin stack projection (exact same as Conservative Model)
                 fig_retirement.add_trace(go.Scatter(
                     x=years_range,
                     y=your_stack_btc,
                     mode='lines+markers',
                     name='Your Bitcoin Stack',
-                    line=dict(color='#f7931a', width=4),
-                    marker=dict(size=8, color='#ff6b35')
+                    line=dict(color='#FF8C00', width=3),
+                    marker=dict(size=6)
                 ))
                 
-                # Minimum BTC needed for retirement (red dashed line)
+                # Minimum BTC needed for retirement (exact same as Conservative Model)
                 fig_retirement.add_trace(go.Scatter(
                     x=years_range,
                     y=min_btc_needed,
                     mode='lines+markers',
                     name='Min BTC for Retirement',
-                    line=dict(color='#ef4444', width=3, dash='dash'),
-                    marker=dict(size=6, color='#dc2626')
+                    line=dict(color='#DC143C', width=3, dash='dash'),
+                    marker=dict(size=6)
                 ))
                 
-                # Add retirement year marker if found
+                # Add retirement readiness line (exact same as Conservative Model)
                 if retirement_year:
                     fig_retirement.add_vline(
                         x=retirement_year,
                         line_width=3,
                         line_dash="dash",
-                        line_color="#10b981",
-                        annotation_text=f"Can Retire: {retirement_year}",
-                        annotation_position="top right"
+                        line_color="green",
+                        annotation_text=f"Can Retire: {retirement_year}"
                     )
                 
+                # Use the exact same layout as Conservative Model
+                chart_title = 'Bitcoin Retirement Readiness - Conservative Model'
+                legend_config = dict(
+                    orientation="h",  # Horizontal orientation  
+                    yanchor="top",
+                    y=-0.15,  # Below the chart
+                    xanchor="center",
+                    x=0.5  # Centered
+                )
+                chart_height = 280  # Adjusted for main page
+                
                 fig_retirement.update_layout(
-                    title='',
-                    xaxis=dict(
-                        title='Year',
-                        tickfont=dict(color='white', size=9),
-                        gridcolor='rgba(255,255,255,0.1)',
-                        title_font=dict(color='white', size=10)
-                    ),
-                    yaxis=dict(
-                        title='Bitcoin (BTC)',
-                        tickfont=dict(color='white', size=9),
-                        gridcolor='rgba(255,255,255,0.1)',
-                        title_font=dict(color='white', size=10)
-                    ),
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    font=dict(color='white'),
-                    margin=dict(t=10, b=10, l=10, r=10),
-                    height=280,
-                    showlegend=True,
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=1.02,
-                        xanchor="center",
-                        x=0.5,
-                        font=dict(color='white', size=8)
-                    )
+                    title=chart_title,
+                    xaxis_title='Year',
+                    yaxis_title='Bitcoin (BTC)',
+                    height=chart_height,
+                    hovermode='x unified',
+                    legend=legend_config,
+                    showlegend=True
                 )
                 
                 st.plotly_chart(fig_retirement, use_container_width=True)
@@ -1453,7 +1447,7 @@ def landing_page():
         <div style="background: #0f172a; padding: 1.5rem; border-radius: 10px; margin: 1rem 0; border-left: 4px solid #f7931a;">
             <h4 style="color: #f7931a; margin: 0 0 0.5rem 0;">🏖️ Your Path to Bitcoin Retirement</h4>
             <p style="color: #e2e8f0; margin: 0; font-size: 1rem;">
-                With a solid starting stack and consistent DCA of <strong>{format_sats(monthly_dca_sats)}</strong> per month, you could potentially retire on Bitcoin in <strong>15-20 years</strong>! 
+                With a solid starting stack and consistent Dollar Cost Averaging of <strong>{format_sats(monthly_dca_sats)}</strong> per month, you could potentially retire on Bitcoin in <strong>15 years</strong>! 
                 The chart above shows exactly when your growing Bitcoin stack intersects with retirement needs. 
                 Time + Consistency + Bitcoin's power law growth = Financial Freedom! 🚀
             </p>
@@ -1639,7 +1633,7 @@ def landing_page():
         
         # Step 1: Bitcoin Income
         st.markdown("""
-            <div style="text-align: center; margin: 1.5rem 0;">
+            <div style="text-align: center; margin: 0.8rem 0;">
                 <div style="background: #f59e0b; color: black; padding: 1rem 2rem; border-radius: 8px; 
                      display: inline-block; font-weight: bold; font-size: 1.1rem;">
                     Bitcoin Income
@@ -1647,11 +1641,11 @@ def landing_page():
             </div>
         """, unsafe_allow_html=True)
         
-        st.markdown("<div style='text-align: center; font-size: 2rem; color: #6b7280; margin: 1rem 0;'>↓</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center; font-size: 2rem; color: #6b7280; margin: 0.5rem 0;'>↓</div>", unsafe_allow_html=True)
         
         # Step 2: Assign to Categories
         st.markdown("""
-            <div style="text-align: center; margin: 1.5rem 0;">
+            <div style="text-align: center; margin: 0.8rem 0;">
                 <div style="background: #ef4444; color: white; padding: 1rem 2rem; border-radius: 8px; 
                      display: inline-block; font-weight: bold; font-size: 1.1rem;">
                     Assign to Categories
@@ -1659,7 +1653,7 @@ def landing_page():
             </div>
         """, unsafe_allow_html=True)
         
-        st.markdown("<div style='text-align: center; font-size: 2rem; color: #6b7280; margin: 1rem 0;'>↓</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center; font-size: 2rem; color: #6b7280; margin: 0.5rem 0;'>↓</div>", unsafe_allow_html=True)
         
         # Step 3: Category Cards
         cat_col1, cat_col2, cat_col3 = st.columns(3)
@@ -1688,11 +1682,11 @@ def landing_page():
                 </div>
             """, unsafe_allow_html=True)
         
-        st.markdown("<div style='text-align: center; font-size: 2rem; color: #6b7280; margin: 1.5rem 0;'>↓</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center; font-size: 2rem; color: #6b7280; margin: 0.5rem 0;'>↓</div>", unsafe_allow_html=True)
         
         # Step 4: Track Spending
         st.markdown("""
-            <div style="text-align: center; margin: 1.5rem 0;">
+            <div style="text-align: center; margin: 0.8rem 0;">
                 <div style="background: #10b981; color: white; padding: 1rem 2rem; border-radius: 8px; 
                      display: inline-block; font-weight: bold; font-size: 1.1rem;">
                     Track Spending & Stay on Budget
