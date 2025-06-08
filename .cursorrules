@@ -110,6 +110,18 @@ if __name__ == "__main__":
 - **Navigation**: Sidebar with session state management
 - **Error handling**: Use st.error, st.warning, st.success for user feedback
 
+### Mobile-Responsive Guidelines ✅ **NEW**
+- **Mobile detection**: Use `is_mobile_layout()` function checking `st.session_state.mobile_mode`
+- **Responsive columns**: `get_responsive_columns(desktop_cols)` for dynamic column adjustment
+- **Mobile metrics**: `mobile_friendly_metrics()` for stacked metric display on mobile
+- **Mobile headers**: `mobile_responsive_header(text, level)` for smaller fonts on mobile
+- **Form key conflicts**: Use unique prefixes for mobile forms (`mobile_add_category_form`)
+- **Touch-friendly buttons**: Full-width buttons with better spacing on mobile
+- **Mobile charts**: Stack vertically, horizontal legends below charts vs vertical on side
+- **Mobile tables**: Tighter columns, shorter labels, hide non-essential columns on mobile
+- **Single codebase**: Same functionality with conditional mobile-optimized presentation
+- **User control**: Sidebar toggle allows switching between desktop and mobile layouts
+
 ### Bitcoin-Specific Rules
 - **Satoshis everywhere**: Always work in satoshis (integers)
 - **Sats-only standard**: Formally reject BIP 178, only accept satoshi input
@@ -195,12 +207,63 @@ def initialize_session_state():
             'categories': [demo_categories],
             'allocations': [demo_allocations]
         }
+    # Initialize mobile mode
+    if 'mobile_mode' not in st.session_state:
+        st.session_state.mobile_mode = False
 
-# Account-based form handling
-with st.form("add_income_form"):
-    amount = st.text_input("Amount", placeholder="1,000,000")
-    description = st.text_input("Description")
-    account = st.selectbox("Account", [acc['name'] for acc in get_accounts()])
+# Mobile-responsive layout helpers
+def is_mobile_layout():
+    """Check if mobile layout is enabled"""
+    return st.session_state.get('mobile_mode', False)
+
+def get_responsive_columns(desktop_cols):
+    """Get responsive column count for desktop vs mobile"""
+    if is_mobile_layout():
+        return min(2, desktop_cols)  # Max 2 columns on mobile
+    return desktop_cols
+
+def mobile_friendly_metrics(metrics_data):
+    """Display metrics in mobile-friendly layout"""
+    if is_mobile_layout():
+        # Stack in pairs for mobile
+        for i in range(0, len(metrics_data), 2):
+            cols = st.columns(2)
+            for j, col in enumerate(cols):
+                if i + j < len(metrics_data):
+                    with col:
+                        metric = metrics_data[i + j]
+                        st.metric(metric['label'], metric['value'])
+    else:
+        # Single row for desktop
+        cols = st.columns(len(metrics_data))
+        for i, (col, metric) in enumerate(zip(cols, metrics_data)):
+            with col:
+                st.metric(metric['label'], metric['value'])
+
+def mobile_responsive_header(text, level=3):
+    """Show smaller headers on mobile"""
+    if is_mobile_layout():
+        level = min(6, level + 1)  # One level smaller on mobile
+    st.markdown('#' * level + ' ' + text)
+
+# Account-based form handling with mobile responsiveness
+form_key = "mobile_add_income_form" if is_mobile_layout() else "add_income_form"
+with st.form(form_key):
+    if is_mobile_layout():
+        # Stack vertically on mobile
+        amount = st.text_input("Amount", placeholder="1,000,000")
+        description = st.text_input("Description")
+        account = st.selectbox("Account", [acc['name'] for acc in get_accounts()])
+    else:
+        # Side-by-side on desktop
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            amount = st.text_input("Amount", placeholder="1,000,000")
+        with col2:
+            description = st.text_input("Description")
+        with col3:
+            account = st.selectbox("Account", [acc['name'] for acc in get_accounts()])
+    
     submitted = st.form_submit_button("Add Income")
     
     if submitted and amount and description and account:
@@ -213,35 +276,36 @@ with st.form("add_income_form"):
         except ValueError:
             st.error("Invalid amount format")
 
-# Advanced analytics charts
-fig = make_subplots(rows=2, cols=2, subplot_titles=(...))
-# Bitcoin price growth, stack value, purchasing power, multipliers
-st.plotly_chart(fig, use_container_width=True)
-
-# Hierarchical data display with interactive sorting
-df['master_group'] = df['category_id'].apply(get_master_group_order)
-df['sort_within_group'] = df['category_id'].apply(get_sort_within_group)
-df = df.sort_values(['master_group', 'sort_within_group'])
-st.data_editor(df, column_config={
-    'master_group': None,  # Hide sorting columns
-    'sort_within_group': None
-})
-
-# Context-aware quick actions
-if available_to_assign > 0:
+# Mobile-responsive chart layouts
+if is_mobile_layout():
+    # Stack charts vertically on mobile
+    st.plotly_chart(fig1, use_container_width=True)
+    st.plotly_chart(fig2, use_container_width=True)
+else:
+    # Side-by-side on desktop
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🚀 To Bitcoin Stack"):
-            allocate_to_bitcoin_category(available_to_assign)
+        st.plotly_chart(fig1, use_container_width=True)
     with col2:
-        if st.button("⚖️ Distribute Evenly"):
-            distribute_evenly_across_categories(available_to_assign)
+        st.plotly_chart(fig2, use_container_width=True)
 
-# Navigation with multiple report types
+# Context-aware quick actions with mobile responsiveness
+if available_to_assign > 0:
+    cols = get_responsive_columns(2)
+    col_layout = st.columns(cols)
+    with col_layout[0]:
+        if st.button("🚀 To Bitcoin Stack", use_container_width=is_mobile_layout()):
+            allocate_to_bitcoin_category(available_to_assign)
+    if cols > 1:
+        with col_layout[1]:
+            if st.button("⚖️ Distribute Evenly", use_container_width=is_mobile_layout()):
+                distribute_evenly_across_categories(available_to_assign)
+
+# Mobile toggle in sidebar
 with st.sidebar:
-    if st.button("🚀 Net Worth Future Value"):
-        st.session_state.page = 'reports'
-        st.session_state.report_type = 'net_worth_future_value'
+    mobile_mode = st.toggle("📱 Mobile-Friendly Layout", value=st.session_state.mobile_mode)
+    if mobile_mode != st.session_state.mobile_mode:
+        st.session_state.mobile_mode = mobile_mode
         st.rerun()
 ```
 
@@ -255,7 +319,7 @@ with st.sidebar:
 
 ### Success Criteria
 - ✅ **Works in browser**: Accessible via web interface
-- ✅ **Mobile friendly**: Responsive design works on phones/tablets
+- ✅ **Mobile friendly**: Responsive design works on phones/tablets with user toggle
 - ✅ **Interactive charts**: Plotly visualizations with hover details
 - ✅ **Professional UI**: Tree-style hierarchy with visual indicators
 - ✅ **Smart automation**: Context-aware quick action buttons
@@ -264,38 +328,48 @@ with st.sidebar:
 - ✅ **Easy deployment**: Auto-deploy to Streamlit Cloud from GitHub
 - ✅ **Account-based budgeting**: Tracked and untracked accounts with transfers
 - ✅ **All YNAB features**: Income, expenses, categories, allocation with accounts
-- ✅ **Advanced analytics**: 5 report types with Bitcoin Power Law projections
+- ✅ **Advanced analytics**: 3 consolidated report types with Bitcoin Power Law projections
 - ✅ **Privacy-first**: Session-based isolation for each user
 - ✅ **Motivational**: Net Worth Future Value to encourage stacking
 - ✅ **No crashes**: Handle user errors gracefully
+- ✅ **Mobile optimization**: Single codebase with responsive layouts and user control
+- ✅ **Touch-friendly**: Mobile layouts optimized for touch interaction and screen space
 
-### Example Streamlit Function
+### Example Streamlit Function with Mobile Responsiveness
 ```python
 def main_page():
-    """Main budget application page with account-based budgeting"""
+    """Main budget application page with account-based budgeting and mobile responsiveness"""
     current_month = st.session_state.current_month
     
     st.title(f"₿ Bitcoin Budget - {current_month}")
     
-    # Account-based budget summary metrics
+    # Account-based budget summary metrics with mobile-friendly display
     tracked_balance = get_total_account_balance(tracked_only=True)
     in_categories = get_total_category_balances_current()
     available = tracked_balance - in_categories
     
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Tracked Account Balance", format_sats(tracked_balance))
-    with col2:
-        st.metric("Money in Categories", format_sats(in_categories))
-    with col3:
-        st.metric("Available to Assign", format_sats(available))
+    # Mobile-responsive metrics display
+    metrics_data = [
+        {'label': 'Tracked Account Balance', 'value': format_sats(tracked_balance)},
+        {'label': 'Money in Categories', 'value': format_sats(in_categories)},
+        {'label': 'Available to Assign', 'value': format_sats(available)}
+    ]
+    mobile_friendly_metrics(metrics_data)
+    
+    # Mobile-responsive header
+    mobile_responsive_header("Budget Health", level=3)
     
     # Tabbed interface with accounts
-    tab1, tab2, tab3, tab4 = st.tabs(["🏦 Accounts", "📁 Categories", "💳 Transactions", "📊 Reports"])
+    tab1, tab2, tab3 = st.tabs(["🏦 Accounts", "📁 Categories", "💳 Transactions"])
     
     with tab1:
-        # Account management with tracked/untracked designation
-        accounts_page()
+        # Account management with mobile-responsive forms
+        if is_mobile_layout():
+            # Full-width mobile forms
+            accounts_page_mobile()
+        else:
+            # Multi-column desktop layout
+            accounts_page()
 ```
 
 Remember: **Simple is better than complex. Account-based is better than transaction-only. Privacy-first is better than shared data. Motivational is better than purely functional.**

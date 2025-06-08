@@ -17,6 +17,22 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+def is_mobile_layout():
+    """Check if mobile layout is enabled"""
+    return st.session_state.get('mobile_mode', False)
+
+def mobile_responsive_header(text, level=3):
+    """Display headers that are smaller on mobile devices"""
+    if is_mobile_layout():
+        # Mobile: One level smaller (### becomes ####, ## becomes ###, etc.)
+        mobile_level = min(level + 1, 6)  # Cap at h6
+        mobile_prefix = "#" * mobile_level
+        st.markdown(f"{mobile_prefix} {text}")
+    else:
+        # Desktop: Use original level
+        desktop_prefix = "#" * level
+        st.markdown(f"{desktop_prefix} {text}")
+
 def get_user_data():
     """Get user data from session state"""
     return st.session_state.user_data
@@ -299,16 +315,15 @@ def spending_analysis_report():
 
 def spending_breakdown_analysis():
     """Spending breakdown analysis component"""
-    st.markdown("### 📊 Spending Breakdown by Category")
+    mobile_responsive_header("📊 Spending Breakdown by Category", 3)
     
     current_month = st.session_state.current_month
     
     # Time period selection (mobile-responsive)
     st.markdown("### ⏰ Time Period")
     
-    # Import mobile detection function from main app
-    import streamlit as st
-    is_mobile = st.session_state.get('mobile_mode', False)
+    # Check mobile layout
+    is_mobile = is_mobile_layout()
     
     if is_mobile:
         # Mobile: Stack in 2x2 grid
@@ -472,7 +487,10 @@ def spending_breakdown_analysis():
 
 def future_purchasing_power_analysis():
     """Future purchasing power analysis component"""
-    st.markdown("### 🔮 Future Cost of Your Spending")
+    mobile_responsive_header("🔮 Future Cost of Your Spending", 3)
+    
+    # Check mobile layout
+    is_mobile = is_mobile_layout()
     
     user_data = get_user_data()
     
@@ -688,7 +706,7 @@ def net_worth_retirement_report():
 
 def retire_on_bitcoin_analysis():
     """Retire on Bitcoin analysis component"""
-    st.markdown("### 🏖️ Bitcoin Retirement Planning")
+    mobile_responsive_header("🏖️ Bitcoin Retirement Planning", 3)
     
     # User input controls
     col1, col2 = st.columns(2)
@@ -771,7 +789,7 @@ def retire_on_bitcoin_analysis():
     
     model_name = "Floor Price (42%)" if use_floor_price else "Fair Price"
     fig.update_layout(
-        title=f'Minimum Bitcoin Stack for {retirement_years}-Year Retirement - {model_name} Model',
+        title=f'Min ₿ Stack for {retirement_years}yr Retirement - {model_name}' if is_mobile_layout() else f'Minimum Bitcoin Stack for {retirement_years}-Year Retirement - {model_name} Model',
         xaxis_title='Retirement Start Year',
         yaxis_title='Minimum Bitcoin (BTC) Stack Needed',
         height=500,
@@ -862,6 +880,9 @@ def retire_on_bitcoin_analysis():
 def net_worth_future_value_analysis():
     """Net worth future value analysis component"""
     st.markdown("#### 💰 Future Value of Your Bitcoin Stack")
+    
+    # Check mobile layout
+    is_mobile = is_mobile_layout()
     
     user_data = get_user_data()
     
@@ -1088,12 +1109,39 @@ def net_worth_future_value_analysis():
         )
     
     model_name = "Conservative" if use_conservative else "Fair Price"
+    
+    # Mobile-responsive title and legend positioning
+    if is_mobile:
+        # Mobile: Shorter title and legend below chart
+        chart_title = f'₿ Retirement Readiness - {model_name}'  # Shorter title
+        legend_config = dict(
+            orientation="h",  # Horizontal orientation
+            yanchor="top",
+            y=-0.15,  # Below the chart
+            xanchor="center",
+            x=0.5  # Centered
+        )
+        chart_height = 450  # Slightly shorter to account for legend below
+    else:
+        # Desktop: Full title and legend on the right
+        chart_title = f'Bitcoin Retirement Readiness - {model_name} Model'
+        legend_config = dict(
+            orientation="v",  # Vertical orientation
+            yanchor="top",
+            y=1,
+            xanchor="left",
+            x=1.02  # To the right
+        )
+        chart_height = 500
+    
     fig.update_layout(
-        title=f'Bitcoin Retirement Readiness - {model_name} Model',
+        title=chart_title,
         xaxis_title='Year',
         yaxis_title='Bitcoin (BTC)',
-        height=500,
-        hovermode='x unified'
+        height=chart_height,
+        hovermode='x unified',
+        legend=legend_config,
+        showlegend=True
     )
     
     st.plotly_chart(fig, use_container_width=True)

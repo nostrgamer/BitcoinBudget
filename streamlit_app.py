@@ -74,6 +74,18 @@ def mobile_friendly_metrics(metrics_data, mobile_stack=True):
             with col:
                 st.metric(**metric)
 
+def mobile_responsive_header(text, level=3):
+    """Display headers that are smaller on mobile devices"""
+    if is_mobile_layout():
+        # Mobile: One level smaller (### becomes ####, ## becomes ###, etc.)
+        mobile_level = min(level + 1, 6)  # Cap at h6
+        mobile_prefix = "#" * mobile_level
+        st.markdown(f"{mobile_prefix} {text}")
+    else:
+        # Desktop: Use original level
+        desktop_prefix = "#" * level
+        st.markdown(f"{desktop_prefix} {text}")
+
 # === PHASE 1: ENHANCED SESSION PERSISTENCE + EXPORT/IMPORT ===
 
 import json
@@ -2062,7 +2074,7 @@ def main_page():
     show_quick_setup_modals()
     
     # === BUDGET SUMMARY METRICS ===
-    st.markdown("### 💰 Budget Summary")
+    mobile_responsive_header("💰 Budget Summary", 3)
     
     # Simple Bitcoin unit explanation for first-time users
     if st.session_state.get('first_visit', True):
@@ -2117,7 +2129,7 @@ def main_page():
     mobile_friendly_metrics(metrics_data)
     
     # === BUDGET HEALTH SUMMARY ===
-    st.markdown("### 📊 Budget Health")
+    mobile_responsive_header("📊 Budget Health", 3)
     
     # Calculate budget health metrics
     allocated_percentage = (total_category_balances / tracked_balance * 100) if tracked_balance > 0 else 0
@@ -2332,13 +2344,13 @@ def main_page():
     
     # === TAB 1: CATEGORIES (Now the primary/default tab) ===
     with tab1:
-        st.markdown("### 📁 Category Management")
+        mobile_responsive_header("📁 Category Management", 3)
         
         # Add new master category and category sections (mobile-responsive)
         if is_mobile_layout():
             # Mobile: Stack vertically for better form usability
             with st.expander("➕ Add Master Category", expanded=False):
-                with st.form("add_master_category_form"):
+                with st.form("mobile_add_master_category_form"):
                     new_master_category = st.text_input("Master Category Name", placeholder="e.g., Fixed Expenses, Variable Expenses, Savings")
                     if st.form_submit_button("Add Master Category", use_container_width=True):
                         if new_master_category:
@@ -2351,7 +2363,7 @@ def main_page():
                             st.error("❌ Please enter a master category name")
             
             with st.expander("➕ Add Category", expanded=False):
-                with st.form("add_category_form"):
+                with st.form("mobile_add_category_form"):
                     new_category = st.text_input("Category Name", placeholder="e.g., Transportation")
                     
                     # Master category selection
@@ -2661,11 +2673,42 @@ def main_page():
             
             # Remove debug output and use data_editor with proper column config
             refresh_count = st.session_state.get('data_editor_refresh_count', 0)
-            edited_df = st.data_editor(
-                display_df,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
+            # Mobile-responsive column configuration
+            if is_mobile_layout():
+                # Mobile: Tighten columns, hide master category assignment to save space
+                column_config = {
+                    "master_group": None,  # Hide grouping column
+                    "sort_within_group": None,  # Hide sorting column
+                    "Category": st.column_config.TextColumn(
+                        "Category", 
+                        help="Category hierarchy",
+                        width="medium"  # Smaller width for mobile
+                    ),
+                    "Master_Category_Assignment": None,  # Hide on mobile to save space
+                    "Current_Balance": st.column_config.NumberColumn(
+                        "Balance",  # Shorter label
+                        help="Current balance in sats",
+                        format="%d",
+                        width="small"
+                    ),
+                    "This_Month_Allocation": st.column_config.NumberColumn(
+                        "This Month",  # Shorter label
+                        help="Monthly allocation (editable)",
+                        min_value=0,
+                        step=1,
+                        format="%d",
+                        width="small"
+                    ),
+                    "Spent": st.column_config.NumberColumn(
+                        "Spent", 
+                        format="%d",
+                        width="small"
+                    ),
+                    "Status": st.column_config.TextColumn("Status", width="small")
+                }
+            else:
+                # Desktop: Keep full layout
+                column_config = {
                     "master_group": None,  # Hide grouping column
                     "sort_within_group": None,  # Hide sorting column
                     "Category": st.column_config.TextColumn(
@@ -2695,7 +2738,13 @@ def main_page():
                         format="%d"
                     ),
                     "Status": st.column_config.TextColumn("Status")
-                },
+                }
+            
+            edited_df = st.data_editor(
+                display_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config=column_config,
                 key=f"unified_categories_{refresh_count}"
             )
             
@@ -2814,7 +2863,7 @@ def main_page():
 
     # === TAB 2: ACCOUNTS ===
     with tab2:
-        st.markdown("### 🏦 Account Management")
+        mobile_responsive_header("🏦 Account Management", 3)
         
         # Account Summary Metrics
         tracked_accounts = get_tracked_accounts()
@@ -2870,10 +2919,62 @@ def main_page():
                 else:
                     st.write("No unaccounted transactions this month.")
         
-        # Add New Account
+        # Add New Account (mobile-responsive)
         with st.expander("➕ Add New Account", expanded=False):
             with st.form("add_account_form"):
-                col1, col2 = st.columns(2)
+                if is_mobile_layout():
+                    # Mobile: Stack vertically for better form usability
+                    account_name = st.text_input("Account Name", placeholder="e.g., Checking, Bitcoin Savings")
+                    
+                    # Enhanced account type selection with icons
+                    account_type_options = [
+                        "checking",
+                        "savings", 
+                        "investment",
+                        "credit",
+                        "loan",
+                        "cold_storage",
+                        "lightning_node", 
+                        "hot_wallet",
+                        "other"
+                    ]
+                    
+                    # Create display options with icons
+                    account_type_display = []
+                    for acc_type in account_type_options:
+                        icon = get_account_type_icon(acc_type)
+                        account_type_display.append(f"{icon} {acc_type.title()}")
+                    
+                    selected_type_display = st.selectbox(
+                        "Account Type", 
+                        account_type_display
+                    )
+                    
+                    # Extract the actual type from selection
+                    account_type = selected_type_display.split(" ", 1)[1].lower()
+                    
+                    initial_balance = st.text_input(
+                        "Initial Balance", 
+                        placeholder="50000",
+                        help="Enter current account balance in satoshis"
+                    )
+                    
+                    # Real-time balance validation
+                    if initial_balance:
+                        is_valid, message, preview = validate_amount_input(initial_balance)
+                        if is_valid:
+                            st.success(f"{message}: {preview}")
+                        else:
+                            st.error(message)
+                    
+                    is_tracked = st.checkbox(
+                        "Tracked Account", 
+                        value=True,
+                        help="Tracked = affects budget planning | Untracked = long-term savings"
+                    )
+                else:
+                    # Desktop: Side by side
+                    col1, col2 = st.columns(2)
                 
                 with col1:
                     account_name = st.text_input("Account Name", placeholder="e.g., Checking, Bitcoin Savings")
@@ -2926,7 +3027,8 @@ def main_page():
                         help="Tracked = affects budget planning | Untracked = long-term savings"
                     )
                 
-                if st.form_submit_button("Add Account"):
+                submit_button_width = is_mobile_layout()
+                if st.form_submit_button("Add Account", use_container_width=submit_button_width):
                     if account_name and initial_balance:
                         try:
                             balance_sats = parse_amount_input(initial_balance)
@@ -2940,8 +3042,85 @@ def main_page():
                     else:
                         st.error("❌ Please fill in all required fields")
         
-        # Enhanced Account Lists with Visual Improvements
-        col1, col2 = st.columns(2)
+        # Enhanced Account Lists with Visual Improvements (mobile-responsive)
+        if is_mobile_layout():
+            # Mobile: Stack account lists vertically
+            st.markdown("#### 🟢 Tracked Accounts (On-Budget)")
+            if tracked_accounts:
+                for i, account in enumerate(tracked_accounts):
+                    # Get visual indicators
+                    type_icon = get_account_type_icon(account['account_type'])
+                    balance_text, health_status, health_color = format_account_balance_with_health(account['balance'])
+                    
+                    # Mobile-friendly account display
+                    account_info_col, balance_col = st.columns([3, 2])
+                    with account_info_col:
+                        st.markdown(f"**{type_icon} {account['name']}**")
+                        st.caption(f"{account['account_type'].replace('_', ' ').title()} • {health_status}")
+                    with balance_col:
+                        st.text(balance_text)  # Use st.text instead of markdown for normal sizing
+                    
+                    # Action buttons in 2x2 grid for mobile (more compact)
+                    btn_col1, btn_col2 = st.columns(2)
+                    with btn_col1:
+                        if st.button("📊 View", help="View Details", key=f"mobile_view_tracked_{account['id']}", use_container_width=True):
+                            st.session_state.selected_account_id = account['id']
+                            st.session_state.selected_account_name = account['name']
+                            st.rerun()
+                        if st.button("🗑️ Delete", help="Delete Account", key=f"mobile_delete_tracked_{account['id']}", use_container_width=True):
+                            if delete_account(account['id']):
+                                st.success(f"Deleted {account['name']}")
+                                st.rerun()
+                            else:
+                                st.error("Cannot delete account with transactions")
+                    with btn_col2:
+                        if st.button("✏️ Edit", help="Edit Account", key=f"mobile_edit_tracked_{account['id']}", use_container_width=True):
+                            st.session_state[f'edit_account_{account["id"]}'] = True
+                            st.rerun()
+                        st.write("")  # Empty space to align with delete button
+                    st.markdown("---")
+            else:
+                st.info("No tracked accounts yet. Add one above!")
+            
+            st.markdown("#### 🔵 Untracked Accounts (Off-Budget)")
+            if untracked_accounts:
+                for i, account in enumerate(untracked_accounts):
+                    # Get visual indicators
+                    type_icon = get_account_type_icon(account['account_type'])
+                    balance_text, health_status, health_color = format_account_balance_with_health(account['balance'])
+                    
+                    # Mobile-friendly account display
+                    account_info_col, balance_col = st.columns([3, 2])
+                    with account_info_col:
+                        st.markdown(f"**{type_icon} {account['name']}**")
+                        st.caption(f"{account['account_type'].replace('_', ' ').title()} • {health_status}")
+                    with balance_col:
+                        st.text(balance_text)  # Use st.text instead of markdown for normal sizing
+                    
+                    # Action buttons in 2x2 grid for mobile (more compact)
+                    btn_col1, btn_col2 = st.columns(2)
+                    with btn_col1:
+                        if st.button("📊 View", help="View Details", key=f"mobile_view_untracked_{account['id']}", use_container_width=True):
+                            st.session_state.selected_account_id = account['id']
+                            st.session_state.selected_account_name = account['name']
+                            st.rerun()
+                        if st.button("🗑️ Delete", help="Delete Account", key=f"mobile_delete_untracked_{account['id']}", use_container_width=True):
+                            if delete_account(account['id']):
+                                st.success(f"Deleted {account['name']}")
+                                st.rerun()
+                            else:
+                                st.error("Cannot delete account with transactions")
+                    with btn_col2:
+                        if st.button("✏️ Edit", help="Edit Account", key=f"mobile_edit_untracked_{account['id']}", use_container_width=True):
+                            st.session_state[f'edit_account_{account["id"]}'] = True
+                            st.rerun()
+                        st.write("")  # Empty space to align with delete button
+                    st.markdown("---")
+            else:
+                st.info("No untracked accounts yet. Add one above!")
+        else:
+            # Desktop: Side by side
+            col1, col2 = st.columns(2)
         
         with col1:
             st.markdown("#### 🟢 Tracked Accounts (On-Budget)")
@@ -3265,7 +3444,7 @@ def main_page():
 
     # === TAB 3: TRANSACTIONS (Combined transaction entry + recent transactions) ===
     with tab3:
-        st.markdown("### 💳 Enter Transaction")
+        mobile_responsive_header("💳 Enter Transaction", 3)
         
         # Transaction type selection outside the form so it updates dynamically
         transaction_type = st.selectbox(
@@ -3274,10 +3453,48 @@ def main_page():
             help="Select whether this is income or an expense"
         )
         
-        # Dynamic form based on transaction type
+        # Dynamic form based on transaction type (mobile-responsive)
         if transaction_type == "Income":
             with st.form("add_income_form"):
-                col1, col2 = st.columns(2)
+                if is_mobile_layout():
+                    # Mobile: Stack vertically
+                    transaction_date = st.date_input(
+                        "Date",
+                        value=datetime.now().date(),
+                        help="Date of transaction"
+                    )
+                    
+                    transaction_amount = st.text_input(
+                        "Amount",
+                        placeholder="1,000,000",
+                        help="Enter amount in satoshis"
+                    )
+                    
+                    # Real-time amount validation
+                    if transaction_amount:
+                        is_valid, message, preview = validate_amount_input(transaction_amount)
+                        if is_valid:
+                            st.success(f"{message}: {preview}")
+                        else:
+                            st.error(message)
+                    
+                    transaction_description = st.text_input(
+                        "Description",
+                        placeholder="Salary, freelance, etc.",
+                        help="Brief description of income source"
+                    )
+                    
+                    # Account selection for income
+                    accounts = get_accounts()
+                    account_options = ['None (no account)'] + [f"{acc['name']}" for acc in accounts]
+                    selected_account = st.selectbox(
+                        "Deposit to Account",
+                        options=account_options,
+                        help="Select which account receives this income"
+                    )
+                else:
+                    # Desktop: Side by side
+                    col1, col2 = st.columns(2)
                 
                 with col1:
                     transaction_date = st.date_input(
@@ -3346,7 +3563,51 @@ def main_page():
             categories = get_categories()
             if categories:
                 with st.form("add_expense_form"):
-                    col1, col2 = st.columns(2)
+                    if is_mobile_layout():
+                        # Mobile: Stack vertically
+                        transaction_date = st.date_input(
+                            "Date",
+                            value=datetime.now().date(),
+                            help="Date of transaction"
+                        )
+                        
+                        transaction_category = st.selectbox(
+                            "Category",
+                            options=[cat['name'] for cat in categories],
+                            help="Select spending category"
+                        )
+                        
+                        transaction_amount = st.text_input(
+                            "Amount",
+                            placeholder="50000",
+                            help="Enter amount in satoshis"
+                        )
+                        
+                        # Real-time amount validation
+                        if transaction_amount:
+                            is_valid, message, preview = validate_amount_input(transaction_amount)
+                            if is_valid:
+                                st.success(f"{message}: {preview}")
+                            else:
+                                st.error(message)
+                        
+                        transaction_description = st.text_input(
+                            "Description",
+                            placeholder="Coffee, groceries, etc.",
+                            help="Brief description of expense"
+                        )
+                        
+                        # Account selection for expense
+                        accounts = get_accounts()
+                        account_options = ['None (no account)'] + [f"{acc['name']}" for acc in accounts]
+                        selected_account = st.selectbox(
+                            "Pay from Account",
+                            options=account_options,
+                            help="Select which account this expense is paid from"
+                        )
+                    else:
+                        # Desktop: Side by side
+                        col1, col2 = st.columns(2)
                     
                     with col1:
                         transaction_date = st.date_input(
@@ -3432,7 +3693,7 @@ def main_page():
         st.markdown("---")
         
         # All transactions section (moved below transaction entry)
-        st.markdown("### 📋 All Transactions")
+        mobile_responsive_header("📋 All Transactions", 3)
         
         transactions = get_all_transactions()  # Get ALL transactions for editing
         
@@ -3478,11 +3739,48 @@ def main_page():
             # Display editable transactions table
             account_options = ['No Account'] + [acc['name'] for acc in all_accounts]
             
-            edited_df = st.data_editor(
-                df,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
+            # Mobile-responsive transaction table configuration
+            if is_mobile_layout():
+                # Mobile: Tighten description column, use shorter labels
+                transaction_column_config = {
+                    "ID": None,  # Hide ID column
+                    "Type": None,  # Hide type column
+                    "Original_Category_ID": None,  # Hide original category ID
+                    "Date": st.column_config.DateColumn(
+                        "Date",
+                        help="Edit date",
+                        format="MM-DD",  # Shorter date format for mobile
+                        width="small"
+                    ),
+                    "Description": st.column_config.TextColumn(
+                        "Description",
+                        help="Edit description",
+                        width="medium"  # Tighter width for mobile
+                    ),
+                    "Amount": st.column_config.NumberColumn(
+                        "Amount",  # Shorter label
+                        help="Edit amount in sats",
+                        min_value=1,
+                        step=1,
+                        format="%d",
+                        width="small"
+                    ),
+                    "Category": st.column_config.SelectboxColumn(
+                        "Category",
+                        help="Change category",
+                        options=category_options,
+                        width="small"
+                    ),
+                    "Account": st.column_config.SelectboxColumn(
+                        "Account",
+                        help="Change account",
+                        options=account_options,
+                        width="small"
+                    )
+                }
+            else:
+                # Desktop: Keep full layout
+                transaction_column_config = {
                     "ID": None,  # Hide ID column
                     "Type": None,  # Hide type column
                     "Original_Category_ID": None,  # Hide original category ID
@@ -3513,7 +3811,13 @@ def main_page():
                         help="Click to change transaction account",
                         options=account_options
                     )
-                },
+                }
+            
+            edited_df = st.data_editor(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                column_config=transaction_column_config,
                 key="transactions_editor"
             )
             
