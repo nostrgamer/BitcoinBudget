@@ -303,29 +303,45 @@ def spending_breakdown_analysis():
     
     current_month = st.session_state.current_month
     
-    # Time period selection
+    # Time period selection (mobile-responsive)
     st.markdown("### ⏰ Time Period")
-    col1, col2, col3, col4 = st.columns(4)
     
-    with col1:
-        if st.button("Current Month", use_container_width=True):
-            period_type = "current_month"
-            st.session_state.spending_period = period_type
+    # Import mobile detection function from main app
+    import streamlit as st
+    is_mobile = st.session_state.get('mobile_mode', False)
     
-    with col2:
-        if st.button("Last 3 Months", use_container_width=True):
-            period_type = "last_3_months"
-            st.session_state.spending_period = period_type
-    
-    with col3:
-        if st.button("Last 6 Months", use_container_width=True):
-            period_type = "last_6_months"
-            st.session_state.spending_period = period_type
-    
-    with col4:
-        if st.button("Last 12 Months", use_container_width=True):
-            period_type = "last_12_months"
-            st.session_state.spending_period = period_type
+    if is_mobile:
+        # Mobile: Stack in 2x2 grid
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Current Month", use_container_width=True):
+                st.session_state.spending_period = "current_month"
+            if st.button("Last 6 Months", use_container_width=True):
+                st.session_state.spending_period = "last_6_months"
+        with col2:
+            if st.button("Last 3 Months", use_container_width=True):
+                st.session_state.spending_period = "last_3_months"
+            if st.button("Last 12 Months", use_container_width=True):
+                st.session_state.spending_period = "last_12_months"
+    else:
+        # Desktop: Horizontal row
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            if st.button("Current Month", use_container_width=True):
+                st.session_state.spending_period = "current_month"
+        
+        with col2:
+            if st.button("Last 3 Months", use_container_width=True):
+                st.session_state.spending_period = "last_3_months"
+        
+        with col3:
+            if st.button("Last 6 Months", use_container_width=True):
+                st.session_state.spending_period = "last_6_months"
+        
+        with col4:
+            if st.button("Last 12 Months", use_container_width=True):
+                st.session_state.spending_period = "last_12_months"
     
     # Initialize default period
     if 'spending_period' not in st.session_state:
@@ -348,10 +364,11 @@ def spending_breakdown_analysis():
     breakdown, total_spent = get_spending_breakdown(start_date, end_date)
     
     if breakdown:
-        col1, col2 = st.columns([3, 2])
-        
-        with col1:
-            # Create pie chart
+        # Mobile-responsive chart layout
+        if is_mobile:
+            # Mobile: Stack vertically for better chart readability
+            # Create pie chart first
+            st.markdown("#### 📊 Spending Chart")
             df = pd.DataFrame(breakdown)
             
             fig = px.pie(
@@ -373,10 +390,9 @@ def spending_breakdown_analysis():
             
             fig.update_layout(height=500)
             st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            # Display breakdown table
-            st.markdown("### 📋 Category Details")
+            
+            # Then show table and metrics below on mobile
+            st.markdown("#### 📋 Category Details")
             
             table_data = []
             for item in breakdown:
@@ -389,14 +405,68 @@ def spending_breakdown_analysis():
             df_table = pd.DataFrame(table_data)
             st.dataframe(df_table, use_container_width=True, hide_index=True)
             
-            # Summary metrics
-            st.markdown("### 📊 Summary")
-            st.metric("Total Spending", format_sats(total_spent))
-            st.metric("Categories", len(breakdown))
+            # Summary metrics in mobile-friendly layout
+            st.markdown("#### 📊 Summary")
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                st.metric("Total Spending", format_sats(total_spent))
+            with col_b:
+                st.metric("Categories", len(breakdown))
+            with col_c:
+                if breakdown:
+                    top_category = max(breakdown, key=lambda x: x['amount'])
+                    st.metric("Top Category", f"{top_category['category']}")
+        else:
+            # Desktop: Side by side layout
+            col1, col2 = st.columns([3, 2])
             
-            if breakdown:
-                top_category = max(breakdown, key=lambda x: x['amount'])
-                st.metric("Top Category", f"{top_category['category']}")
+            with col1:
+                # Create pie chart
+                df = pd.DataFrame(breakdown)
+                
+                fig = px.pie(
+                    df, 
+                    values='amount', 
+                    names='category',
+                    title=f'Spending Breakdown - Total: {format_sats(total_spent)}',
+                    hover_data=['percentage'],
+                    labels={'amount': 'Amount (sats)', 'percentage': 'Percentage'}
+                )
+                
+                fig.update_traces(
+                    textposition='inside', 
+                    textinfo='percent+label',
+                    hovertemplate='<b>%{label}</b><br>' +
+                                 'Amount: %{customdata[0]:.1f}%<br>' +
+                                 'Value: %{value:,} sats<extra></extra>'
+                )
+                
+                fig.update_layout(height=500)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                # Display breakdown table
+                st.markdown("### 📋 Category Details")
+                
+                table_data = []
+                for item in breakdown:
+                    table_data.append({
+                        'Category': item['category'],
+                        'Amount': format_sats(item['amount']),
+                        'Percentage': f"{item['percentage']:.1f}%"
+                    })
+                
+                df_table = pd.DataFrame(table_data)
+                st.dataframe(df_table, use_container_width=True, hide_index=True)
+                
+                # Summary metrics
+                st.markdown("### 📊 Summary")
+                st.metric("Total Spending", format_sats(total_spent))
+                st.metric("Categories", len(breakdown))
+                
+                if breakdown:
+                    top_category = max(breakdown, key=lambda x: x['amount'])
+                    st.metric("Top Category", f"{top_category['category']}")
     else:
         st.info("No spending data found for the selected period.")
 
@@ -451,92 +521,110 @@ def future_purchasing_power_analysis():
             'Inflation Impact': f"{((future_cost/current_amount - 1) * 100):.1f}%"
         })
     
-    # Create comparison pie charts
+    # Create comparison pie charts (mobile-responsive)
     st.markdown("### 📊 Current vs Future Spending Comparison")
     
-    col1, col2 = st.columns(2)
+    # Current spending by category
+    current_category_totals = {}
+    for expense in recent_expenses[:10]:
+        category = expense[5] or 'Unknown'
+        amount = expense[4]
+        if category in current_category_totals:
+            current_category_totals[category] += amount
+        else:
+            current_category_totals[category] = amount
     
-    with col1:
-        # Current spending by category
-        current_category_totals = {}
-        for expense in recent_expenses[:10]:
-            category = expense[5] or 'Unknown'
-            amount = expense[4]
-            if category in current_category_totals:
-                current_category_totals[category] += amount
-            else:
-                current_category_totals[category] = amount
-        
+    if is_mobile:
+        # Mobile: Stack charts vertically for better readability
+        st.markdown("#### Current Spending by Category")
         fig_current = px.pie(
             values=list(current_category_totals.values()),
             names=list(current_category_totals.keys()),
             title='Current Spending by Category'
         )
         st.plotly_chart(fig_current, use_container_width=True)
-    
-    with col2:
-        # Future spending with Bitcoin appreciation effect
-        future_category_totals = {}
-        total_bitcoin_savings = 0
         
-        for expense in recent_expenses[:10]:
-            category = expense[5] or 'Unknown'
-            current_amount = expense[4]
-            
-            # What it would cost with just inflation
-            inflated_cost = current_amount * ((1 + inflation_rate) ** years_ahead)
-            
-            # What it actually costs with Bitcoin appreciation
-            future_cost, _ = calculate_future_purchasing_power(current_amount, years_ahead, inflation_rate)
-            
-            # Bitcoin savings (the difference)
-            bitcoin_savings = inflated_cost - future_cost
-            total_bitcoin_savings += bitcoin_savings
-            
-            if category in future_category_totals:
-                future_category_totals[category] += future_cost
-            else:
-                future_category_totals[category] = future_cost
+        st.markdown("#### Future Cost with Bitcoin Appreciation")
+    else:
+        # Desktop: Side by side
+        col1, col2 = st.columns(2)
         
-        # Add Bitcoin vibes as a category (naturally orange!)
-        if total_bitcoin_savings > 0:
-            future_category_totals['🟠 Bitcoin Vibes'] = total_bitcoin_savings
-        
-        # Create custom colors with orange for Bitcoin Vibes
-        colors = px.colors.qualitative.Set3
-        category_names = list(future_category_totals.keys())
-        custom_colors = []
-        for name in category_names:
-            if 'Bitcoin Vibes' in name:
-                custom_colors.append('#FF8C00')  # Orange for Bitcoin vibes, naturally!
-            else:
-                custom_colors.append(colors[len(custom_colors) % len(colors)])
-        
-        fig_future = px.pie(
-            values=list(future_category_totals.values()),
-            names=category_names,
-            title=f'Future Cost with Bitcoin Appreciation ({years_ahead} Years)',
-            color_discrete_sequence=custom_colors
-        )
-        
-        # Configure to show text through title for small slices
-        fig_future.update_traces(
-            textposition='inside', 
-            textinfo='percent+label',
-            textfont_size=10
-        )
-        fig_future.update_layout(
-            showlegend=True,
-            legend=dict(
-                orientation="v",
-                yanchor="top",
-                y=1,
-                xanchor="left",
-                x=1.01
+        with col1:
+            fig_current = px.pie(
+                values=list(current_category_totals.values()),
+                names=list(current_category_totals.keys()),
+                title='Current Spending by Category'
             )
-        )
+            st.plotly_chart(fig_current, use_container_width=True)
+    
+    # Future spending with Bitcoin appreciation effect (both mobile and desktop)
+    future_category_totals = {}
+    total_bitcoin_savings = 0
+    
+    for expense in recent_expenses[:10]:
+        category = expense[5] or 'Unknown'
+        current_amount = expense[4]
         
+        # What it would cost with just inflation
+        inflated_cost = current_amount * ((1 + inflation_rate) ** years_ahead)
+        
+        # What it actually costs with Bitcoin appreciation
+        future_cost, _ = calculate_future_purchasing_power(current_amount, years_ahead, inflation_rate)
+        
+        # Bitcoin savings (the difference)
+        bitcoin_savings = inflated_cost - future_cost
+        total_bitcoin_savings += bitcoin_savings
+        
+        if category in future_category_totals:
+            future_category_totals[category] += future_cost
+        else:
+            future_category_totals[category] = future_cost
+    
+    # Add Bitcoin vibes as a category (naturally orange!)
+    if total_bitcoin_savings > 0:
+        future_category_totals['🟠 Bitcoin Vibes'] = total_bitcoin_savings
+    
+    # Create custom colors with orange for Bitcoin Vibes
+    colors = px.colors.qualitative.Set3
+    category_names = list(future_category_totals.keys())
+    custom_colors = []
+    for name in category_names:
+        if 'Bitcoin Vibes' in name:
+            custom_colors.append('#FF8C00')  # Orange for Bitcoin vibes, naturally!
+        else:
+            custom_colors.append(colors[len(custom_colors) % len(colors)])
+    
+    fig_future = px.pie(
+        values=list(future_category_totals.values()),
+        names=category_names,
+        title=f'Future Cost with Bitcoin Appreciation ({years_ahead} Years)',
+        color_discrete_sequence=custom_colors
+    )
+    
+    # Configure to show text through title for small slices
+    fig_future.update_traces(
+        textposition='inside', 
+        textinfo='percent+label',
+        textfont_size=10
+    )
+    fig_future.update_layout(
+        showlegend=True,
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=1,
+            xanchor="left",
+            x=1.01
+        )
+    )
+    
+    if is_mobile:
+        # Mobile: Just show the chart
         st.plotly_chart(fig_future, use_container_width=True)
+    else:
+        # Desktop: Show in col2
+        with col2:
+            st.plotly_chart(fig_future, use_container_width=True)
     
     # Chart summary metrics
     total_current = sum(expense[4] for expense in recent_expenses[:10])
