@@ -86,6 +86,99 @@ def mobile_responsive_header(text, level=3):
         desktop_prefix = "#" * level
         st.markdown(f"{desktop_prefix} {text}")
 
+# === UX ENHANCEMENT FUNCTIONS ===
+
+def show_loading_spinner(message="Processing..."):
+    """Show a loading spinner with message"""
+    return st.empty().info(f"⏳ {message}")
+
+def show_success_toast(message, auto_clear=True):
+    """Show a success toast notification with Bitcoin styling"""
+    placeholder = st.empty()
+    placeholder.markdown(f"""
+        <div style="background: linear-gradient(90deg, #10b981 0%, #059669 100%); 
+             color: white; padding: 0.75rem 1rem; border-radius: 8px; margin: 0.5rem 0;
+             box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); border-left: 4px solid #047857;">
+            <strong>✅ Success!</strong> {message}
+        </div>
+    """, unsafe_allow_html=True)
+    
+    if auto_clear:
+        # Clear after 3 seconds using JavaScript
+        import time
+        time.sleep(0.1)  # Brief pause to let user see the message
+    
+    return placeholder
+
+def show_error_toast(message):
+    """Show an error toast notification with Bitcoin styling"""
+    return st.markdown(f"""
+        <div style="background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%); 
+             color: white; padding: 0.75rem 1rem; border-radius: 8px; margin: 0.5rem 0;
+             box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2); border-left: 4px solid #b91c1c;">
+            <strong>❌ Error!</strong> {message}
+        </div>
+    """, unsafe_allow_html=True)
+
+def show_warning_toast(message):
+    """Show a warning toast notification with Bitcoin styling"""
+    return st.markdown(f"""
+        <div style="background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%); 
+             color: white; padding: 0.75rem 1rem; border-radius: 8px; margin: 0.5rem 0;
+             box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2); border-left: 4px solid #b45309;">
+            <strong>⚠️ Warning!</strong> {message}
+        </div>
+    """, unsafe_allow_html=True)
+
+def show_info_toast(message):
+    """Show an info toast notification with Bitcoin styling"""
+    return st.markdown(f"""
+        <div style="background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%); 
+             color: white; padding: 0.75rem 1rem; border-radius: 8px; margin: 0.5rem 0;
+             box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2); border-left: 4px solid #1d4ed8;">
+            <strong>ℹ️ Info:</strong> {message}
+        </div>
+    """, unsafe_allow_html=True)
+
+def show_bitcoin_toast(message, toast_type="success"):
+    """Show a Bitcoin-themed toast notification"""
+    colors = {
+        "success": {"bg": "#10b981", "border": "#047857", "icon": "✅"},
+        "error": {"bg": "#ef4444", "border": "#b91c1c", "icon": "❌"},
+        "warning": {"bg": "#f7931a", "border": "#d97706", "icon": "⚠️"},  # Bitcoin orange
+        "info": {"bg": "#3b82f6", "border": "#1d4ed8", "icon": "ℹ️"}
+    }
+    
+    color = colors.get(toast_type, colors["success"])
+    
+    return st.markdown(f"""
+        <div style="background: {color['bg']}; color: white; padding: 0.75rem 1rem; 
+             border-radius: 8px; margin: 0.5rem 0; border-left: 4px solid {color['border']};
+             box-shadow: 0 4px 6px rgba(247, 147, 26, 0.2);">
+            <strong>{color['icon']} {message}</strong>
+        </div>
+    """, unsafe_allow_html=True)
+
+def with_loading_state(operation_func, loading_message="Processing...", *args, **kwargs):
+    """Execute a function with loading state management"""
+    # Show loading spinner
+    loading_placeholder = st.empty()
+    loading_placeholder.info(f"⏳ {loading_message}")
+    
+    try:
+        # Execute the operation
+        result = operation_func(*args, **kwargs)
+        
+        # Clear loading state
+        loading_placeholder.empty()
+        
+        return result
+    except Exception as e:
+        # Clear loading state and show error
+        loading_placeholder.empty()
+        show_error_toast(f"Operation failed: {str(e)}")
+        return None
+
 # === PHASE 1: ENHANCED SESSION PERSISTENCE + EXPORT/IMPORT ===
 
 import json
@@ -2348,13 +2441,19 @@ def main_page():
                     new_master_category = st.text_input("Master Category Name", placeholder="e.g., Fixed Expenses, Variable Expenses, Savings")
                     if st.form_submit_button("Add Master Category", use_container_width=True):
                         if new_master_category:
+                            # Show loading state
+                            loading_placeholder = st.empty()
+                            loading_placeholder.info("⏳ Creating master category...")
+                            
                             if add_master_category(new_master_category):
-                                st.success(f"✅ Added master category: {new_master_category}")
+                                loading_placeholder.empty()
+                                show_bitcoin_toast(f"Added master category: {new_master_category}", "success")
                                 st.rerun()
                             else:
-                                st.error("❌ Master category name already exists")
+                                loading_placeholder.empty()
+                                show_bitcoin_toast("Master category name already exists", "warning")
                         else:
-                            st.error("❌ Please enter a master category name")
+                            show_bitcoin_toast("Please enter a master category name", "warning")
             
             with st.expander("➕ Add Category", expanded=False):
                 with st.form("mobile_add_category_form"):
@@ -2367,6 +2466,10 @@ def main_page():
                     
                     if st.form_submit_button("Add Category", use_container_width=True):
                         if new_category:
+                            # Show loading state
+                            loading_placeholder = st.empty()
+                            loading_placeholder.info("⏳ Creating category...")
+                            
                             if add_category(new_category):
                                 # Assign to master category if selected
                                 if selected_master != 'None':
@@ -2387,12 +2490,14 @@ def main_page():
                                         if category_id:
                                             assign_category_to_master(category_id, master_id)
                                 
-                                st.success(f"✅ Added category: {new_category}")
+                                loading_placeholder.empty()
+                                show_bitcoin_toast(f"Added category: {new_category}", "success")
                                 st.rerun()
                             else:
-                                st.error("❌ Category name already exists")
+                                loading_placeholder.empty()
+                                show_bitcoin_toast("Category name already exists", "warning")
                         else:
-                            st.error("❌ Please enter a category name")
+                            show_bitcoin_toast("Please enter a category name", "warning")
         else:
             # Desktop: Side by side
             col1, col2 = st.columns(2)
@@ -2403,13 +2508,19 @@ def main_page():
                     new_master_category = st.text_input("Master Category Name", placeholder="e.g., Fixed Expenses, Variable Expenses, Savings")
                     if st.form_submit_button("Add Master Category"):
                         if new_master_category:
+                            # Show loading state
+                            loading_placeholder = st.empty()
+                            loading_placeholder.info("⏳ Creating master category...")
+                            
                             if add_master_category(new_master_category):
-                                st.success(f"✅ Added master category: {new_master_category}")
+                                loading_placeholder.empty()
+                                show_bitcoin_toast(f"Added master category: {new_master_category}", "success")
                                 st.rerun()
                             else:
-                                st.error("❌ Master category name already exists")
+                                loading_placeholder.empty()
+                                show_bitcoin_toast("Master category name already exists", "warning")
                         else:
-                            st.error("❌ Please enter a master category name")
+                            show_bitcoin_toast("Please enter a master category name", "warning")
         
         with col2:
             with st.expander("➕ Add Category", expanded=False):
@@ -2423,6 +2534,10 @@ def main_page():
                     
                     if st.form_submit_button("Add Category"):
                         if new_category:
+                            # Show loading state
+                            loading_placeholder = st.empty()
+                            loading_placeholder.info("⏳ Creating category...")
+                            
                             if add_category(new_category):
                                 # Assign to master category if selected
                                 if selected_master != 'None':
@@ -2443,12 +2558,14 @@ def main_page():
                                         if category_id:
                                             assign_category_to_master(category_id, master_id)
                                 
-                                st.success(f"✅ Added category: {new_category}")
+                                loading_placeholder.empty()
+                                show_bitcoin_toast(f"Added category: {new_category}", "success")
                                 st.rerun()
                             else:
-                                st.error("❌ Category name already exists")
+                                loading_placeholder.empty()
+                                show_bitcoin_toast("Category name already exists", "warning")
                         else:
-                            st.error("❌ Please enter a category name")
+                            show_bitcoin_toast("Please enter a category name", "warning")
 
         st.markdown("---")
 
@@ -3024,17 +3141,25 @@ def main_page():
                 submit_button_width = is_mobile_layout()
                 if st.form_submit_button("Add Account", use_container_width=submit_button_width):
                     if account_name and initial_balance:
+                        # Show loading state
+                        loading_placeholder = st.empty()
+                        loading_placeholder.info("⏳ Creating account...")
+                        
                         try:
                             balance_sats = parse_amount_input(initial_balance)
                             if add_account(account_name, balance_sats, is_tracked, account_type):
-                                st.success(f"✅ Added account: {account_name}")
+                                loading_placeholder.empty()
+                                account_status = "tracked" if is_tracked else "untracked"
+                                show_bitcoin_toast(f"Added {account_status} account: {account_name}", "success")
                                 st.rerun()
                             else:
-                                st.error("❌ Account name already exists")
+                                loading_placeholder.empty()
+                                show_bitcoin_toast("Account name already exists", "warning")
                         except ValueError as e:
-                            st.error(f"❌ {str(e)}")
+                            loading_placeholder.empty()
+                            show_bitcoin_toast(f"Invalid balance: {str(e)}", "error")
                     else:
-                        st.error("❌ Please fill in all required fields")
+                        show_bitcoin_toast("Please fill in all required fields", "warning")
         
         # Enhanced Account Lists with Visual Improvements (mobile-responsive)
         if is_mobile_layout():
@@ -3063,10 +3188,10 @@ def main_page():
                             st.rerun()
                         if st.button("🗑️ Delete", help="Delete Account", key=f"mobile_delete_tracked_{account['id']}", use_container_width=True):
                             if delete_account(account['id']):
-                                st.success(f"Deleted {account['name']}")
+                                show_bitcoin_toast(f"Deleted account: {account['name']}", "success")
                                 st.rerun()
                             else:
-                                st.error("Cannot delete account with transactions")
+                                show_bitcoin_toast("Cannot delete account with transactions", "warning")
                     with btn_col2:
                         if st.button("✏️ Edit", help="Edit Account", key=f"mobile_edit_tracked_{account['id']}", use_container_width=True):
                             st.session_state[f'edit_account_{account["id"]}'] = True
@@ -3100,10 +3225,10 @@ def main_page():
                             st.rerun()
                         if st.button("🗑️ Delete", help="Delete Account", key=f"mobile_delete_untracked_{account['id']}", use_container_width=True):
                             if delete_account(account['id']):
-                                st.success(f"Deleted {account['name']}")
+                                show_bitcoin_toast(f"Deleted account: {account['name']}", "success")
                                 st.rerun()
                             else:
-                                st.error("Cannot delete account with transactions")
+                                show_bitcoin_toast("Cannot delete account with transactions", "warning")
                     with btn_col2:
                         if st.button("✏️ Edit", help="Edit Account", key=f"mobile_edit_untracked_{account['id']}", use_container_width=True):
                             st.session_state[f'edit_account_{account["id"]}'] = True
@@ -3147,10 +3272,10 @@ def main_page():
                         
                         if st.button("🗑️ Delete", help="Delete Account", key=f"delete_tracked_{account['id']}"):
                             if delete_account(account['id']):
-                                st.success(f"Deleted {account['name']}")
+                                show_bitcoin_toast(f"Deleted account: {account['name']}", "success")
                                 st.rerun()
                             else:
-                                st.error("Cannot delete account with transactions")
+                                show_bitcoin_toast("Cannot delete account with transactions", "warning")
                     
 
             else:
@@ -3187,10 +3312,10 @@ def main_page():
                         
                         if st.button("🗑️ Delete", help="Delete Account", key=f"delete_untracked_{account['id']}"):
                             if delete_account(account['id']):
-                                st.success(f"Deleted {account['name']}")
+                                show_bitcoin_toast(f"Deleted account: {account['name']}", "success")
                                 st.rerun()
                             else:
-                                st.error("Cannot delete account with transactions")
+                                show_bitcoin_toast("Cannot delete account with transactions", "warning")
                     
 
             else:
@@ -3532,6 +3657,10 @@ def main_page():
                 
                 if submitted:
                     if transaction_amount and transaction_description:
+                        # Show loading state
+                        loading_placeholder = st.empty()
+                        loading_placeholder.info("⏳ Adding income...")
+                        
                         try:
                             amount_sats = parse_amount_input(transaction_amount)
                             
@@ -3543,15 +3672,19 @@ def main_page():
                                         account_id = acc['id']
                                         break
                             
+                            # Clear loading state
+                            loading_placeholder.empty()
+                            
                             if add_income(amount_sats, transaction_description, str(transaction_date), account_id):
-                                st.success(f"✅ Added income: {format_sats(amount_sats)} - {transaction_description}")
+                                show_bitcoin_toast(f"Added income: {format_sats(amount_sats)} - {transaction_description}", "success")
                                 st.rerun()
                             else:
-                                st.error("❌ Failed to add income")
+                                show_bitcoin_toast("Failed to add income. Please try again.", "error")
                         except ValueError as e:
-                            st.error(f"❌ {str(e)}")
+                            loading_placeholder.empty()
+                            show_bitcoin_toast(f"Invalid amount: {str(e)}", "error")
                     else:
-                        st.error("❌ Please fill in all required fields")
+                        show_bitcoin_toast("Please fill in all required fields", "warning")
         
         else:  # Expense
             categories = get_categories()
@@ -3651,6 +3784,10 @@ def main_page():
                     
                     if submitted:
                         if transaction_amount and transaction_description:
+                            # Show loading state
+                            loading_placeholder = st.empty()
+                            loading_placeholder.info("⏳ Adding expense...")
+                            
                             try:
                                 amount_sats = parse_amount_input(transaction_amount)
                                 
@@ -3669,16 +3806,20 @@ def main_page():
                                             account_id = acc['id']
                                             break
                                 
+                                # Clear loading state
+                                loading_placeholder.empty()
+                                
                                 if category_id:
                                     if add_expense(amount_sats, transaction_description, category_id, str(transaction_date), account_id):
-                                        st.success(f"✅ Added expense: {format_sats(amount_sats)} - {transaction_description}")
+                                        show_bitcoin_toast(f"Added expense: {format_sats(amount_sats)} - {transaction_description}", "success")
                                         st.rerun()
                                     else:
-                                        st.error("❌ Failed to add expense")
+                                        show_bitcoin_toast("Failed to add expense. Please try again.", "error")
                             except ValueError as e:
-                                st.error(f"❌ {str(e)}")
+                                loading_placeholder.empty()
+                                show_bitcoin_toast(f"Invalid amount: {str(e)}", "error")
                         else:
-                            st.error("❌ Please fill in all required fields")
+                            show_bitcoin_toast("Please fill in all required fields", "warning")
             else:
                 st.warning("⚠️ Add categories first before recording expenses.")
                 st.info("👆 Go to the Categories tab to add your first spending category.")
